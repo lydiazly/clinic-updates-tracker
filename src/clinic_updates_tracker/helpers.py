@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 # src/clinic_updates_tracker/helpers.py
-from bs4 import BeautifulSoup, Tag, NavigableString
+from bs4 import BeautifulSoup
 import argparse
+from datetime import datetime, timedelta
+from dateutil import parser
 import logging
 import re
 import sys
 from urllib.parse import urlencode
 
-from . import target_base_url, default_city, browser_choices
+from . import TARGET_BASE_URL, DEFAULT_CITY, DAYS_SINCE_LAST, MAX_N_ITEMS, BROWSER_CHOICES
 
 
-def get_full_url(base_url: str, delim: str = '?', sub: dict|str = {}) -> str:
+def get_full_url(base_url: str, delim: str = '?', sub: dict | str = {}) -> str:
     """Appends `sub` (a query dict or a subdirectory string) to the base URL:
     {base_url}?arg1=val1&... or {base_url}/..."""
     if delim == '?' and isinstance(sub, dict):  # query
@@ -45,26 +47,40 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
     """Gets options from user and sets the logger."""
 
     parser = argparse.ArgumentParser(
-        description=f"Check updates on {target_base_url}"
+        description=f"Check updates on {TARGET_BASE_URL}"
     )
     parser.add_argument(
-        "city", type=str, nargs="?", default=default_city, help="town/city (default: %(default)s)"
+        "city", type=str, nargs="?",
+        default=DEFAULT_CITY,
+        help="town/city (default: %(default)s)"
     )
     parser.add_argument(
-        "-a", "--all", action="store_true", help="all updates (only affects the clinic table but not the update list)"
+        "--days", type=int, nargs="?", metavar='N',
+        default=DAYS_SINCE_LAST,
+        help="only show items within N days (default: %(default)s)"
     )
     parser.add_argument(
-        "-H", "--headed", action="store_true", help="run in headed mode (default: headless)"
+        "-n", "--nmax", type=int, nargs="?", metavar='N',
+        default=MAX_N_ITEMS,
+        help="show first N items (default: %(default)s)"
+    )
+    parser.add_argument(
+        "-a", "--all", action="store_true",
+        help="all updates (only affects the clinic table but not the update list)"
+    )
+    parser.add_argument(
+        "-H", "--headed", action="store_true",
+        help="run in headed mode (default: headless)"
     )
     parser.add_argument(
         "-d", "--debug", action="store_true", help="print debug logs"
     )
     parser.add_argument(
         "-b", "--browser",
-        choices=browser_choices,
+        choices=BROWSER_CHOICES,
         default="chromium",
         metavar="<browser>",
-        help=f"choose a browser: {', '.join(browser_choices)} (default: %(default)s)"
+        help=f"choose a browser: {', '.join(BROWSER_CHOICES)} (default: %(default)s)"
     )
     parser.add_argument(
         "--headless-shell",
@@ -80,14 +96,14 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
     args = parser.parse_args()
 
     # Append a subdirectory or query
-    # {target_base_url}?... or {target_base_url}/...
-    target_url = (target_base_url + "?"
+    # {TARGET_BASE_URL}?... or {TARGET_BASE_URL}/...
+    target_url = (TARGET_BASE_URL + "?"
                 + ("" if args.all else "only_accepting=yes&")
                 + "list_town=" + args.city
     )
     # Note: 'only_accepting' only affects the clinic table but not the update list
     query_dict = ({'only_accepting': 'yes'} if not args.all else {}) | {'list_town': args.city}
-    target_url = get_full_url(target_base_url, '?', query_dict)
+    target_url = get_full_url(TARGET_BASE_URL, '?', query_dict)
 
     logger = setup_logger('' if args.debug else __name__)
 
@@ -104,22 +120,40 @@ def preserve_tags(element) -> str:
     return text
 
 
-def remove_node(node):
-    """Removes either a NavigableString or a Tag."""
-    if isinstance(node, NavigableString):
-        node.extract()  # remove text node
-    elif isinstance(node, Tag):
-        node.decompose()  # remove HTML tag
-
-
-def extract_detail_content(content: str) -> tuple[str, str, str]:
+def clear_content(content: str) -> str:
     """Clears content."""
     soup = BeautifulSoup(content, 'html.parser')
-
-    cleared_content = " ".join(map(preserve_tags, soup))
-    cleared_content = re.sub(r"(<p>\s*</p>)+", "", cleared_content)  # remove any '<p></p>'
-    cleared_content = re.sub(r"\s*<p>\s*|\s*</p>\s*", "<br />", cleared_content)  # '<p>...</p>' --> '<br />...<br />'
-    cleared_content = re.sub(r"(\s*<br\s*/?>\s*)+", "<br />", cleared_content)  # multiple <br /> --> <br />
-    cleared_content = re.sub(r'^<br />|<br />$', '', cleared_content)  # remove leading and trailing <br/>
-
+    cleared_content = "\n".join(s.strip() for s in map(preserve_tags, soup) if s.strip())
+    cleared_content = re.sub(r"(<p>\s*</p>)+", "", cleared_content)  # remove any empty '<p></p>'
+    # cleared_content = re.sub(r"[ \t]*<p>|</p>[ \t]*", "<br>", cleared_content)  # '<p>...</p>' --> '<br>...<br>'
+    cleared_content = re.sub(r"([ \t]*<br\s*/?>[ \t]*)+", "<br>", cleared_content)  # multiple <br> or <br /> --> <br>
+    cleared_content = re.sub(r'^[ \t]*(<br\s*/?>)+|(<br\s*/?>)+[ \t]*$', '', cleared_content)  # remove leading and trailing <br> or <br />
     return cleared_content
+
+
+def is_date_within_n_days(date_str: str, ref_time: float, n_days: int) -> tuple[bool, str, bool]:
+    """Checks if a given date string in any format is within n days before the reference time."""
+    if not date_str:
+        return False, "Error parsing date: date string is empty.", False
+
+    try:
+        # Parse the date string using dateutil.parser (handles many formats)
+        parsed_date = parser.parse(date_str)
+        # Convert ref_time to datetime object
+        ref_datetime = datetime.fromtimestamp(ref_time)
+        ref_date_str = ref_datetime.strftime('%B %d, %Y')
+        # Calculate the earliest date (n days before ref_datetime)
+        min_datetime = ref_datetime - timedelta(days=n_days)
+        # Check if parsed_date is within the range (between min_datetime and ref_datetime)
+        is_within = min_datetime <= parsed_date <= ref_datetime
+        return (
+            True,
+            (
+                f"{date_str} is within {n_days} days before {ref_date_str}, collect." if is_within
+                else f"{date_str} is {n_days} days earlier than {ref_date_str}, return."
+            ),
+            is_within,
+        )
+
+    except (ValueError, TypeError) as e:
+        return False, f"Error parsing date '{date_str}': {e}", False

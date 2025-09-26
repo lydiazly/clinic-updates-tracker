@@ -1,22 +1,31 @@
 # src/clinic_updates_tracker/__init__.py
 from dotenv import load_dotenv
 import os
-from pathlib import Path
+# from pathlib import Path
 
 load_dotenv()
 
-local_directory: str = os.environ.get(
-    "XDG_DATA_HOME", os.path.join(Path.home(), ".local/share")
-)
-os.makedirs(local_directory, exist_ok=True)
+# local_directory: str = os.environ.get(
+#     "XDG_DATA_HOME", os.path.join(Path.home(), ".local/share")
+# )
+# os.makedirs(local_directory, exist_ok=True)
 
-last_run_at_file_name: str = os.path.join(local_directory, "clinic_updates_lastrun.txt")
-last_run_at_absolute_path: str = os.path.abspath(
-    os.path.join(Path.home(), last_run_at_file_name)
-)
+# LAST_RUN_AT_FILE_NAME: str = os.path.join(local_directory, "clinic_updates_lastrun.txt")
+# LAST_RUN_AT_ABSOLUTE_PATH: str = os.path.abspath(
+#     os.path.join(Path.home(), LAST_RUN_AT_FILE_NAME)
+# )
 
-target_base_url: str = os.getenv('TARGET_BASE_URL')
-default_city: str = os.getenv('DEFAULT_CITY')
+HTML_FILE_NAME: str = "./tmp_content.html"
 
+TARGET_BASE_URL: str = os.getenv('TARGET_BASE_URL')
+DEFAULT_CITY: str = os.getenv('DEFAULT_CITY')
 
-browser_choices = ["chromium", "firefox", "webkit"]
+DAYS_SINCE_LAST: int = int(os.getenv('DAYS_SINCE_LAST'))
+if DAYS_SINCE_LAST is None:
+    DAYS_SINCE_LAST = 30  # default: 1 month
+
+MAX_N_ITEMS: int = int(os.getenv('MAX_N_ITEMS'))
+if MAX_N_ITEMS is None:
+    MAX_N_ITEMS = 10  # default: 10 items
+
+BROWSER_CHOICES = ["chromium", "firefox", "webkit"]

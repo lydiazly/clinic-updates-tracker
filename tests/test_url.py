@@ -3,7 +3,7 @@
 # pytest tests/test_url.py --browser-channel chromium
 import pytest
 from playwright.sync_api import Page, expect
-from src.clinic_updates_tracker import target_base_url
+from src.clinic_updates_tracker import TARGET_BASE_URL
 from src.clinic_updates_tracker.helpers import get_full_url
 
 
@@ -19,7 +19,7 @@ def test_get_full_url(full_url, full_url_expected):
 
 
 @pytest.mark.parametrize("url, text_expected", [
-    [get_full_url(target_base_url, '?', {'list_town': 'some_city'}), "Updates regarding some_city"],
+    [get_full_url(TARGET_BASE_URL, '?', {'list_town': 'some_city'}), "Updates regarding some_city"],
 ])
 def test_url(page: Page, url, text_expected):
     """Tests URL."""

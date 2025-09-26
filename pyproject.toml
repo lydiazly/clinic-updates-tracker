@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "clinic_updates_tracker"
+version = "0.1.0"
+authors = [
+  { name = "Lydia Zhang", email = "lydiazly2@gmail.com" },
+]
+description = "Fetches updates on a target public service platform."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+dependencies = [
+    "beautifulsoup4>=4.13.5",
+    "pytest>=8.4.2",
+    "pytest-playwright>=0.7.1",
+    "python-dateutil",
+    "python-dotenv",
+]
+
+[project.scripts]
+clinic-updates-tracker = "clinic_updates_tracker.__main__:main"
+
+[project.urls]
+"Homepage" = "https://github.com/lydiazly/clinic-updates-tracker"
+"Bug Tracker" = "https://github.com/lydiazly/clinic-updates-tracker/issues"

@@ -1,0 +1,115 @@
+# This workflow will install Python dependencies and run a script then notify the user about the result
+# [Actions secrets] GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER(same as receiver)
+# [Actions variables] CITY, DAYS_SINCE_LAST, MAX_N_ITEMS
+
+name: Run and and Notify
+
+on:
+  # 15:00 AM UTC every day
+  schedule:
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Test mode (force email sending)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  run-task:
+
+    runs-on: ubuntu-latest
+
+    env:
+      TEST_MODE: ${{ github.event.inputs.test_mode || 'false' }}  # read from inputs
+      HTML_NAME: ./tmp_content.html
+
+    steps:
+      - name: Update
+        run: |
+          sudo apt-get update
+
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python3 --version
+          python3 -m pip install --upgrade pip
+          python3 -m pip install --user -r requirements.txt
+
+      - name: Install chromium headless shell
+        run: |
+          python3 -m playwright install --with-deps --only-shell chromium
+
+      - name: Install clinic_updates_tracker
+        run: |
+          python3 -m pip install --user .
+
+      #TODO: The script should return a HTML doc or object, e.g., a string named `content`.
+      # But the output of this script includes verbose message for showing the process, which should not be in the `content`
+      - name: Run script and save to
+        run: |
+          clinic_updates_tracker --headless-shell \
+          --days ${{ env.TEST_MODE && 90 || vars.DAYS_SINCE_LAST }} \
+          --nmax ${{ env.TEST_MODE && 10 || vars.MAX_N_ITEMS }} \
+          ${{ vars.CITY }}
+
+      - name: Read HTML content
+        id: read_html
+        run: |
+          if [ -s "${{ env.HTML_NAME }}" ]; then
+            # Read the HTML file and set it as output, escaping newlines
+            content=$(cat ${{ env.HTML_NAME }} | tr '\n' ' ')
+            echo "content=$content" >> $GITHUB_OUTPUT
+          else
+            echo "content=<p>No updates in ${{ vars.CITY }} in the past ${{ vars.DAYS_SINCE_LAST }} days.</p>" >> $GITHUB_OUTPUT
+          fi
+
+      #TODO: Include the `content` obtained from the previous step in an email and send to user
+      - name: Send email via Gmail API
+        run: |
+          echo "> Requesting Gmail access token..."
+          access_token=$(curl -s \
+            -d client_id="${{ secrets.GMAIL_CLIENT_ID }}" \
+            -d client_secret="${{ secrets.GMAIL_CLIENT_SECRET }}" \
+            -d refresh_token="${{ secrets.GMAIL_REFRESH_TOKEN }}" \
+            -d grant_type=refresh_token \
+            https://oauth2.googleapis.com/token | jq -r .access_token)
+
+          if [ "$access_token" = "null" ] || [ -z "$access_token" ]; then
+            echo "x Failed to get access token"
+            exit 1
+          fi
+
+          recipients="${{ secrets.GMAIL_SENDER }}"
+          repo="${{ github.repository }}"
+          is_test="${{ env.TEST_MODE }}"
+
+          subject_prefix=""
+          [ "$is_test" = "true" ] && subject_prefix=" [TEST]"
+          subject_encoded=$(echo -n "${subject_prefix} Clinic Updates" | base64)
+          subject="=?UTF-8?B?$subject_encoded?="
+
+          body="<body>"
+          body+="${{ steps.read_html.outputs.content }}"
+          body+="<br><hr><p style=\"color:gray\">You are receiving this email because a scheduled workflow <code>run-task</code> is enabled in <strong>${repo}</strong>.</p>"
+          body+="<br>Sent by GitHub Actions. Please do not reply directly.</p>"
+          body+="</body>"
+
+          raw_message=$(printf "From: Lydia Zhang - GitHub Actions <${{ secrets.GMAIL_SENDER }}>\nTo: ${recipients}\nSubject: ${subject}\nContent-Type: text/html; charset=UTF-8\n\n%s" "$body" | base64 | tr -d '\n')
+
+          echo "> Sending to: $recipients"
+          curl -s -X POST \
+            -H "Authorization: Bearer $access_token" \
+            -H "Content-Type: application/json" \
+            -d "{\"raw\": \"$raw_message\"}" \
+            https://gmail.googleapis.com/gmail/v1/users/me/messages/send
