@@ -2,7 +2,7 @@
 # [Actions secrets] GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER(same as receiver)
 # [Actions variables] CITY, DAYS_SINCE_LAST, MAX_N_ITEMS
 
-name: Run and and Notify
+name: Run and Notify
 
 on:
   # 15:00 AM UTC every day
@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       test_mode:
-        description: 'Test mode (force email sending)'
+        description: 'Test mode (10 items, 3 months)'
         required: false
         type: boolean
         default: false
@@ -26,6 +26,8 @@ jobs:
 
     env:
       TEST_MODE: ${{ github.event.inputs.test_mode || 'false' }}  # read from inputs
+      DAYS_SINCE_LAST: ${{ github.event.inputs.test_mode && 90 || vars.DAYS_SINCE_LAST }}
+      MAX_N_ITEMS: ${{ github.event.inputs.test_mode && 10 || vars.MAX_N_ITEMS }}
       HTML_NAME: ./tmp_content.html
 
     steps:
@@ -54,13 +56,10 @@ jobs:
         run: |
           python3 -m pip install --user .
 
-      #TODO: The script should return a HTML doc or object, e.g., a string named `content`.
-      # But the output of this script includes verbose message for showing the process, which should not be in the `content`
       - name: Run script and save to
         run: |
           clinic_updates_tracker --headless-shell \
-          --days ${{ env.TEST_MODE && 90 || vars.DAYS_SINCE_LAST }} \
-          --nmax ${{ env.TEST_MODE && 10 || vars.MAX_N_ITEMS }} \
+          --days ${{ env.DAYS_SINCE_LAST }} --nmax ${{ env.MAX_N_ITEMS }} \
           ${{ vars.CITY }}
 
       - name: Read HTML content
@@ -70,12 +69,14 @@ jobs:
             # Read the HTML file and set it as output, escaping newlines
             content=$(cat ${{ env.HTML_NAME }} | tr '\n' ' ')
             echo "content=$content" >> $GITHUB_OUTPUT
+            echo "hasUpdates='true'" >> $GITHUB_OUTPUT
           else
-            echo "content=<p>No updates in ${{ vars.CITY }} in the past ${{ vars.DAYS_SINCE_LAST }} days.</p>" >> $GITHUB_OUTPUT
+            echo "No updates in ${{ vars.CITY }} in the past ${{ env.DAYS_SINCE_LAST }} days. Nothing to do."
+            echo "hasUpdates='false'" >> $GITHUB_OUTPUT
           fi
 
-      #TODO: Include the `content` obtained from the previous step in an email and send to user
       - name: Send email via Gmail API
+        if: env.TEST_MODE || steps.read_html.outputs.hasUpdates == 'true'
         run: |
           echo "> Requesting Gmail access token..."
           access_token=$(curl -s \
