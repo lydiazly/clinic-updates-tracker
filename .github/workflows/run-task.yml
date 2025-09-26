@@ -58,7 +58,7 @@ jobs:
 
       - name: Run script and save to
         run: |
-          clinic_updates_tracker --headless-shell \
+          clinic-updates-tracker --headless-shell \
           --days ${{ env.DAYS_SINCE_LAST }} --nmax ${{ env.MAX_N_ITEMS }} \
           ${{ vars.CITY }}
 
