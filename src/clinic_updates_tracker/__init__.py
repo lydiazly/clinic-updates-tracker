@@ -17,15 +17,12 @@ load_dotenv()
 
 HTML_FILE_NAME: str = "./tmp_content.html"
 
-TARGET_BASE_URL: str = os.getenv('TARGET_BASE_URL')
-DEFAULT_CITY: str = os.getenv('DEFAULT_CITY')
+TARGET_BASE_URL: str = os.getenv('TARGET_BASE_URL') or ''
 
-DAYS_SINCE_LAST: int = int(os.getenv('DAYS_SINCE_LAST'))
-if DAYS_SINCE_LAST is None:
-    DAYS_SINCE_LAST = 30  # default: 1 month
+DEFAULT_CITY: str = os.getenv('DEFAULT_CITY') or 'Unknown'
 
-MAX_N_ITEMS: int = int(os.getenv('MAX_N_ITEMS'))
-if MAX_N_ITEMS is None:
-    MAX_N_ITEMS = 10  # default: 10 items
+DAYS_SINCE_LAST: int = int(os.getenv('DAYS_SINCE_LAST')) or 30  # default: 1 month
+
+MAX_N_ITEMS: int = int(os.getenv('MAX_N_ITEMS')) or 10  # default: 10 items
 
 BROWSER_CHOICES = ["chromium", "firefox", "webkit"]

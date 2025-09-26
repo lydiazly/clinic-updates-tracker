@@ -6,6 +6,10 @@ from .core import run
 def main():
     """Gets options, runs program, cleans up on exception."""
     args, logger, target_url = get_options()
+    if not args.url:
+        print("Error: URL not given.", file=sys.stderr)
+        sys.exit(1)
+
     success = run(args, logger, target_url)
     if success:
         print("Done!", file=sys.stderr)

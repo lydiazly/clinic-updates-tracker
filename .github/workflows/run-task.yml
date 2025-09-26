@@ -1,6 +1,6 @@
 # This workflow will install Python dependencies and run a script then notify the user about the result
 # [Actions secrets] GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER(same as receiver)
-# [Actions variables] CITY, DAYS_SINCE_LAST, MAX_N_ITEMS
+# [Actions variables] TARGET_BASE_URL, CITY, DAYS_SINCE_LAST, MAX_N_ITEMS
 
 name: Run and Notify
 
@@ -59,7 +59,9 @@ jobs:
       - name: Run script and save to
         run: |
           clinic-updates-tracker --headless-shell \
-          --days ${{ env.DAYS_SINCE_LAST }} --nmax ${{ env.MAX_N_ITEMS }} \
+          --url ${{ vars.TARGET_BASE_URL }} \
+          --days ${{ env.DAYS_SINCE_LAST }} \
+          --nmax ${{ env.MAX_N_ITEMS }} \
           ${{ vars.CITY }}
 
       - name: Read HTML content

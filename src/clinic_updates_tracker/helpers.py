@@ -47,12 +47,17 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
     """Gets options from user and sets the logger."""
 
     parser = argparse.ArgumentParser(
-        description=f"Check updates on {TARGET_BASE_URL}"
+        description="Check updates on target URL."
     )
     parser.add_argument(
         "city", type=str, nargs="?",
         default=DEFAULT_CITY,
         help="town/city (default: %(default)s)"
+    )
+    parser.add_argument(
+        "--url", type=str, nargs="?",
+        default=TARGET_BASE_URL,
+        help="URL (default: %(default)s)"
     )
     parser.add_argument(
         "--days", type=int, nargs="?", metavar='N',
@@ -95,15 +100,9 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
     )
     args = parser.parse_args()
 
-    # Append a subdirectory or query
-    # {TARGET_BASE_URL}?... or {TARGET_BASE_URL}/...
-    target_url = (TARGET_BASE_URL + "?"
-                + ("" if args.all else "only_accepting=yes&")
-                + "list_town=" + args.city
-    )
-    # Note: 'only_accepting' only affects the clinic table but not the update list
+    # Note: argument 'only_accepting' only affects the clinic table but not the update list
     query_dict = ({'only_accepting': 'yes'} if not args.all else {}) | {'list_town': args.city}
-    target_url = get_full_url(TARGET_BASE_URL, '?', query_dict)
+    target_url = get_full_url(args.url, '?', query_dict)
 
     logger = setup_logger('' if args.debug else __name__)
 
