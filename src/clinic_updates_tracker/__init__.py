@@ -21,7 +21,7 @@ TARGET_BASE_URL: str = os.getenv('TARGET_BASE_URL') or ''
 
 DEFAULT_CITY: str = os.getenv('DEFAULT_CITY') or 'Unknown'
 
-DAYS_SINCE_LAST: int = int(os.getenv('DAYS_SINCE_LAST')) or 30  # default: 1 month
+DAYS_SINCE: int = int(os.getenv('DAYS_SINCE')) or 30  # default: 1 month
 
 MAX_N_ITEMS: int = int(os.getenv('MAX_N_ITEMS')) or 10  # default: 10 items
 

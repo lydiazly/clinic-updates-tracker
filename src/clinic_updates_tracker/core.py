@@ -48,12 +48,14 @@ def navigate_to_page(page: Page, url: str) -> tuple[bool, str]:
         return True, ''
 
 
-def get_update_list(page: Page, url: str, n_days: int, nmax: int, logger: logging.Logger) -> tuple[bool, str, list[dict] | None]:
+def get_update_list(
+    page: Page, url: str, n_days: int, nmax: int, logger: logging.Logger, quiet: bool = False
+) -> tuple[bool, str, list[dict] | None]:
     """Navigates to the page and finds the update list."""
     success, msg = navigate_to_page(page, url)
     if not success:
         return success, f"Unable to load {url}: {msg}", None
-    logger.info(f"Result page loaded: {url}")
+    quiet or logger.info(f"Result page loaded: {url}")
 
     # Find the <strong>Updates regarding...</strong> element,
     # then navigate to following sibling <ul>
@@ -65,14 +67,14 @@ def get_update_list(page: Page, url: str, n_days: int, nmax: int, logger: loggin
     # Wait for the container to be loaded
     try:
         container_locator.wait_for(state="visible")
-        logger.info(f"Result title: {container_locator.locator(TITLE_SELECTOR).inner_text().strip()}")
+        quiet or logger.info(f"Result title: {container_locator.locator(TITLE_SELECTOR).inner_text().strip()}")
     except TimeoutError:
         return False, f"Timeout waiting for '{UPDATES_CONTAINER_SELECTOR}' after {TIMEOUT/1000:g} s.", None
 
     # Wait for the updates title to be loaded
     try:
         list_title_locator.wait_for(state="visible")
-        logger.info(f"List title: {list_title_locator.inner_text().strip()}")
+        quiet or logger.info(f"List title: {list_title_locator.inner_text().strip()}")
     except TimeoutError:
         return False, f"Timeout waiting for '{UPDATES_TITLE_SELECTOR}' after {TIMEOUT/1000:g} s.", None
 
@@ -82,7 +84,7 @@ def get_update_list(page: Page, url: str, n_days: int, nmax: int, logger: loggin
         items_locator = list_locator.locator(UPDATES_ITEM_SELECTOR)
         # If at least one <li> is loaded
         items_locator.locator("nth=0").wait_for(state="visible", timeout=TIMEOUT_UL)
-        logger.info(f"List loaded. {items_locator.count()} updates found.")
+        quiet or logger.info(f"List loaded. {items_locator.count()} updates found.")
     except TimeoutError:
         try:
             no_updates_text_locator.wait_for(state="visible", timeout=TIMEOUT_UL)
@@ -95,13 +97,13 @@ def get_update_list(page: Page, url: str, n_days: int, nmax: int, logger: loggin
     item_list = []
     count = 0
     current_time = time()
-    logger.info(f"Checking updates in the past {n_days} days (collect first {nmax} items)...")
+    quiet or logger.info(f"Checking updates in the past {n_days} days (collect first {nmax} items)...")
 
     for item_locator in item_locator_list:
         if count >= nmax:
             break
 
-        success, msg, res = parse_item(page, item_locator, logger)
+        success, msg, res = parse_item(page, item_locator, logger, quiet)
         if not success:
             return success, msg, None
 
@@ -112,10 +114,10 @@ def get_update_list(page: Page, url: str, n_days: int, nmax: int, logger: loggin
                 if success:
                     if is_within:
                         item_list.append(res)
-                        # logger.info(msg)
+                        quiet or logger.info(msg)
                         count += 1
                     else:
-                        # logger.info(msg)
+                        quiet or logger.info(msg)
                         break
                 else:
                     logger.error(msg)
@@ -129,7 +131,9 @@ def get_update_list(page: Page, url: str, n_days: int, nmax: int, logger: loggin
     return success, f"{len(item_list)} updates collected.", item_list
 
 
-def parse_item(page: Page, item: Locator, logger: logging.Logger) -> tuple[bool, str, dict]:
+def parse_item(
+    page: Page, item: Locator, logger: logging.Logger, quiet: bool = False
+) -> tuple[bool, str, dict]:
     """Parses the page (and detail page) and retrieves the title, URL, date, and content, of this item."""
     # Get info from result page
     link = item.get_by_role("link")
@@ -141,7 +145,7 @@ def parse_item(page: Page, item: Locator, logger: logging.Logger) -> tuple[bool,
     }
 
     # Get info and content from the detail page in a new tab
-    success, msg, info_from_detail, content = get_details(page, info['url'], logger)
+    success, msg, info_from_detail, content = get_details(page, info['url'], logger, quiet)
     # Update info
     if info_from_detail is not None:
         if info_from_detail['title'] and info_from_detail['title'] != info['title']:
@@ -152,7 +156,9 @@ def parse_item(page: Page, item: Locator, logger: logging.Logger) -> tuple[bool,
     return success, msg, info | {'content': content}
 
 
-def get_details(page: Page, url: str, logger: logging.Logger) -> tuple[bool, str, str | None, str]:
+def get_details(
+    page: Page, url: str, logger: logging.Logger, quiet: bool = False
+) -> tuple[bool, str, str | None, str]:
     """Retrieves title, date, and content, on detail page."""
     # Get the current context to create a new page (tab)
     context = page.context
@@ -162,7 +168,7 @@ def get_details(page: Page, url: str, logger: logging.Logger) -> tuple[bool, str
     if not success:
         new_page.close()
         return success, f"Unable to load {url} in a new tab: {msg}", None, ''
-    # logger.info(f"Detail page loaded in a new tab: {url}")
+    quiet or logger.info(f"Detail page loaded in a new tab: {url}")
 
     info = {'title': '', 'date': ''}
     title_locator = new_page.locator(DETAIL_TITLE_SELECTOR)
@@ -202,8 +208,10 @@ def run(
     logger: logging.Logger = logging.getLogger(),
     target_url: str = "",
 ) -> bool:
+    logger.debug(f"Arguments: {args}")
+
     with sync_playwright() as p:
-        browser = get_browser(p, args, logger)
+        browser = get_browser(p, args, logger, args.quiet)
         if browser is None:
             return False
 
@@ -217,29 +225,37 @@ def run(
                 return True
 
             # Directly go to the search result page -------------------|
-            success, msg, item_list = get_update_list(page, target_url, args.days, args.nmax, logger)
+            success, msg, item_list = get_update_list(
+                page, target_url,
+                args.days, args.nmax,
+                logger,
+                args.quiet,
+            )
             if success:
-                logger.info(msg)
+                args.quiet or logger.info(msg)
             else:
                 logger.error(msg)
                 return False
 
             # Print to stdout
             if args.print:
-                logger.info(f"Showing first {args.nmax} updates:")
-                for i, item in enumerate(item_list):
-                    print(f"{i + 1}.")
-                    print(f"{item['url']}")
-                    print(f"{item['title']}")
-                    print(f"{item['date']}")
-                    print(f"{BeautifulSoup(item['content'], 'html.parser').get_text()}\n")
+                if len(item_list) > 0:
+                    print(f"Showing first {args.nmax} updates regarding {args.city} in the past {args.days} days:")
+                    for i, item in enumerate(item_list):
+                        print(f"{i + 1}.")
+                        print(f"{item['url']}")
+                        print(f"{item['title']}")
+                        print(f"{item['date']}")
+                        print(f"{BeautifulSoup(item['content'], 'html.parser').get_text()}\n")
+                else:
+                    print(f"No updates regarding {args.city} in the past {args.days} days.")
 
             # Save part of the HTML to a file (for GitHub Actions)
             lines = construct_content(item_list, args.city, args.days, args.nmax)
             content = '\n'.join(lines)
             with open(HTML_FILE_NAME, "w") as f:
                 f.write(content)
-            logger.info(f"Saved to '{HTML_FILE_NAME}'." + (" (empty)" if len(lines) == 0 else ''))
+            args.quiet or logger.info(f"Saved to '{HTML_FILE_NAME}'." + (" (empty)" if len(lines) == 0 else ''))
 
             # Save complete HTML to a file (for testing)
             # lines = ["<!DOCTYPE html>", "<html>", "<body>"] + lines + ["</body>", "</html>"]
@@ -256,4 +272,4 @@ def run(
 
         finally:
             # Close
-            logger.info(close_everything(browser, context))
+            args.quiet or logger.info(close_everything(browser, context))

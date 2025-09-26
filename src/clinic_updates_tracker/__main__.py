@@ -7,13 +7,14 @@ def main():
     """Gets options, runs program, cleans up on exception."""
     args, logger, target_url = get_options()
     if not args.url:
-        print("Error: URL not given.", file=sys.stderr)
+        logger.error("Error: URL not given.")
         sys.exit(1)
 
     success = run(args, logger, target_url)
     if success:
-        print("Done!", file=sys.stderr)
+        args.quiet or logger.info("Done!")
     else:
+        logger.error("Exit with error.")
         sys.exit(1)
 
 

@@ -1,17 +1,22 @@
 # This workflow will install Python dependencies and run a script then notify the user about the result
 # [Actions secrets] GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER(same as receiver)
-# [Actions variables] TARGET_BASE_URL, CITY, DAYS_SINCE_LAST, MAX_N_ITEMS
+# [Actions variables] TARGET_BASE_URL, CITY, DAYS_SINCE, MAX_N_ITEMS, RETRIES
 
 name: Run and Notify
 
 on:
-  # 15:00 AM UTC every day
+  # 16:00 AM UTC every day
   schedule:
-    - cron: '0 15 * * *'
+    - cron: '0 16 * * *'
   workflow_dispatch:
     inputs:
       test_mode:
         description: 'Test mode (10 items, 3 months)'
+        required: false
+        type: boolean
+        default: false
+      debug_mode:
+        description: 'Debug mode (print variables only)'
         required: false
         type: boolean
         default: false
@@ -25,12 +30,29 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TEST_MODE: ${{ github.event.inputs.test_mode || 'false' }}  # read from inputs
-      DAYS_SINCE_LAST: ${{ github.event.inputs.test_mode && 90 || vars.DAYS_SINCE_LAST }}
-      MAX_N_ITEMS: ${{ github.event.inputs.test_mode && 10 || vars.MAX_N_ITEMS }}
+      TEST_MODE: ${{ github.event.inputs.test_mode == true && 'true' || 'false' }}
+      DAYS_SINCE: ${{ github.event.inputs.test_mode == true && '90' || vars.DAYS_SINCE }}
+      MAX_N_ITEMS: ${{ github.event.inputs.test_mode == true && '10' || vars.MAX_N_ITEMS }}
       HTML_NAME: ./tmp_content.html
 
     steps:
+      - name: Debug variables
+        if: github.event.inputs.debug_mode
+        run: |
+          echo "*** Debug Mode ***"
+          echo "github.event.inputs.test_mode: '${{ github.event.inputs.test_mode }}'"
+          echo "                env.TEST_MODE: '${{ env.TEST_MODE }}'"
+          echo "              vars.DAYS_SINCE: '${{ vars.DAYS_SINCE }}'"
+          echo "               env.DAYS_SINCE: '${{ env.DAYS_SINCE }}'"
+          echo "             vars.MAX_N_ITEMS: '${{ vars.MAX_N_ITEMS }}'"
+          echo "              env.MAX_N_ITEMS: '${{ env.MAX_N_ITEMS }}'"
+          echo "         vars.TARGET_BASE_URL: '${{ vars.TARGET_BASE_URL }}'"
+          echo "                    vars.CITY: '${{ vars.CITY }}'"
+          echo "                 vars.RETRIES: '${{ vars.RETRIES }}'"
+          echo "                env.HTML_NAME: '${{ env.HTML_NAME }}'"
+          echo "Debugging complete. Exiting workflow."
+          exit 0
+
       - name: Configure man-db to seed up
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate && sudo dpkg-reconfigure man-db
@@ -62,27 +84,32 @@ jobs:
 
       - name: Run script and save to
         run: |
-          clinic-updates-tracker --headless-shell \
-          --url ${{ vars.TARGET_BASE_URL }} \
-          --days ${{ env.DAYS_SINCE_LAST }} \
-          --nmax ${{ env.MAX_N_ITEMS }} \
-          ${{ vars.CITY }}
+          for i in {1..${{ vars.RETRIES }}}; do \
+            clinic-updates-tracker --headless-shell \
+              --url ${{ vars.TARGET_BASE_URL }} \
+              --days ${{ env.DAYS_SINCE }} \
+              --nmax ${{ env.MAX_N_ITEMS }} \
+              ${{ vars.CITY }} \
+            [ $? -eq 0 ] && break \
+            echo "> Waiting to retry ($i/${{ vars.RETRIES }})..." \
+            sleep 5 \
+          done
 
+      # Read the HTML file and set it as output, escaping newlines
       - name: Read HTML content
         id: read_html
         run: |
           if [ -s "${{ env.HTML_NAME }}" ]; then
-            # Read the HTML file and set it as output, escaping newlines
             content=$(cat ${{ env.HTML_NAME }} | tr '\n' ' ')
             echo "content=$content" >> $GITHUB_OUTPUT
             echo "hasUpdates='true'" >> $GITHUB_OUTPUT
           else
-            echo "No updates in ${{ vars.CITY }} in the past ${{ env.DAYS_SINCE_LAST }} days. Nothing to do."
+            echo "No updates in ${{ vars.CITY }} in the past ${{ env.DAYS_SINCE }} days. Nothing to do."
             echo "hasUpdates='false'" >> $GITHUB_OUTPUT
           fi
 
       - name: Send email via Gmail API
-        if: env.TEST_MODE || steps.read_html.outputs.hasUpdates == 'true'
+        if: env.TEST_MODE == 'true' || steps.read_html.outputs.hasUpdates == 'true'
         run: |
           echo "> Requesting Gmail access token..."
           access_token=$(curl -s \
@@ -103,7 +130,7 @@ jobs:
 
           subject_prefix=""
           [ "$is_test" = "true" ] && subject_prefix=" [TEST]"
-          subject_encoded=$(echo -n "${subject_prefix} Clinic Updates" | base64)
+          subject_encoded=$(echo -n "${subject_prefix} Clinic News Alert" | base64)
           subject="=?UTF-8?B?$subject_encoded?="
 
           body="<body>"

@@ -12,6 +12,7 @@ def get_browser(
         p: Playwright,
         args: argparse.Namespace,
         logger: logging.Logger = logging.getLogger(),
+        quiet: bool = False,
 ) -> Browser | None:
     """Checks/Installs and returns a browser.
 
@@ -31,7 +32,7 @@ def get_browser(
         return browser
 
     except Exception:
-        logger.info("Installing Chromium...")
+        quiet or logger.info("Installing Chromium...")
         cmd = [sys.executable, "-m", "playwright", "install", "--with-deps"]
         # For chromium headless shell / chromium new headless mode
         if args.browser == "chromium" and not args.headed:
@@ -43,7 +44,7 @@ def get_browser(
         # Install
         try:
             subprocess.run(cmd, text=True, check=True, env=env)
-            logger.info(f"{args.browser} installed.")
+            quiet or logger.info(f"{args.browser} installed.")
         except KeyboardInterrupt:
             logger.error("Interrupted by user.")
             return None

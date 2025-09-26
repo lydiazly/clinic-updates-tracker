@@ -53,7 +53,7 @@ clinic-updates-tracker -h
 ```
 
 ```text
-usage: clinic-updates-tracker [-h] [--url [URL]] [--days [N]] [-n [N]] [-a] [-H] [-d] [-b <browser>] [--headless-shell] [--test] [city]
+usage: clinic-updates-tracker [-h] [options] [city]
 
 Check updates on target URL.
 
@@ -62,12 +62,14 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --url [URL]           URL (default: https://findadoctorbc.ca/vancouver-island-region-text-search/)
-  --days [N]            only show items within N days (default: 5)
-  -n [N], --nmax [N]    show first N items (default: 10)
+  --url [URL]           URL (default: read from .env if exists)
+  -d [N], --days [N]    only show items within N days (default: read from .env if exists)
+  -n [N], --nmax [N]    show first N items (default: read from .env if exists)
   -a, --all             all updates (only affects the clinic table but not the update list)
+  -p, --print           print result as plain text to stdout
+  -q, --quiet           only show errors but suppress info output in stderr, unless --test or --debug is set
   -H, --headed          run in headed mode (default: headless)
-  -d, --debug           print debug logs
+  --debug               print debug logs
   -b <browser>, --browser <browser>
                         choose a browser: chromium, firefox, webkit (default: chromium)
   --headless-shell      use a separate headless shell for chromium headless mode
