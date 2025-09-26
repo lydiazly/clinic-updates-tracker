@@ -31,6 +31,10 @@ jobs:
       HTML_NAME: ./tmp_content.html
 
     steps:
+      - name: Configure man-db to seed up
+        run: |
+          echo "set man-db/auto-update false" | sudo debconf-communicate && sudo dpkg-reconfigure man-db
+
       - name: Update
         run: |
           sudo apt-get update
