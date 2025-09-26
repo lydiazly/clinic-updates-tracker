@@ -74,6 +74,9 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
         help="all updates (only affects the clinic table but not the update list)"
     )
     parser.add_argument(
+        "-p", "--print", action="store_true", help="print result as plain text to stdout"
+    )
+    parser.add_argument(
         "-H", "--headed", action="store_true",
         help="run in headed mode (default: headless)"
     )

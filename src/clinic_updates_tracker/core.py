@@ -3,6 +3,7 @@
 # python -c "from src.clinic_updates_tracker.__main__ import main; main()"
 """Use Playwright to find the updates."""
 import argparse
+from bs4 import BeautifulSoup
 import logging
 import random
 import re
@@ -223,14 +224,15 @@ def run(
                 logger.error(msg)
                 return False
 
-            # Print to stdout (for testing)
-            # logger.info(f"Showing first {args.nmax} updates:")
-            # for i, item in enumerate(item_list):
-            #     print(f"{i + 1}.")
-            #     print(f"[Title] {item['title']}")
-            #     print(f"[Date] {item['date']}")
-            #     print(f"[URL] {item['url']}")
-            #     print(f"[Content]\n{item['content']}\n")
+            # Print to stdout
+            if args.print:
+                logger.info(f"Showing first {args.nmax} updates:")
+                for i, item in enumerate(item_list):
+                    print(f"{i + 1}.")
+                    print(f"{item['url']}")
+                    print(f"{item['title']}")
+                    print(f"{item['date']}")
+                    print(f"{BeautifulSoup(item['content'], 'html.parser').get_text()}\n")
 
             # Save part of the HTML to a file (for GitHub Actions)
             lines = construct_content(item_list, args.city, args.days, args.nmax)
