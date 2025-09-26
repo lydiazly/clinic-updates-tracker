@@ -1,6 +1,6 @@
 # This workflow will install Python dependencies and run a script then notify the user about the result
 # [Actions secrets] GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER(same as receiver)
-# [Actions variables] TARGET_BASE_URL, CITY, DAYS_SINCE, MAX_N_ITEMS, RETRIES
+# [Actions variables] RECIPIENT_LIST(comma-separated), TARGET_BASE_URL, CITY, DAYS_SINCE, MAX_N_ITEMS, RETRIES
 
 name: Run and Notify
 
@@ -30,14 +30,14 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TEST_MODE: ${{ github.event.inputs.test_mode == true && 'true' || 'false' }}
-      DAYS_SINCE: ${{ github.event.inputs.test_mode == true && '90' || vars.DAYS_SINCE }}
-      MAX_N_ITEMS: ${{ github.event.inputs.test_mode == true && '10' || vars.MAX_N_ITEMS }}
+      TEST_MODE: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
+      DAYS_SINCE: ${{ github.event.inputs.test_mode == 'true' && '90' || vars.DAYS_SINCE }}
+      MAX_N_ITEMS: ${{ github.event.inputs.test_mode == 'true' && '10' || vars.MAX_N_ITEMS }}
       HTML_NAME: ./tmp_content.html
 
     steps:
       - name: Debug variables
-        if: github.event.inputs.debug_mode
+        if: github.event.inputs.debug_mode == 'true'
         run: |
           echo "*** Debug Mode ***"
           echo "github.event.inputs.test_mode: '${{ github.event.inputs.test_mode }}'"
@@ -51,7 +51,7 @@ jobs:
           echo "                 vars.RETRIES: '${{ vars.RETRIES }}'"
           echo "                env.HTML_NAME: '${{ env.HTML_NAME }}'"
           echo "Debugging complete. Exiting workflow."
-          exit 0
+          exit 1
 
       - name: Configure man-db to seed up
         run: |
@@ -61,7 +61,8 @@ jobs:
         run: |
           sudo apt-get update
 
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4  # default: fetch-depth=1
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -83,6 +84,7 @@ jobs:
           python3 -m pip install --user .
 
       - name: Run script and save to
+        shell: bash
         run: |
           for i in {1..${{ vars.RETRIES }}}; do \
             clinic-updates-tracker --headless-shell \
@@ -98,18 +100,36 @@ jobs:
       # Read the HTML file and set it as output, escaping newlines
       - name: Read HTML content
         id: read_html
+        shell: bash
         run: |
           if [ -s "${{ env.HTML_NAME }}" ]; then
             content=$(cat ${{ env.HTML_NAME }} | tr '\n' ' ')
             echo "content=$content" >> $GITHUB_OUTPUT
-            echo "hasUpdates='true'" >> $GITHUB_OUTPUT
+            echo "has_updates='true'" >> $GITHUB_OUTPUT
           else
             echo "No updates in ${{ vars.CITY }} in the past ${{ env.DAYS_SINCE }} days. Nothing to do."
-            echo "hasUpdates='false'" >> $GITHUB_OUTPUT
+            echo "has_updates='false'" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Parse recipient email list
+        if: env.TEST_MODE == 'true' || steps.read_html.outputs.has_updates == 'true'
+        id: parse_emails
+        env:
+          RECIPIENT_LIST: ${{ vars.RECIPIENT_LIST }}
+        shell: bash
+        run: |
+          recipient_list=$(echo "$RECIPIENT_LIST" | xargs | sed -E 's/ *[\t ,]+ */, /g')
+          if [ -z "$recipient_list" ]; then
+            echo "WARNING: No emails found in vars.RECIPIENT_LIST"
+            echo "has_recipients=false" >> $GITHUB_OUTPUT
+          else
+            echo "> Parsed emails: $recipient_list"
+            echo "has_recipients=true" >> $GITHUB_OUTPUT
+            echo "emails=$recipient_list" >> $GITHUB_OUTPUT
           fi
 
       - name: Send email via Gmail API
-        if: env.TEST_MODE == 'true' || steps.read_html.outputs.hasUpdates == 'true'
+        if: (env.TEST_MODE == 'true' || steps.read_html.outputs.has_updates == 'true') && steps.parse_emails.outputs.has_recipients == 'true'
         run: |
           echo "> Requesting Gmail access token..."
           access_token=$(curl -s \
@@ -124,7 +144,8 @@ jobs:
             exit 1
           fi
 
-          recipients="${{ secrets.GMAIL_SENDER }}"
+          sender="Lydia Zhang - GitHub Actions <${{ secrets.GMAIL_SENDER }}>"
+          recipients="${{ steps.parse_emails.outputs.emails }}"
           repo="${{ github.repository }}"
           is_test="${{ env.TEST_MODE }}"
 
@@ -139,7 +160,9 @@ jobs:
           body+="<br>Sent by GitHub Actions. Please do not reply directly.</p>"
           body+="</body>"
 
-          raw_message=$(printf "From: Lydia Zhang - GitHub Actions <${{ secrets.GMAIL_SENDER }}>\nTo: ${recipients}\nSubject: ${subject}\nContent-Type: text/html; charset=UTF-8\n\n%s" "$body" | base64 | tr -d '\n')
+          raw_message="From: ${sender}\nTo: ${recipients}\nSubject: ${subject}"
+          raw_message+="\nContent-Type: text/html; charset=UTF-8"
+          raw_message=$(printf "${raw_message}\n\n${body}" | base64 | tr -d '\n')
 
           echo "> Sending to: $recipients"
           curl -s -X POST \
