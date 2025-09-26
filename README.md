@@ -1,6 +1,6 @@
 # clinic-updates-tracker
 
-[![Run](https://github.com/lydiazly/clinic-updates-tracker/actions/workflows/run-task.yml/badge.svg?branch=master)](https://github.com/lydiazly/clinic-updates-tracker/actions/workflows/run-task.yml)
+[![Run](https://github.com/lydiazly/clinic-updates-tracker/actions/workflows/run-task.yml/badge.svg?branch=main)](https://github.com/lydiazly/clinic-updates-tracker/actions/workflows/run-task.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org)
 
