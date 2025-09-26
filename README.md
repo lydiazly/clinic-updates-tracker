@@ -1,5 +1,6 @@
 # clinic-updates-tracker
 
+[![Run](https://github.com/lydiazly/clinic-updates-tracker/actions/workflows/run-task.yml/badge.svg?branch=master)](https://github.com/lydiazly/clinic-updates-tracker/actions/workflows/run-task.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org)
 
@@ -42,7 +43,35 @@ python3 -m pip uninstall clinic-updates-tracker
 Example:
 
 ```sh
-# <code>
+clinic-updates-tracker
+```
+
+Usage:
+
+```sh
+clinic-updates-tracker -h
+```
+
+```text
+usage: clinic-updates-tracker [-h] [--url [URL]] [--days [N]] [-n [N]] [-a] [-H] [-d] [-b <browser>] [--headless-shell] [--test] [city]
+
+Check updates on target URL.
+
+positional arguments:
+  city                  town/city (default: Vancouver)
+
+options:
+  -h, --help            show this help message and exit
+  --url [URL]           URL (default: https://findadoctorbc.ca/vancouver-island-region-text-search/)
+  --days [N]            only show items within N days (default: 5)
+  -n [N], --nmax [N]    show first N items (default: 10)
+  -a, --all             all updates (only affects the clinic table but not the update list)
+  -H, --headed          run in headed mode (default: headless)
+  -d, --debug           print debug logs
+  -b <browser>, --browser <browser>
+                        choose a browser: chromium, firefox, webkit (default: chromium)
+  --headless-shell      use a separate headless shell for chromium headless mode
+  --test                test the browser without any page operation
 ```
 
 ## Testing
@@ -53,8 +82,10 @@ Install requirements:
 python3 -m pip install -r requirements.txt
 ```
 
+Run tests:
+
 ```sh
-pytest tests
+pytest tests --browser-channel chromium -s
 ```
 
 ## Important Legal Notice
