@@ -60,6 +60,8 @@ jobs:
       - name: Update
         run: |
           sudo apt-get update
+          sudo rm -rf /var/lib/apt/lists/*
+          sudo apt-get clean
 
       - name: Checkout repository
         uses: actions/checkout@v4  # default: fetch-depth=1
@@ -72,8 +74,8 @@ jobs:
       - name: Install dependencies
         run: |
           python3 --version
-          python3 -m pip install --upgrade pip
-          python3 -m pip install --user -r requirements.txt
+          python3 -m pip install --no-cache-dir --upgrade pip
+          python3 -m pip install --no-cache-dir --user -r requirements.txt
 
       - name: Install chromium headless shell
         run: |
@@ -81,7 +83,7 @@ jobs:
 
       - name: Install clinic_updates_tracker
         run: |
-          python3 -m pip install --user .
+          python3 -m pip install --no-cache-dir --user .
 
       - name: Run script and save to HTML_NAME
         shell: bash
