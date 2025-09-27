@@ -67,6 +67,7 @@ options:
   -n [N], --nmax [N]    show first N items (default: read from .env if exists)
   -a, --all             all updates (only affects the clinic table but not the update list)
   -p, --print           print result as plain text to stdout
+  -f [FILE]             name of the exported HTML file (default: ./tmp_content.html)
   -q, --quiet           only show errors but suppress info output in stderr, unless --test or --debug is set
   -H, --headed          run in headed mode (default: headless)
   --debug               print debug logs

@@ -12,7 +12,7 @@ import traceback
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Locator, TimeoutError
 
 # from . import LAST_RUN_AT_ABSOLUTE_PATH
-from . import HTML_FILE_NAME
+# from . import HTML_FILE_NAME
 from .browsers import get_browser
 from .selectors import TITLE_SELECTOR, UPDATES_CONTAINER_SELECTOR, UPDATES_TITLE_SELECTOR, \
     UPDATE_LIST_SELECTOR, UPDATES_ITEM_SELECTOR, UPDATES_EMPTY_SELECTOR, \
@@ -237,7 +237,7 @@ def run(
                 logger.error(msg)
                 return False
 
-            # Print to stdout
+            # Print to stdout if --print
             if args.print:
                 if len(item_list) > 0:
                     print(f"Showing first {args.nmax} updates regarding {args.city} in the past {args.days} days:")
@@ -250,17 +250,17 @@ def run(
                 else:
                     print(f"No updates regarding {args.city} in the past {args.days} days.")
 
-            # Save part of the HTML to a file (for GitHub Actions)
+            # Export to a file with main part of the HTML content (inside <body></body>)
             lines = construct_content(item_list, args.city, args.days, args.nmax)
             content = '\n'.join(lines)
-            with open(HTML_FILE_NAME, "w") as f:
+            with open(args.file, "w") as f:
                 f.write(content)
-            args.quiet or logger.info(f"Saved to '{HTML_FILE_NAME}'." + (" (empty)" if len(lines) == 0 else ''))
+            args.quiet or logger.info(f"Saved to '{args.file}'." + (" (empty)" if len(lines) == 0 else ''))
 
-            # Save complete HTML to a file (for testing)
+            # Export to a file with the complete HTML content (for testing)
             # lines = ["<!DOCTYPE html>", "<html>", "<body>"] + lines + ["</body>", "</html>"]
             # content = '\n'.join(lines)
-            # with open("tmp_" + HTML_FILE_NAME, "w") as f:
+            # with open("./tmp_content_all.html", "w") as f:
             #     f.write(content)
 
         except Exception:
