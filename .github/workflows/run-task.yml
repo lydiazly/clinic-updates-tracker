@@ -91,10 +91,10 @@ jobs:
               --url ${{ vars.TARGET_BASE_URL }} \
               --days ${{ env.DAYS_SINCE }} \
               --nmax ${{ env.MAX_N_ITEMS }} \
-              ${{ vars.CITY }} \
-            [ $? -eq 0 ] && break \
-            echo "> Waiting to retry ($i/${{ vars.RETRIES }})..." \
-            sleep 5 \
+              ${{ vars.CITY }}; \
+            [ $? -eq 0 ] && break; \
+            echo "> Waiting to retry ($i/${{ vars.RETRIES }})..."; \
+            sleep 5; \
           done
 
       # Read the HTML file and set it as output, escaping newlines
