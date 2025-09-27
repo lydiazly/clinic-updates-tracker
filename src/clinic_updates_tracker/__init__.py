@@ -19,7 +19,7 @@ HTML_FILE_NAME: str = "./tmp_content.html"
 
 TARGET_BASE_URL: str = os.getenv('TARGET_BASE_URL') or ''
 
-DEFAULT_CITY: str = os.getenv('DEFAULT_CITY') or 'Unknown'
+CITY: str = os.getenv('CITY') or 'Unknown'
 
 DAYS_SINCE: int = int(os.getenv('DAYS_SINCE')) or 30  # default: 1 month
 

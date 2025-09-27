@@ -9,7 +9,7 @@ import re
 import sys
 from urllib.parse import urlencode
 
-from . import HTML_FILE_NAME, TARGET_BASE_URL, DEFAULT_CITY, DAYS_SINCE, MAX_N_ITEMS, BROWSER_CHOICES
+from . import HTML_FILE_NAME, TARGET_BASE_URL, CITY, DAYS_SINCE, MAX_N_ITEMS, BROWSER_CHOICES
 
 
 def get_full_url(base_url: str, delim: str = '?', sub: dict | str = {}) -> str:
@@ -51,7 +51,7 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
     )
     parser.add_argument(
         "city", type=str, nargs="?",
-        default=DEFAULT_CITY,
+        default=CITY,
         help="town/city (default: %(default)s)"
     )
     parser.add_argument(
