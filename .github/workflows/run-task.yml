@@ -83,7 +83,7 @@ jobs:
         run: |
           python3 -m pip install --user .
 
-      - name: Run script and save to
+      - name: Run script and save to HTML_NAME
         shell: bash
         run: |
           for i in {1..${{ vars.RETRIES }}}; do \
