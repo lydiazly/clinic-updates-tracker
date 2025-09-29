@@ -53,27 +53,28 @@ clinic-updates-tracker -h
 ```
 
 ```text
-usage: clinic-updates-tracker [-h] [options] [city]
+usage: clinic-updates-tracker [-h] [options] [town/city]
 
 Check updates on target URL.
 
 positional arguments:
-  city                  town/city (default: Vancouver)
+  town/city             target town/city
 
 options:
   -h, --help            show this help message and exit
-  --url [URL]           URL (default: read from .env if exists)
-  -d [N], --days [N]    only show items within N days (default: read from .env if exists)
-  -n [N], --nmax [N]    show first N items (default: read from .env if exists)
-  -a, --all             all updates (only affects the clinic table but not the update list)
-  -p, --print           print result as plain text to stdout
-  -f [FILE]             name of the exported HTML file (default: ./export/content.html)
-  -q, --quiet           only show errors but suppress info output in stderr, unless --test or --debug is set
+  --url str             target URL (default: read from .env)
+  -d int, --days int    only show items within N days (default: read from .env)
+  -n int, --nmax int    only show first n items (default: read from .env)
+  -a, --all             get all updates (only affects the clinic table but not the update list)
+  -p, --print           print result as plain text to STDOUT
+  -o str, --output str  path of output file (default: ./output/content.html)
+  -q, --quiet           still show errors but suppress info output in stderr, unless --test or --debug is set
   -H, --headed          run in headed mode (default: headless)
   --debug               print debug logs
-  -b <browser>, --browser <browser>
-                        choose a browser: chromium, firefox, webkit (default: chromium)
-  --headless-shell      use a separate headless shell for chromium headless mode
+  -b str, --browser str
+                        specify a browser. Choices: chromium, firefox, webkit (default: chromium)
+  --headless-shell      use a separate headless shell for chromium headless mode (see
+                        https://playwright.dev/python/docs/browsers#chromium-headless-shell)
   --test                test the browser without any page operation
 ```
 

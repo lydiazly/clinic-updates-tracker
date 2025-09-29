@@ -32,7 +32,7 @@ jobs:
       TEST_MODE: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
       DAYS_SINCE: ${{ github.event.inputs.test_mode == 'true' && '90' || vars.DAYS_SINCE }}
       MAX_N_ITEMS: ${{ github.event.inputs.test_mode == 'true' && '10' || vars.MAX_N_ITEMS }}
-      HTML_NAME: ./export/content.html
+      OUTPUT_NAME: ./output/content.html
 
     steps:
       - name: Debug variables
@@ -48,7 +48,7 @@ jobs:
           echo "         vars.TARGET_BASE_URL: '${{ vars.TARGET_BASE_URL }}'"
           echo "                    vars.CITY: '${{ vars.CITY }}'"
           echo "                 vars.RETRIES: '${{ vars.RETRIES }}'"
-          echo "                env.HTML_NAME: '${{ env.HTML_NAME }}'"
+          echo "              env.OUTPUT_NAME: '${{ env.OUTPUT_NAME }}'"
           echo "Debugging complete. Exiting workflow."
           exit 1
 
@@ -88,7 +88,7 @@ jobs:
         run: |
           python3 -m pip install --no-cache-dir --user .
 
-      - name: Run script and save to HTML_NAME
+      - name: Run script and save to OUTPUT_NAME
         shell: bash
         run: |
           for i in $(seq 1 ${{ vars.RETRIES }}); do
@@ -96,7 +96,7 @@ jobs:
               --url "${{ vars.TARGET_BASE_URL }}" \
               --days ${{ env.DAYS_SINCE }} \
               --nmax ${{ env.MAX_N_ITEMS }} \
-              -f "${{ env.HTML_NAME }}" \
+              --output "${{ env.OUTPUT_NAME }}" \
               "${{ vars.CITY }}"
             if [ $? -eq 0 ]; then break; fi
             echo "> Waiting to retry ($i/${{ vars.RETRIES }})..."
@@ -109,8 +109,8 @@ jobs:
         id: read_html
         shell: bash
         run: |
-          if [ -s "${{ env.HTML_NAME }}" ]; then
-            content=$(cat "${{ env.HTML_NAME }}" | tr '\n' ' ')
+          if [ -s "${{ env.OUTPUT_NAME }}" ]; then
+            content=$(cat "${{ env.OUTPUT_NAME }}" | tr '\n' ' ')
             echo "content=${content}" >> $GITHUB_OUTPUT
             echo "has_updates='true'" >> $GITHUB_OUTPUT
           else

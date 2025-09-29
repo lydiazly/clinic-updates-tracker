@@ -12,7 +12,7 @@ import traceback
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Locator, TimeoutError
 
 # from . import LAST_RUN_AT_ABSOLUTE_PATH
-# from . import HTML_DIR
+# from . import OUTPUT_DIR
 from .browsers import get_browser
 from .selectors import TITLE_SELECTOR, UPDATES_CONTAINER_SELECTOR, UPDATES_TITLE_SELECTOR, \
     UPDATE_LIST_SELECTOR, UPDATES_ITEM_SELECTOR, UPDATES_EMPTY_SELECTOR, \
@@ -253,14 +253,14 @@ def run(
             # Export to a file with main part of the HTML content (inside <body></body>)
             lines = construct_content(item_list, args.city, args.days, args.nmax)
             content = '\n'.join(lines)
-            with open(args.file, "w") as f:
+            with open(args.output, "w") as f:
                 f.write(content)
-            args.quiet or logger.info(f"Saved to '{args.file}'." + (" (empty)" if len(lines) == 0 else ''))
+            args.quiet or logger.info(f"Saved to '{args.output}'." + (" (empty)" if len(lines) == 0 else ''))
 
             # Export to a file with the complete HTML content (for testing)
             # lines = ["<!DOCTYPE html>", "<html>", "<body>"] + lines + ["</body>", "</html>"]
             # content = '\n'.join(lines)
-            # with open(os.path.join(HTML_DIR, "content_all.html"), "w") as f:
+            # with open(os.path.join(OUTPUT_DIR, "content_all.html"), "w") as f:
             #     f.write(content)
 
         except Exception:

@@ -9,7 +9,7 @@ import re
 import sys
 from urllib.parse import urlencode
 
-from . import HTML_NAME, TARGET_BASE_URL, CITY, DAYS_SINCE, MAX_N_ITEMS, BROWSER_CHOICES
+from . import OUTPUT_NAME, TARGET_BASE_URL, CITY, DAYS_SINCE, MAX_N_ITEMS, BROWSER_CHOICES
 
 
 def get_full_url(base_url: str, delim: str = '?', sub: dict | str = {}) -> str:
@@ -50,65 +50,82 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
         description="Check updates on target URL."
     )
     parser.add_argument(
-        "city", type=str, nargs="?",
+        'city',
+        type=str,
+        nargs="?",
+        metavar='town/city',
         default=CITY,
-        help="town/city (default: %(default)s)"
+        help="target town/city (default: %(default)s)"
     )
     parser.add_argument(
-        "--url", type=str, nargs="?",
+        '--url',
+        type=str,
+        metavar='str',
         default=TARGET_BASE_URL,
-        help="URL (default: %(default)s)"
+        help="target URL (default: %(default)s)"
     )
     parser.add_argument(
-        "-d", "--days", type=int, nargs="?", metavar='N',
+        '-d', '--days',
+        type=int,
+        metavar='int',
         default=DAYS_SINCE,
-        help="only show items within N days (default: %(default)s)"
+        help="only show items within these days (default: %(default)s)"
     )
     parser.add_argument(
-        "-n", "--nmax", type=int, nargs="?", metavar='N',
+        '-n', '--nmax',
+        type=int,
+        metavar='int',
         default=MAX_N_ITEMS,
-        help="show first N items (default: %(default)s)"
+        help="only show first n items (default: %(default)s)"
     )
     parser.add_argument(
-        "-a", "--all", action="store_true",
-        help="all updates (only affects the clinic table but not the update list)"
+        '-a', '--all',
+        action='store_true',
+        help="get all updates (only affects the clinic table but not the update list)"
     )
     parser.add_argument(
-        "-p", "--print", action="store_true",
-        help="print result as plain text to stdout"
+        '-p', '--print',
+        action='store_true',
+        help="print result as plain text to STDOUT"
     )
     parser.add_argument(
-        "-f", dest='file', type=str, nargs="?",
-        default=HTML_NAME,
-        help="name of the exported HTML file (default: %(default)s)"
+        '-o', '--output',
+        type=str,
+        metavar='str',
+        default=OUTPUT_NAME,
+        help="path of output file (default: %(default)s)"
     )
     parser.add_argument(
-        "-q", "--quiet", action="store_true",
-        help="only show errors but suppress info output in stderr, unless --test or --debug is set"
+        '-q', '--quiet',
+        action='store_true',
+        help="still show errors but suppress info output in stderr, unless --test or --debug is set"
     )
     parser.add_argument(
-        "-H", "--headed", action="store_true",
+        '-H', '--headed',
+        action='store_true',
         help="run in headed mode (default: headless)"
     )
     parser.add_argument(
-        "--debug", action="store_true", help="print debug logs"
+        '--debug',
+        action='store_true',
+        help="print debug logs"
     )
     parser.add_argument(
-        "-b", "--browser",
+        '-b', '--browser',
+        metavar='str',
         choices=BROWSER_CHOICES,
-        default="chromium",
-        metavar="<browser>",
-        help=f"choose a browser: {', '.join(BROWSER_CHOICES)} (default: %(default)s)"
+        default='chromium',
+        help="specify a browser. Choices: %(choices)s (default: %(default)s)"
     )
     parser.add_argument(
-        "--headless-shell",
-        dest="shell",
-        action="store_true",
-        help="use a separate headless shell for chromium headless mode"
+        '--headless-shell',
+        dest='shell',
+        action='store_true',
+        help="use a separate headless shell for chromium headless mode (see https://playwright.dev/python/docs/browsers#chromium-headless-shell)"
     )
     parser.add_argument(
-        "--test",
-        action="store_true",
+        '--test',
+        action='store_true',
         help="test the browser without any page operation"
     )
     args = parser.parse_args()
@@ -161,8 +178,8 @@ def is_date_within_n_days(date_str: str, ref_time: float, n_days: int) -> tuple[
         return (
             True,
             (
-                f"{date_str} is within {n_days} days before {ref_date_str}, collect." if is_within
-                else f"{date_str} is {n_days} days earlier than {ref_date_str}, return."
+                f"{date_str} is within {n_days} days before {ref_date_str}. Collecting..." if is_within
+                else f"{date_str} is {n_days} days earlier than {ref_date_str}. Returning..."
             ),
             is_within,
         )

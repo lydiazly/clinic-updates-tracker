@@ -1,25 +1,15 @@
 # src/clinic_updates_tracker/__init__.py
 from dotenv import load_dotenv
 import os
-# from pathlib import Path
+
 
 load_dotenv()
 
-# local_directory: str = os.environ.get(
-#     "XDG_DATA_HOME", os.path.join(Path.home(), ".local/share")
-# )
-# os.makedirs(local_directory, exist_ok=True)
+OUTPUT_DIR = "./output"
 
-# LAST_RUN_AT_FILE_NAME: str = os.path.join(local_directory, "clinic_updates_lastrun.txt")
-# LAST_RUN_AT_ABSOLUTE_PATH: str = os.path.abspath(
-#     os.path.join(Path.home(), LAST_RUN_AT_FILE_NAME)
-# )
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-HTML_DIR = "./export"
-
-os.makedirs(HTML_DIR, exist_ok=True)
-
-HTML_NAME: str = os.path.join(HTML_DIR, "content.html")
+OUTPUT_NAME: str = os.path.join(OUTPUT_DIR, "content.html")
 
 TARGET_BASE_URL: str = os.getenv('TARGET_BASE_URL') or ''
 
