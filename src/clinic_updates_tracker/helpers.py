@@ -9,7 +9,7 @@ import re
 import sys
 from urllib.parse import urlencode
 
-from . import HTML_FILE_NAME, TARGET_BASE_URL, CITY, DAYS_SINCE, MAX_N_ITEMS, BROWSER_CHOICES
+from . import HTML_NAME, TARGET_BASE_URL, CITY, DAYS_SINCE, MAX_N_ITEMS, BROWSER_CHOICES
 
 
 def get_full_url(base_url: str, delim: str = '?', sub: dict | str = {}) -> str:
@@ -79,7 +79,7 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
     )
     parser.add_argument(
         "-f", dest='file', type=str, nargs="?",
-        default=HTML_FILE_NAME,
+        default=HTML_NAME,
         help="name of the exported HTML file (default: %(default)s)"
     )
     parser.add_argument(

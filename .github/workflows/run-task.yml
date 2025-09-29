@@ -1,13 +1,12 @@
 # This workflow will install Python dependencies and run a script then notify the user about the result
-# [Actions secrets] GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER(same as receiver)
+# [Actions secrets] GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER
 # [Actions variables] RECIPIENT_LIST(comma-separated), TARGET_BASE_URL, CITY, DAYS_SINCE, MAX_N_ITEMS, RETRIES
 
 name: Run and Notify
 
 on:
-  # 16:00 AM UTC every day
   schedule:
-    - cron: '0 16 * * *'
+    - cron: '0 16 * * *'  # 16:00 AM UTC every day
   workflow_dispatch:
     inputs:
       test_mode:
@@ -33,7 +32,7 @@ jobs:
       TEST_MODE: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
       DAYS_SINCE: ${{ github.event.inputs.test_mode == 'true' && '90' || vars.DAYS_SINCE }}
       MAX_N_ITEMS: ${{ github.event.inputs.test_mode == 'true' && '10' || vars.MAX_N_ITEMS }}
-      HTML_NAME: ./tmp_content.html
+      HTML_NAME: ./export/content.html
 
     steps:
       - name: Debug variables
@@ -53,7 +52,7 @@ jobs:
           echo "Debugging complete. Exiting workflow."
           exit 1
 
-      - name: Configure man-db to seed up
+      - name: Configure man-db to speed up
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate && sudo dpkg-reconfigure man-db
 
@@ -71,10 +70,14 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Add ~/.local/bin to PATH
+        run: |
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - name: Install dependencies
         run: |
           python3 --version
-          python3 -m pip install --no-cache-dir --upgrade pip
+          python3 -m pip install --no-cache-dir --upgrade --user pip
           python3 -m pip install --no-cache-dir --user -r requirements.txt
 
       - name: Install chromium headless shell
@@ -88,16 +91,18 @@ jobs:
       - name: Run script and save to HTML_NAME
         shell: bash
         run: |
-          for i in {1..${{ vars.RETRIES }}}; do \
+          for i in $(seq 1 ${{ vars.RETRIES }}); do
             clinic-updates-tracker --headless-shell \
-              --url ${{ vars.TARGET_BASE_URL }} \
+              --url "${{ vars.TARGET_BASE_URL }}" \
               --days ${{ env.DAYS_SINCE }} \
               --nmax ${{ env.MAX_N_ITEMS }} \
-              ${{ vars.CITY }}; \
-            [ $? -eq 0 ] && break; \
-            echo "> Waiting to retry ($i/${{ vars.RETRIES }})..."; \
-            sleep 5; \
+              -f "${{ env.HTML_NAME }}" \
+              "${{ vars.CITY }}"
+            if [ $? -eq 0 ]; then break; fi
+            echo "> Waiting to retry ($i/${{ vars.RETRIES }})..."
+            sleep 5
           done
+          echo "✓ Script completed successfully."
 
       # Read the HTML file and set it as output, escaping newlines
       - name: Read HTML content
@@ -105,8 +110,8 @@ jobs:
         shell: bash
         run: |
           if [ -s "${{ env.HTML_NAME }}" ]; then
-            content=$(cat ${{ env.HTML_NAME }} | tr '\n' ' ')
-            echo "content=$content" >> $GITHUB_OUTPUT
+            content=$(cat "${{ env.HTML_NAME }}" | tr '\n' ' ')
+            echo "content=${content}" >> $GITHUB_OUTPUT
             echo "has_updates='true'" >> $GITHUB_OUTPUT
           else
             echo "No updates in ${{ vars.CITY }} in the past ${{ env.DAYS_SINCE }} days. Nothing to do."
@@ -120,29 +125,29 @@ jobs:
           RECIPIENT_LIST: ${{ vars.RECIPIENT_LIST }}
         shell: bash
         run: |
-          recipient_list=$(echo "$RECIPIENT_LIST" | xargs | sed -E 's/ *[\t ,]+ */, /g')
-          if [ -z "$recipient_list" ]; then
-            echo "WARNING: No emails found in vars.RECIPIENT_LIST"
-            echo "has_recipients=false" >> $GITHUB_OUTPUT
+          recipient_list=$(echo "${RECIPIENT_LIST}" | xargs | sed -E 's/ *[\t ,]+ */, /g')
+          if [ -z "${recipient_list}" ]; then
+            echo "WARNING: No emails found in vars.RECIPIENT_LIST" >&2
+            echo "has_recipients='false'" >> $GITHUB_OUTPUT
           else
-            echo "> Parsed emails: $recipient_list"
-            echo "has_recipients=true" >> $GITHUB_OUTPUT
-            echo "emails=$recipient_list" >> $GITHUB_OUTPUT
+            echo "> Parsed emails: ${recipient_list}"
+            echo "has_recipients='true'" >> $GITHUB_OUTPUT
+            echo "emails=${recipient_list}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Send email via Gmail API
+      - name: Send email to all listed users via Gmail API
         if: (env.TEST_MODE == 'true' || steps.read_html.outputs.has_updates == 'true') && steps.parse_emails.outputs.has_recipients == 'true'
         run: |
           echo "> Requesting Gmail access token..."
           access_token=$(curl -s \
-            -d client_id="${{ secrets.GMAIL_CLIENT_ID }}" \
-            -d client_secret="${{ secrets.GMAIL_CLIENT_SECRET }}" \
-            -d refresh_token="${{ secrets.GMAIL_REFRESH_TOKEN }}" \
-            -d grant_type=refresh_token \
+            -d "client_id=${{ secrets.GMAIL_CLIENT_ID }}" \
+            -d "client_secret=${{ secrets.GMAIL_CLIENT_SECRET }}" \
+            -d "refresh_token=${{ secrets.GMAIL_REFRESH_TOKEN }}" \
+            -d "grant_type=refresh_token" \
             https://oauth2.googleapis.com/token | jq -r .access_token)
 
-          if [ "$access_token" = "null" ] || [ -z "$access_token" ]; then
-            echo "x Failed to get access token"
+          if [ "${access_token}" = "null" ] || [ -z "${access_token}" ]; then
+            echo "✗ Failed to get Gmail access token." >&2
             exit 1
           fi
 
@@ -152,9 +157,9 @@ jobs:
           is_test="${{ env.TEST_MODE }}"
 
           subject_prefix=""
-          [ "$is_test" = "true" ] && subject_prefix=" [TEST]"
+          [ "${is_test}" = "true" ] && subject_prefix=" [TEST]"
           subject_encoded=$(echo -n "${subject_prefix} Clinic News Alert" | base64)
-          subject="=?UTF-8?B?$subject_encoded?="
+          subject="=?UTF-8?B?${subject_encoded}?="
 
           body="<body>"
           body+="${{ steps.read_html.outputs.content }}"
@@ -166,9 +171,10 @@ jobs:
           raw_message+="\nContent-Type: text/html; charset=UTF-8"
           raw_message=$(printf "${raw_message}\n\n${body}" | base64 | tr -d '\n')
 
-          echo "> Sending to: $recipients"
+          echo "> Sending to: ${recipients}"
           curl -s -X POST \
-            -H "Authorization: Bearer $access_token" \
+            -H "Authorization: Bearer ${access_token}" \
             -H "Content-Type: application/json" \
-            -d "{\"raw\": \"$raw_message\"}" \
+            -d "{\"raw\": \"${raw_message}\"}" \
             https://gmail.googleapis.com/gmail/v1/users/me/messages/send
+          echo "✓ Email sent successfully."

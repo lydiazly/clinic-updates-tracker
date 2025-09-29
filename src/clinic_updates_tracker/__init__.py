@@ -15,7 +15,11 @@ load_dotenv()
 #     os.path.join(Path.home(), LAST_RUN_AT_FILE_NAME)
 # )
 
-HTML_FILE_NAME: str = "./tmp_content.html"
+HTML_DIR = "./export"
+
+os.makedirs(HTML_DIR, exist_ok=True)
+
+HTML_NAME: str = os.path.join(HTML_DIR, "content.html")
 
 TARGET_BASE_URL: str = os.getenv('TARGET_BASE_URL') or ''
 
