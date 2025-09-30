@@ -1,0 +1,38 @@
+name: clinic-updates-tracker
+services:
+  run-task:
+    image: clinic-updates-tracker:latest
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: clinic_run
+    env_file:
+      - ./.env
+    environment:
+      - TEST_MODE=false
+      - KEEP_ALIVE=false
+      - SEND_EMAILS=false
+    volumes:
+      - ./output:/app/output
+
+  test-mode:
+    image: clinic-updates-tracker:latest
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: clinic_test
+    env_file:
+      - ./.env
+    environment:
+      - TEST_MODE=true
+      - KEEP_ALIVE=true
+      - SEND_EMAILS=false
+      - DAYS_SINCE=90
+      - MAX_N_ITEMS=10
+    volumes:
+      - ./output:/app/output
+    entrypoint: /bin/bash  # Override the ENTRYPOINT
+    stdin_open: true  # Keep STDIN open (-i)
+    tty: true  # Allocate a pseudo-TTY (-t)

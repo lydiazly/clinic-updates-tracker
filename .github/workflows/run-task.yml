@@ -151,7 +151,7 @@ jobs:
             exit 1
           fi
 
-          sender="Lydia Zhang - GitHub Actions <${{ secrets.GMAIL_SENDER }}>"
+          sender="Lydia Zhang <${{ secrets.GMAIL_SENDER }}>"
           recipients="${{ steps.parse_emails.outputs.emails }}"
           repo="${{ github.repository }}"
           is_test="${{ env.TEST_MODE }}"
@@ -163,8 +163,12 @@ jobs:
 
           body="<body>"
           body+="${{ steps.read_html.outputs.content }}"
-          body+="<br><hr><p style=\"color:gray\">You are receiving this email because a scheduled workflow <code>run-task</code> is enabled in <strong>${repo}</strong>.</p>"
-          body+="<br>Sent by GitHub Actions. Please do not reply directly.</p>"
+          body+="<br><hr><p style=\"color:gray\">"
+          body+="You are receiving this email because "
+          body+="a GitHub Actions workflow <strong>run-task</strong> "
+          body+="in repository <strong>${repo}</strong> is triggered."
+          body+="</p>"
+          body+="<p style=\"color:gray\">Sent by GitHub Actions. Please do not reply directly.</p>"
           body+="</body>"
 
           raw_message="From: ${sender}\nTo: ${recipients}\nSubject: ${subject}"

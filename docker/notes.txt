@@ -1,0 +1,33 @@
+# Run
+docker compose up -d run-task
+docker compose up -d test-mode  # be aware that KEEP_ALIVE=true
+
+# Rebuild images before starting containers
+docker compose up --build -d run-task
+
+# Force rebuild without cache
+docker compose build --no-cache run-task
+docker compose up -d run-task
+# The up command will automatically recreate containers if it detects the image has changed
+
+# View and follow logs
+docker compose logs -f run-task
+
+# Test
+docker compose run -e DAYS_SINCE=1 --rm run-task
+docker compose run -e SEND_EMAILS=true --rm run-task
+
+docker compose exec -e DAYS_SINCE=1 -e SEND_EMAILS=true test-mode ./docker/docker-entrypoint.sh
+
+docker compose run --entrypoint ./docker/docker-entrypoint.sh --rm test-mode  # will remove after manually close
+docker compose run -e KEEP_ALIVE=false --entrypoint ./docker/docker-entrypoint.sh --rm test-mode
+
+# Commands in the container
+ls -la ./docker/*
+python3 --version
+clinic-updates-tracker -h
+./docker/docker-entrypoint.sh
+
+# Exit and clean up
+docker compose down
+docker image prune -a

@@ -1,0 +1,9 @@
+# Ignore all files by default
+*
+
+# Allow specific files and directories
+!docker/
+!src/
+!pyproject.toml
+!README.md
+!requirements.txt
