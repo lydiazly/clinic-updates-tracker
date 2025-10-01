@@ -115,7 +115,7 @@ jobs:
             content=$(cat "${{ env.OUTPUT_NAME }}" | tr '\n' ' ')
             echo "content=${content}" >> $GITHUB_OUTPUT
             echo "has_updates=true" >> $GITHUB_OUTPUT
-            echo "> Parsed HTML"
+            echo "✓ HTML content loaded (${#content} characters)"
           else
             echo "No updates in ${{ vars.CITY }} in the past ${{ env.DAYS_SINCE }} days. Nothing to do."
             echo "has_updates=false" >> $GITHUB_OUTPUT
