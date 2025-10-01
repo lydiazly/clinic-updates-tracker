@@ -94,6 +94,7 @@ jobs:
           for i in $(seq 1 ${{ vars.RETRIES }}); do
             clinic-updates-tracker --headless-shell \
               --url "${{ vars.TARGET_BASE_URL }}" \
+              --tz "${{ vars.TARGET_TZ }}" \
               --days ${{ env.DAYS_SINCE }} \
               --nmax ${{ env.MAX_N_ITEMS }} \
               --output "${{ env.OUTPUT_NAME }}" \
