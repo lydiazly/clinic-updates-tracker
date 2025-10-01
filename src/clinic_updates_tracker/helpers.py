@@ -199,7 +199,7 @@ def is_date_within_n_days(date_str: str, n_days: int, tz: str = '') -> tuple[boo
     try:
         # Parse the date string using dateutil.parser (handles many formats)
         # with the determined timezone
-        parsed_date = parser.parse(date_str, default=datetime.now(tzinfo))
+        parsed_date = parser.parse(date_str + " 12:00:00", default=datetime.now(tzinfo))
         date_str_with_tz = f"{date_str} ({tzname})"
         # Convert to UTC
         parsed_date_utc = parsed_date.astimezone(timezone.utc).date()
