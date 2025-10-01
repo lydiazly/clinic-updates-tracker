@@ -2,7 +2,7 @@
 
 [![Run](https://github.com/lydiazly/clinic-updates-tracker/actions/workflows/run-task.yml/badge.svg?branch=main)](https://github.com/lydiazly/clinic-updates-tracker/actions/workflows/run-task.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org)
+[![python](https://img.shields.io/badge/Python-3.11,3.12-3776AB?logo=python&logoColor=white)](https://www.python.org)
 
 Fetches updates on a target public service platform such as Find a Doctor BC.
 
