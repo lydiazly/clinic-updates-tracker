@@ -46,6 +46,7 @@ jobs:
           echo "             vars.MAX_N_ITEMS: '${{ vars.MAX_N_ITEMS }}'"
           echo "              env.MAX_N_ITEMS: '${{ env.MAX_N_ITEMS }}'"
           echo "         vars.TARGET_BASE_URL: '${{ vars.TARGET_BASE_URL }}'"
+          echo "               vars.TARGET_TZ: '${{ vars.TARGET_TZ }}'"
           echo "                    vars.CITY: '${{ vars.CITY }}'"
           echo "                 vars.RETRIES: '${{ vars.RETRIES }}'"
           echo "              env.OUTPUT_NAME: '${{ env.OUTPUT_NAME }}'"
@@ -114,6 +115,7 @@ jobs:
             content=$(cat "${{ env.OUTPUT_NAME }}" | tr '\n' ' ')
             echo "content=${content}" >> $GITHUB_OUTPUT
             echo "has_updates='true'" >> $GITHUB_OUTPUT
+            echo "> Parsed HTML"
           else
             echo "No updates in ${{ vars.CITY }} in the past ${{ env.DAYS_SINCE }} days. Nothing to do."
             echo "has_updates='false'" >> $GITHUB_OUTPUT
