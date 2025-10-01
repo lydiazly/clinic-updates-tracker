@@ -114,11 +114,11 @@ jobs:
           if [ -s "${{ env.OUTPUT_NAME }}" ]; then
             content=$(cat "${{ env.OUTPUT_NAME }}" | tr '\n' ' ')
             echo "content=${content}" >> $GITHUB_OUTPUT
-            echo "has_updates='true'" >> $GITHUB_OUTPUT
+            echo "has_updates=true" >> $GITHUB_OUTPUT
             echo "> Parsed HTML"
           else
             echo "No updates in ${{ vars.CITY }} in the past ${{ env.DAYS_SINCE }} days. Nothing to do."
-            echo "has_updates='false'" >> $GITHUB_OUTPUT
+            echo "has_updates=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Parse recipient email list
@@ -134,7 +134,7 @@ jobs:
             echo "has_recipients='false'" >> $GITHUB_OUTPUT
           else
             echo "> Parsed emails: ${recipient_list}"
-            echo "has_recipients='true'" >> $GITHUB_OUTPUT
+            echo "has_recipients=true" >> $GITHUB_OUTPUT
             echo "emails=${recipient_list}" >> $GITHUB_OUTPUT
           fi
 
