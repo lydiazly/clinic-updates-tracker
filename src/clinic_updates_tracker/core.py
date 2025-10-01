@@ -251,11 +251,17 @@ def run(
                     print(f"No updates regarding {args.city} in the past {args.days} days.")
 
             # Export to a file with main part of the HTML content (inside <body></body>)
-            lines = construct_content(item_list, args.city, args.days, args.nmax)
-            content = '\n'.join(lines)
-            with open(args.output, "w") as f:
-                f.write(content)
-            args.quiet or logger.info(f"Saved to '{args.output}'." + (" (empty)" if len(lines) == 0 else ''))
+            if args.output.strip():
+                if len(item_list) > 0:
+                    lines = construct_content(item_list, args.city, args.days, args.nmax)
+                    content = '\n'.join(lines)
+                    with open(args.output, "w") as f:
+                        f.write(content)
+                    args.quiet or logger.info(f"Saved to '{args.output}'.")
+                else:
+                    args.quiet or logger.info("No updates. No file export.")
+            else:
+                args.quiet or logger.info("Filename is empty. No file export.")
 
             # Export to a file with the complete HTML content (for testing)
             # lines = ["<!DOCTYPE html>", "<html>", "<body>"] + lines + ["</body>", "</html>"]

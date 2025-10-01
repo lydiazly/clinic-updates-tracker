@@ -67,7 +67,7 @@ options:
   -n int, --nmax int    only show first n items (default: read from .env)
   -a, --all             get all updates (only affects the clinic table but not the update list)
   -p, --print           print result as plain text to STDOUT
-  -o str, --output str  path of output file (default: ./output/content.html)
+  -o str, --output str  path of output file. Empty indicates no export. (default: ./output/content.html)
   -q, --quiet           still show errors but suppress info output in stderr, unless --test or --debug is set
   -H, --headed          run in headed mode (default: headless)
   --debug               print debug logs

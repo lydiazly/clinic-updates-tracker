@@ -93,7 +93,7 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
         type=str,
         metavar='str',
         default=OUTPUT_NAME,
-        help="path of output file (default: %(default)s)"
+        help="path of output file. Empty indicates no export. (default: %(default)s)"
     )
     parser.add_argument(
         '-q', '--quiet',
