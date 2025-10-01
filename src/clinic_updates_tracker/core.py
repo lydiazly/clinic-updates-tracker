@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 import logging
 import random
 import re
-from time import sleep, time
+from time import sleep
 import traceback
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Locator, TimeoutError
 
@@ -49,13 +49,14 @@ def navigate_to_page(page: Page, url: str) -> tuple[bool, str]:
 
 
 def get_update_list(
-    page: Page, url: str, n_days: int, nmax: int, logger: logging.Logger, quiet: bool = False
+    page: Page, url: str, n_days: int, nmax: int,
+    logger: logging.Logger, quiet: bool = False, tz: str = ''
 ) -> tuple[bool, str, list[dict] | None]:
     """Navigates to the page and finds the update list."""
     success, msg = navigate_to_page(page, url)
     if not success:
         return success, f"Unable to load {url}: {msg}", None
-    quiet or logger.info(f"Result page loaded: {url}")
+    quiet or logger.info(f"Result page loaded: {url} (tz: {tz or 'local'})")
 
     # Find the <strong>Updates regarding...</strong> element,
     # then navigate to following sibling <ul>
@@ -96,7 +97,6 @@ def get_update_list(
     item_locator_list = items_locator.all()
     item_list = []
     count = 0
-    current_time = time()
     quiet or logger.info(f"Checking updates in the past {n_days} days (collect first {nmax} items)...")
 
     for item_locator in item_locator_list:
@@ -110,7 +110,7 @@ def get_update_list(
         if res:
             # If within n days, append to the list
             if res['date']:
-                success, msg, is_within = is_date_within_n_days(res['date'], current_time, n_days)
+                success, msg, is_within = is_date_within_n_days(res['date'], n_days, tz)
                 if success:
                     if is_within:
                         item_list.append(res)
@@ -230,6 +230,7 @@ def run(
                 args.days, args.nmax,
                 logger,
                 args.quiet,
+                args.tz,
             )
             if success:
                 args.quiet or logger.info(msg)

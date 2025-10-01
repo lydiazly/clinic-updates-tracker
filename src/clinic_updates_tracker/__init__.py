@@ -13,6 +13,8 @@ OUTPUT_NAME: str = os.path.join(OUTPUT_DIR, "content.html")
 
 TARGET_BASE_URL: str = os.getenv('TARGET_BASE_URL') or ''
 
+TARGET_TZ: str = os.getenv('TARGET_TZ') or ''
+
 CITY: str = os.getenv('CITY') or 'Unknown'
 
 DAYS_SINCE: int = int(os.getenv('DAYS_SINCE')) or 30  # default: 1 month

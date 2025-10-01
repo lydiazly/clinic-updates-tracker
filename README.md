@@ -63,12 +63,14 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --url str             target URL (default: read from .env)
+  time zone identifier of the target website (empty means native) (default: read from .env)
   -d int, --days int    only show items within N days (default: read from .env)
   -n int, --nmax int    only show first n items (default: read from .env)
   -a, --all             get all updates (only affects the clinic table but not the update list)
   -p, --print           print result as plain text to STDOUT
   -o str, --output str  path of output file. Empty indicates no export. (default: ./output/content.html)
   -q, --quiet           still show errors but suppress info output in stderr, unless --test or --debug is set
+  --utc                 convert time to UTC before comparing dates
   -H, --headed          run in headed mode (default: headless)
   --debug               print debug logs
   -b str, --browser str

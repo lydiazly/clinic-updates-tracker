@@ -2,14 +2,15 @@
 # src/clinic_updates_tracker/helpers.py
 from bs4 import BeautifulSoup
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from dateutil import parser
 import logging
 import re
 import sys
 from urllib.parse import urlencode
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from . import OUTPUT_NAME, TARGET_BASE_URL, CITY, DAYS_SINCE, MAX_N_ITEMS, BROWSER_CHOICES
+from . import OUTPUT_NAME, TARGET_BASE_URL, TARGET_TZ, CITY, DAYS_SINCE, MAX_N_ITEMS, BROWSER_CHOICES
 
 
 def get_full_url(base_url: str, delim: str = '?', sub: dict | str = {}) -> str:
@@ -63,6 +64,13 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
         metavar='str',
         default=TARGET_BASE_URL,
         help="target URL (default: %(default)s)"
+    )
+    parser.add_argument(
+        '--tz',
+        type=str,
+        metavar='str',
+        default=TARGET_TZ,
+        help="time zone identifier of the target website (empty means native) (default: %(default)s)"
     )
     parser.add_argument(
         '-d', '--days',
@@ -160,29 +168,64 @@ def clear_content(content: str) -> str:
     return cleared_content
 
 
-def is_date_within_n_days(date_str: str, ref_time: float, n_days: int) -> tuple[bool, str, bool]:
+def is_date_within_n_days(date_str: str, n_days: int, tz: str = '') -> tuple[bool, str, bool]:
     """Checks if a given date string in any format is within n days before the reference time."""
     if not date_str:
         return False, "Error parsing date: date string is empty.", False
 
+    # Get current date (native) for getting local time zone
+    now_naive = datetime.now()  # native datetime
+    now_local = now_naive.astimezone()  # presumed to be local time
+    now_naive_str = now_local.strftime('%B %d, %Y (%Z)')  # %Z: timezone name, not identifier
+    # Get current time in UTC
+    now_date_utc = datetime.now(timezone.utc).date()
+    now_utc_str = now_date_utc.strftime('%Y-%m-%d (UTC)')
+    now_str_all = f"{now_naive_str} / {now_utc_str}"
+
+    msg = ''
+    tzinfo = None
+    # Use provided time zone string
+    if tz:
+        try:
+            tzinfo = ZoneInfo(tz.strip())  # <class 'zoneinfo.ZoneInfo'>
+            tzname = tzinfo.key  # or str(tzinfo)
+        except ZoneInfoNotFoundError as e:
+            msg = f"WARNING: {e}. Using local time zone...\n"
+    # Or use local timezone
+    if tzinfo is None:
+        tzinfo = now_local.tzinfo  # <class 'datetime.timezone'>
+        tzname = str(tzinfo)
+
     try:
         # Parse the date string using dateutil.parser (handles many formats)
-        parsed_date = parser.parse(date_str)
+        # with the determined timezone
+        parsed_date = parser.parse(date_str, default=datetime.now(tzinfo))
+        date_str_with_tz = f"{date_str} ({tzname})"
+        # Convert to UTC
+        parsed_date_utc = parsed_date.astimezone(timezone.utc).date()
+        date_utc_str = parsed_date_utc.strftime('%Y-%m-%d (UTC)')
+        date_str_all = f"{date_str_with_tz} / {date_utc_str}"
+
         # Convert ref_time to datetime object
-        ref_datetime = datetime.fromtimestamp(ref_time)
-        ref_date_str = ref_datetime.strftime('%B %d, %Y')
+        # ref_datetime = datetime.fromtimestamp(ref_time)
+        # ref_date_str = ref_datetime.strftime('%B %d, %Y')
+
         # Calculate the earliest date (n days before ref_datetime)
-        min_datetime = ref_datetime - timedelta(days=n_days)
+        # min_datetime = ref_datetime - timedelta(days=n_days)
+
+        # Calculate the days between ref_datetime and parsed_date
         # Check if parsed_date is within the range (between min_datetime and ref_datetime)
-        is_within = min_datetime <= parsed_date <= ref_datetime
-        return (
-            True,
-            (
-                f"{date_str} is within {n_days} days before {ref_date_str}. Collecting..." if is_within
-                else f"{date_str} is {n_days} days earlier than {ref_date_str}. Returning..."
-            ),
-            is_within,
-        )
+        # is_within = min_datetime <= parsed_date <= ref_datetime
+
+        # Compare the date
+        days_diff = (now_date_utc - parsed_date_utc).days
+        is_within = 0 <= days_diff <= n_days
+
+        if is_within:
+            msg += f"{date_str_all} is within {n_days} days before {now_str_all}. Collecting..."
+        else:
+            msg += f"{date_str_all} is {days_diff} day{'s' if days_diff > 1 else ''} earlier than {now_str_all}. Returning..."
+        return True, msg, is_within
 
     except (ValueError, TypeError) as e:
         return False, f"Error parsing date '{date_str}': {e}", False
