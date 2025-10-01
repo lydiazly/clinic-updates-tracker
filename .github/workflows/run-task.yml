@@ -153,6 +153,7 @@ jobs:
             echo "✗ Failed to get Gmail access token." >&2
             exit 1
           fi
+          echo "✓ Successfully obtained Gmail access token."
 
           sender="Lydia Zhang <${{ secrets.GMAIL_SENDER }}>"
           recipients="${{ steps.parse_emails.outputs.emails }}"
@@ -179,9 +180,14 @@ jobs:
           raw_message=$(printf "${raw_message}\n\n${body}" | base64 | tr -d '\n')
 
           echo "> Sending to: ${recipients}"
-          curl -s -X POST \
+          response=$(curl -s -X POST \
             -H "Authorization: Bearer ${access_token}" \
             -H "Content-Type: application/json" \
             -d "{\"raw\": \"${raw_message}\"}" \
-            https://gmail.googleapis.com/gmail/v1/users/me/messages/send
-          echo "✓ Email sent successfully."
+            https://gmail.googleapis.com/gmail/v1/users/me/messages/send)
+
+          if echo "${response}" | jq -e '.id' >/dev/null 2>&1; then
+            echo "✓ Email sent successfully."
+          else
+            echo -e "✗ Failed to send email:\n${response}" >&2
+          fi
