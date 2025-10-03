@@ -197,9 +197,9 @@ def is_date_within_n_days(date_str: str, n_days: int, tz: str = '') -> tuple[boo
         tzname = str(tzinfo)
 
     try:
-        # Parse the date string using dateutil.parser (handles many formats)
-        # with the determined timezone
-        parsed_date = parser.parse(date_str + " 12:00:00", default=datetime.now(tzinfo))
+        # Parse the date string (no time) using dateutil.parser with the determined timezone
+        ref_time_str = ' 12:00:00'  # preset, adjust this if needed
+        parsed_date = parser.parse(date_str + ref_time_str, default=datetime.now(tzinfo))
         date_str_with_tz = f"{date_str} ({tzname})"
         # Convert to UTC
         parsed_date_utc = parsed_date.astimezone(timezone.utc).date()
@@ -219,7 +219,9 @@ def is_date_within_n_days(date_str: str, n_days: int, tz: str = '') -> tuple[boo
 
         # Compare the date
         days_diff = (now_date_utc - parsed_date_utc).days
-        is_within = 0 <= days_diff <= n_days
+        is_within = days_diff <= n_days
+        # Note: Because ref_time_str is a preset value, days_diff might be < 0
+        # if converting ref_time_str to UTC derives one day ahead of now_date_utc
 
         if is_within:
             msg += f"{date_str_all} is within {n_days} days before {now_str_all}. Collecting..."

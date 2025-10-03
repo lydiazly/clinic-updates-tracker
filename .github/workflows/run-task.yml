@@ -6,7 +6,7 @@ name: Run and Notify
 
 on:
   schedule:
-    - cron: '0 19 * * *'  # 19:00 AM UTC every day
+    - cron: '0 19 * * *'  # 19:00 UTC every day (set to 12:00 local time)
   workflow_dispatch:
     inputs:
       test_mode:
