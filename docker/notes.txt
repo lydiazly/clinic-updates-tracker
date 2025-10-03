@@ -43,51 +43,61 @@ docker run -it --name clinic-test --env-file .env --env-file .secrets \
 
 # Other tests
 tag='test-py'
-docker run -it --name clinic-test --env-file .env --env-file .secrets \
-  -u runner \
-  -e TEST_MODE=false -e SEND_EMAILS=false --rm clinic-test:$tag  # ✓
+docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
+  -u runner --rm clinic-test:$tag  # ✓
 
 tag='run-py'
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
   -v "$(pwd)"/output:/app/output \
-  -e TEST_MODE=true -e SEND_EMAILS=false --rm clinic-test:$tag  # ✓
+  -e TEST_MODE=true -e DAYS_SINCE=3 -e SEND_EMAILS=true --rm clinic-test:$tag  # ✓
 
 #----------------------------------------------------------------------|
 # Compose
 
-# Run
-docker compose up -d run-task
-docker compose up -d test-mode  # be aware that KEEP_ALIVE=true
+# Build
+docker compose build run-task
 
-# Rebuild images before starting containers
-docker compose up --build -d run-task
+# Run (keep running if -e KEEP_ALIVE=true)
+# Already set -it in test-mode
+docker compose run --name clinic-test --rm test-mode  # ✓
+docker compose run --name clinic-test -u root --rm test-mode  # ✓
+docker compose run --name clinic-test -e DAYS_SINCE=1 --rm test-mode ./docker/docker-entrypoint.sh # ✓
+docker compose run --name clinic-test -e DAYS_SINCE=1 \
+  --entrypoint /app/docker/docker-entrypoint.sh --rm test-mode # ✓
+docker compose run --name clinic-test -e SEND_EMAILS=true --rm run-task  # ✓
 
+# Create & start container
+docker compose up -d test-mode
+# Rebuild images before starting container
+docker compose up --build -d test-mode
 # Force rebuild without cache
-docker compose build --no-cache run-task
-docker compose up -d run-task
-# The up command will automatically recreate containers if it detects the image has changed
+docker compose build --no-cache test-mode
+docker compose up -d test-mode
+# Stop & remove
+docker compose down test-mode
 
-# View and follow logs
-docker compose logs -f run-task
+# View and follow logs (running)
+# docker compose logs -f test-mode
 
-# Test
-docker compose run -e DAYS_SINCE=1 --rm run-task
-docker compose run -e SEND_EMAILS=true --rm run-task
-
-docker compose exec -e DAYS_SINCE=1 -e SEND_EMAILS=true test-mode ./docker/docker-entrypoint.sh
-
-docker compose run --entrypoint ./docker/docker-entrypoint.sh --rm test-mode  # will remove after manually close
-docker compose run -e KEEP_ALIVE=false --entrypoint ./docker/docker-entrypoint.sh --rm test-mode
+# Test (running)
+docker compose run --name clinic-test -e KEEP_ALIVE=true -d test-mode  # ✓
+docker compose exec -e DAYS_SINCE=1 test-mode ./docker/docker-entrypoint.sh  # ✓
+# Force stop & remove manually
+docker compose kill test-mode
+docker compose down --remove-orphans
 
 #----------------------------------------------------------------------|
 # Commands in the container
+compgen -u
 df -h
 ls -la ./docker/*
-python3 --version
+ls /run/secrets/
+python3 -V
 clinic-updates-tracker -h
 ./docker/docker-entrypoint.sh
 
 #----------------------------------------------------------------------|
 # Exit and clean up
-docker compose down
+docker compose down --remove-orphans
 docker image prune -a
+docker builder prune -a

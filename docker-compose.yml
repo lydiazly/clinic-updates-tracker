@@ -1,38 +1,49 @@
 name: clinic-updates-tracker
+
 services:
   run-task:
-    image: clinic-updates-tracker:latest
+    image: clinic-test:run-py
     pull_policy: build
     build:
       context: .
-      dockerfile: docker/Dockerfile
-    container_name: clinic_run
+      dockerfile: docker/Dockerfile-multi-py
+      target: run
+    container_name: clinic-run
+    secrets:
+      - gmail_api
     env_file:
       - ./.env
     environment:
       - TEST_MODE=false
       - KEEP_ALIVE=false
       - SEND_EMAILS=false
+      - SECRETS_FILE=/run/secrets/gmail_api
     volumes:
       - ./output:/app/output
 
-  test-mode:
-    image: clinic-updates-tracker:latest
+  test-mode:  # install browser and change user, but turn on test mode
+    image: clinic-test:run-py
     pull_policy: build
     build:
       context: .
-      dockerfile: docker/Dockerfile
-    container_name: clinic_test
+      dockerfile: docker/Dockerfile-multi-py
+      target: run
+    container_name: clinic-test
+    secrets:
+      - gmail_api
     env_file:
-      - ./.env
+      - ./.env.test
     environment:
       - TEST_MODE=true
-      - KEEP_ALIVE=true
+      - KEEP_ALIVE=false
       - SEND_EMAILS=false
-      - DAYS_SINCE=90
-      - MAX_N_ITEMS=10
+      - SECRETS_FILE=/run/secrets/gmail_api
     volumes:
       - ./output:/app/output
     entrypoint: /bin/bash  # Override the ENTRYPOINT
     stdin_open: true  # Keep STDIN open (-i)
     tty: true  # Allocate a pseudo-TTY (-t)
+
+secrets:
+  gmail_api:
+    file: ./.secrets  # token and sender

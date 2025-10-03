@@ -1,5 +1,6 @@
 output/
 .secrets
+.env.*
 
 !.keepalive.log
 

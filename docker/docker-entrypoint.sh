@@ -4,16 +4,10 @@ set -e
 export TEST_MODE=${TEST_MODE:-true}
 export KEEP_ALIVE=${KEEP_ALIVE:-false}
 export SEND_EMAILS=${SEND_EMAILS:-false}
+export DAYS_SINCE=${DAYS_SINCE:-90}
+export MAX_N_ITEMS=${MAX_N_ITEMS:-10}
 export RETRIES=${RETRIES:-3}
 export OUTPUT_NAME="./output/content_docker.html"
-
-if [ "${TEST_MODE}" = 'true' ]; then
-  export DAYS_SINCE=90
-  export MAX_N_ITEMS=10
-else
-  export DAYS_SINCE=${DAYS_SINCE:-90}
-  export MAX_N_ITEMS=${MAX_N_ITEMS:-10}
-fi
 
 if [ -n "${SECRETS_FILE}" ] && [ -s "${SECRETS_FILE}" ]; then
   source "${SECRETS_FILE}"
