@@ -1,3 +1,60 @@
+#----------------------------------------------------------------------|
+# Test images
+# ARG DEBIAN_FRONTEND=noninteractive
+
+docker run -it --name clinic-test --env-file .env --rm ubuntu:24.04
+docker run -it --name clinic-test --env-file .env --rm python:3.12-slim-bookworm bash
+# Other commands for verifying
+apt list --installed
+uname -a
+bash -c 'echo $SHELL'
+python3 -V
+
+#----------------------------------------------------------------------|
+# Build
+
+# [Ubuntu 24.04, python3.11]
+tag='ubuntu24.04-py3.11'
+docker build -t clinic-test:$tag -f docker/Dockerfile-py3.11 .  # 1.56GB run:✓
+
+# [Ubuntu 24.04, python3.12]
+tag='ubuntu24.04'
+docker build -t clinic-test:$tag -f docker/Dockerfile-py3.12 .  # 1.37GB run:✓
+
+# [Ubuntu 24.04, python3.12, multi-stage]
+tag='test'
+tag='run'
+docker build --target builder -t clinic-test:builder -f docker/Dockerfile-multi .  # 350MB
+docker build --target base -t clinic-test:base -f docker/Dockerfile-multi .  # 341MB
+docker build --target test -t clinic-test:test -f docker/Dockerfile-multi .  # 341MB run:✓
+docker build --target run -t clinic-test:run -f docker/Dockerfile-multi .  # 1.02GB run:✓
+
+# [Debian-based (Linux 6.10.14-linuxkit), python3.12, multi-stage]
+tag='test-py'
+tag='run-py'
+docker build --target builder -t clinic-test:builder-py -f docker/Dockerfile-multi-py .  # 327MB
+docker build --target base -t clinic-test:base-py -f docker/Dockerfile-multi-py .  # 322MB
+docker build --target test -t clinic-test:test-py -f docker/Dockerfile-multi-py .  # 322MB run:✓
+docker build --target run -t clinic-test:run-py -f docker/Dockerfile-multi-py .  # 957MB run:✓
+
+# Run
+docker run -it --name clinic-test --env-file .env --env-file .secrets \
+  -e TEST_MODE=false -e SEND_EMAILS=false --rm clinic-test:$tag
+
+# Other tests
+tag='test-py'
+docker run -it --name clinic-test --env-file .env --env-file .secrets \
+  -u runner \
+  -e TEST_MODE=false -e SEND_EMAILS=false --rm clinic-test:$tag  # ✓
+
+tag='run-py'
+docker run -it --name clinic-test --env-file .env --env-file .secrets \
+  -v "$(pwd)"/output:/app/output \
+  -e TEST_MODE=true -e SEND_EMAILS=false --rm clinic-test:$tag  # ✓
+
+#----------------------------------------------------------------------|
+# Compose
+
 # Run
 docker compose up -d run-task
 docker compose up -d test-mode  # be aware that KEEP_ALIVE=true
@@ -22,12 +79,15 @@ docker compose exec -e DAYS_SINCE=1 -e SEND_EMAILS=true test-mode ./docker/docke
 docker compose run --entrypoint ./docker/docker-entrypoint.sh --rm test-mode  # will remove after manually close
 docker compose run -e KEEP_ALIVE=false --entrypoint ./docker/docker-entrypoint.sh --rm test-mode
 
+#----------------------------------------------------------------------|
 # Commands in the container
+df -h
 ls -la ./docker/*
 python3 --version
 clinic-updates-tracker -h
 ./docker/docker-entrypoint.sh
 
+#----------------------------------------------------------------------|
 # Exit and clean up
 docker compose down
 docker image prune -a

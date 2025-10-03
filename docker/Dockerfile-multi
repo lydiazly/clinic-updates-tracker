@@ -1,0 +1,85 @@
+# syntax=docker/dockerfile:1
+
+# builder: Install the dependencies in the builder image within a virtual environment.
+# final: Copy over the dependencies to the final image
+
+ARG UBUNTU_VERSION=24.04
+
+# Build (temporary)
+FROM ubuntu:${UBUNTU_VERSION} AS builder
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_ROOT_USER_ACTION=ignore
+
+# Update & install python3.12:
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY ./requirements.txt ./src ./pyproject.toml ./README.md ./
+
+# Use a virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Python dependencies
+RUN <<EOF
+python3 -m pip install --no-cache-dir --upgrade pip
+python3 -m pip install --no-cache-dir -r requirements.txt
+python3 -m pip install --no-cache-dir .
+rm -rf /var/lib/apt/lists/*
+EOF
+
+
+# Prepare for runtime
+FROM ubuntu:${UBUNTU_VERSION} AS base
+
+ARG UID=10001
+
+ENV USERNAME=runner \
+    PLAYWRIGHT_BROWSERS_PATH=/app/pw-browsers
+
+# Update & install essential packages & python3.12
+#   curl, jq: for requesting Gmail access token
+#   ca-certificates: for HTTPS requests (Gmail API, pip installs)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    jq \
+    ca-certificates \
+    python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+
+ENV PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+COPY . .
+
+RUN useradd -lMU -u ${UID} ${USERNAME} \
+    && chown -R ${USERNAME}:${USERNAME} /app \
+    && chmod +x ./docker/docker-entrypoint.sh
+
+
+# Production runtime
+FROM base AS run
+
+# Install browser (chromium headless shell)
+RUN python3 -m playwright install --with-deps --only-shell chromium \
+    && rm -rf /var/lib/apt/lists/*
+
+USER ${USERNAME}
+
+ENTRYPOINT ["/app/docker/docker-entrypoint.sh"]
+
+
+# Test environment
+FROM base AS test
+
+# Skip installing browser. Enter as root.
