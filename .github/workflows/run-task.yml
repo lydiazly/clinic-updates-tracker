@@ -142,15 +142,16 @@ jobs:
         if: (env.TEST_MODE == 'true' || steps.read_html.outputs.has_updates == 'true') && steps.parse_emails.outputs.has_recipients == 'true'
         run: |
           echo "> Requesting Gmail access token..."
-          access_token=$(curl -s \
+          token_response=$(curl -s \
             -d "client_id=${{ secrets.GMAIL_CLIENT_ID }}" \
             -d "client_secret=${{ secrets.GMAIL_CLIENT_SECRET }}" \
             -d "refresh_token=${{ secrets.GMAIL_REFRESH_TOKEN }}" \
             -d "grant_type=refresh_token" \
-            https://oauth2.googleapis.com/token | jq -r .access_token)
+            https://oauth2.googleapis.com/token)
+          access_token=$(echo ${token_response} | jq -r .access_token)
 
           if [ "${access_token}" = "null" ] || [ -z "${access_token}" ]; then
-            echo "✗ Failed to get Gmail access token." >&2
+            echo -e "✗ Failed to get Gmail access token:\n${token_response}" >&2
             exit 1
           fi
           echo "✓ Successfully obtained Gmail access token."
