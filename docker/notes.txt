@@ -1,6 +1,9 @@
 #----------------------------------------------------------------------|
 # Test images
 # ARG DEBIAN_FRONTEND=noninteractive
+# ENV PYTHONDONTWRITEBYTECODE=1 \
+#     PYTHONUNBUFFERED=1 \
+#     PIP_ROOT_USER_ACTION=ignore
 
 docker run -it --name clinic-test --env-file .env --rm ubuntu:24.04
 docker run -it --name clinic-test --env-file .env --rm python:3.12-slim-bookworm bash
