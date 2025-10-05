@@ -23,7 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY ./requirements.txt ./src ./pyproject.toml ./README.md ./
+COPY requirements.txt pyproject.toml README.md ./
+COPY src ./src/
 
 # Use a virtual environment
 RUN python3 -m venv /opt/venv
