@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 
-# builder: Install the dependencies in the builder image within a virtual environment.
-# final: Copy over the dependencies to the final image
+# builder: Install dependencies within a virtual environment.
+# base: Prepare for runtime: copy python venv, add user
+# run: Install browser and run script, change user
+# test: no browser, root
 
 ARG PYTHON_VERSION=3.12
 
