@@ -70,7 +70,7 @@ docker compose run --name clinic-test -e DAYS_SINCE=1 \
 docker compose run --name clinic-test -e SEND_EMAILS=true --rm run-task  # ✓
 
 # Create & start container
-docker compose up -d test-mode
+docker compose up -d test-mode  # ✓
 # Rebuild images before starting container
 docker compose up --build -d test-mode
 # Force rebuild without cache
@@ -101,6 +101,6 @@ clinic-updates-tracker -h
 
 #----------------------------------------------------------------------|
 # Exit and clean up
-docker compose down --remove-orphans
-docker image prune -a
-docker builder prune -a
+docker compose down
+docker image prune
+docker builder prune

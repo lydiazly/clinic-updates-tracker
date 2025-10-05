@@ -63,9 +63,11 @@ EOF
 
 COPY . .
 
-RUN useradd -lMU -u ${UID} ${USERNAME} \
-    && chown -R ${USERNAME}:${USERNAME} /app \
-    && chmod +x ./docker/docker-entrypoint.sh
+RUN <<EOF
+useradd -lMU -u ${UID} ${USERNAME}
+chown -R ${USERNAME}:${USERNAME} /app
+chmod +x ./docker/docker-entrypoint.sh
+EOF
 
 USER ${USERNAME}
 
