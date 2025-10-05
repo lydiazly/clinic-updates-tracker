@@ -43,7 +43,7 @@ ARG UID=10001
 ENV USERNAME=runner \
     PLAYWRIGHT_BROWSERS_PATH=/app/pw-browsers
 
-# Update & install essential packages & python3.12
+# Update & install essential packages
 #   curl, jq: for requesting Gmail access token
 #   ca-certificates: for HTTPS requests (Gmail API, pip installs) (already installed)
 RUN apt-get update && apt-get install -y --no-install-recommends \
