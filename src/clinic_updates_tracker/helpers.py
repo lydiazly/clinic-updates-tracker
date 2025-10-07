@@ -157,10 +157,10 @@ def preserve_tags(element) -> str:
     return text
 
 
-def clear_content(content: str, indent: str = '') -> str:
+def clear_content(content: str) -> str:
     """Clears content."""
     soup = BeautifulSoup(content, 'html.parser')
-    cleared_content = f"\n{indent}".join(s.strip() for s in map(preserve_tags, soup) if s.strip())
+    cleared_content = "\n".join(s.strip() for s in map(preserve_tags, soup) if s.strip())
     cleared_content = re.sub(r"(<p>\s*</p>)+", "", cleared_content)  # remove any empty '<p></p>'
     # cleared_content = re.sub(r"[ \t]*<p>|</p>[ \t]*", "<br>", cleared_content)  # '<p>...</p>' --> '<br>...<br>'
     cleared_content = re.sub(r"([ \t]*<br\s*/?>[ \t]*)+", "<br>", cleared_content)  # multiple <br> or <br /> --> <br>
@@ -176,23 +176,23 @@ def construct_content(
         return []
 
     title = f"Updates regarding {city} in the past {n_days} days"
-    lines = [f"  <h2>{title}</h2>"]
-    lines.append(f"  <p><strong>Showing first {nmax} updates:</strong></p>")
-    lines.append("  <ol>")
+    lines = [f"<h2>{title}</h2>"]
+    lines.append(f"<p><strong>Showing first {nmax} updates:</strong></p>")
+    lines.append("<ol>")
     for item in item_list:
         lines.append(
-            "    <li><strong>"
+            "<li><strong>"
             + f"<a href=\"{item['url']}\">{item['title']}</a>"
             + f" (Posted {item['date']})"
             + "</strong></li>"
         )
-        lines.append('    ' + item['content'])
+        lines.append(item['content'])
     if len(item_list) < ntot:
-        lines.append(f"    <p>(<a href=\"{page_url}\"><em>Go to website to view full list</a></em>)</p>")
-    lines.append("  </ol>")
+        lines.append(f"<p><a href=\"{page_url}\"><em>Go to website to view full list</em></a></p>")
+    lines.append("</ol>")
     lines = (
         ["<!DOCTYPE html>", "<html>", "<head>"]
-        + ['  <meta charset="utf-8">', f"  <title>{title}</title>"]
+        + ['<meta charset="utf-8">', f"<title>{title}</title>"]
         + ["</head>", "<body>"]
         + lines
         + ["</body>", "</html>"]

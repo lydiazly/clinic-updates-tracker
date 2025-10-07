@@ -105,13 +105,12 @@ jobs:
           echo "✓ Script completed successfully."
 
       # Read the HTML file and set it as output, escaping newlines
-      - name: Read HTML content
-        id: read_html
+      - name: Check HTML content
+        id: check_html
         shell: bash
         run: |
           if [ -s "${{ env.OUTPUT_NAME }}" ]; then
-            content=$(cat "${{ env.OUTPUT_NAME }}" | tr '\n' ' ')
-            echo "content=${content}" >> $GITHUB_OUTPUT
+            content=$(cat "${{ env.OUTPUT_NAME }}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/')
             echo "has_updates=true" >> $GITHUB_OUTPUT
             echo "✓ HTML content loaded (${#content} characters)"
           else
@@ -120,7 +119,7 @@ jobs:
           fi
 
       - name: Parse recipient email list
-        if: env.TEST_MODE == 'true' || steps.read_html.outputs.has_updates == 'true'
+        if: env.TEST_MODE == 'true' || steps.check_html.outputs.has_updates == 'true'
         id: parse_emails
         env:
           RECIPIENT_LIST: ${{ vars.RECIPIENT_LIST }}
@@ -137,7 +136,7 @@ jobs:
           fi
 
       - name: Send email to all listed users via Gmail API
-        if: (env.TEST_MODE == 'true' || steps.read_html.outputs.has_updates == 'true') && steps.parse_emails.outputs.has_recipients == 'true'
+        if: (env.TEST_MODE == 'true' || steps.check_html.outputs.has_updates == 'true') && steps.parse_emails.outputs.has_recipients == 'true'
         run: |
           echo "> Requesting Gmail access token..."
           token_response=$(curl -s \
@@ -165,7 +164,7 @@ jobs:
           subject="=?UTF-8?B?${subject_encoded}?="
 
           body="<body>"
-          body+="${{ steps.read_html.outputs.content }}"
+          body+=$(cat "${{ env.OUTPUT_NAME }}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/' | tr '\n' ' ')
           body+="<br><hr><p style=\"color:gray\">"
           body+="You are receiving this email because "
           body+="a GitHub Actions workflow <strong>run-task</strong> "

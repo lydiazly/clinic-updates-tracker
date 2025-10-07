@@ -184,7 +184,7 @@ def get_details(
     title_locator = new_page.locator(DETAIL_TITLE_SELECTOR)
     date_locator = new_page.locator(DETAIL_DATE_SELECTOR)
     content_locator = new_page.locator(DETAIL_CONTENT_SELECTOR)
-    content = clear_content(content_locator.inner_html(), '    ')
+    content = clear_content(content_locator.inner_html())
     info['title'] = title_locator.inner_text().strip()
     info['date'] = date_locator.inner_text().strip()
 
