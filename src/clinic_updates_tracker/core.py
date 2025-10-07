@@ -17,7 +17,7 @@ from .browsers import get_browser
 from .selectors import TITLE_SELECTOR, UPDATES_CONTAINER_SELECTOR, UPDATES_TITLE_SELECTOR, \
     UPDATE_LIST_SELECTOR, UPDATES_ITEM_SELECTOR, UPDATES_EMPTY_SELECTOR, \
     DETAIL_TITLE_SELECTOR, DETAIL_DATE_SELECTOR, DETAIL_CONTENT_SELECTOR
-from .helpers import clear_content, is_date_within_n_days
+from .helpers import clear_content, construct_content, is_date_within_n_days
 
 
 # Global variables
@@ -51,11 +51,11 @@ def navigate_to_page(page: Page, url: str) -> tuple[bool, str]:
 def get_update_list(
     page: Page, url: str, n_days: int, nmax: int,
     logger: logging.Logger, quiet: bool = False, tz: str = ''
-) -> tuple[bool, str, list[dict] | None]:
+) -> tuple[bool, str, list[dict] | None, int | None]:
     """Navigates to the page and finds the update list."""
     success, msg = navigate_to_page(page, url)
     if not success:
-        return success, f"Unable to load {url}: {msg}", None
+        return success, f"Unable to load {url}: {msg}", None, None
     quiet or logger.info(f"Result page loaded: {url} (tz: {tz or 'local'})")
 
     # Find the <strong>Updates regarding...</strong> element,
@@ -68,36 +68,46 @@ def get_update_list(
     # Wait for the container to be loaded
     try:
         container_locator.wait_for(state="visible")
-        quiet or logger.info(f"Result title: {container_locator.locator(TITLE_SELECTOR).inner_text().strip()}")
+        quiet or logger.info(
+            f"Result title: {container_locator.locator(TITLE_SELECTOR).inner_text().strip()}"
+        )
     except TimeoutError:
-        return False, f"Timeout waiting for '{UPDATES_CONTAINER_SELECTOR}' after {TIMEOUT/1000:g} s.", None
+        msg = f"Timeout waiting for '{UPDATES_CONTAINER_SELECTOR}' after {TIMEOUT/1000:g} s."
+        return False, msg, None, None
 
     # Wait for the updates title to be loaded
     try:
         list_title_locator.wait_for(state="visible")
         quiet or logger.info(f"List title: {list_title_locator.inner_text().strip()}")
     except TimeoutError:
-        return False, f"Timeout waiting for '{UPDATES_TITLE_SELECTOR}' after {TIMEOUT/1000:g} s.", None
+        msg = f"Timeout waiting for '{UPDATES_TITLE_SELECTOR}' after {TIMEOUT/1000:g} s."
+        return False, msg, None, None
 
     # Wait for the list to be loaded
+    ntot = 0  # total number of updates
     try:
         list_locator.wait_for(state="visible", timeout=TIMEOUT_UL)
         items_locator = list_locator.locator(UPDATES_ITEM_SELECTOR)
         # If at least one <li> is loaded
         items_locator.locator("nth=0").wait_for(state="visible", timeout=TIMEOUT_UL)
-        quiet or logger.info(f"List loaded. {items_locator.count()} updates found.")
+        ntot = items_locator.count()
+        quiet or logger.info(f"List loaded. {ntot} updates found.")
     except TimeoutError:
         try:
             no_updates_text_locator.wait_for(state="visible", timeout=TIMEOUT_UL)
-            return True, "No updates found: " + no_updates_text_locator.inner_text().strip(), []
+            msg = "No updates found: " + no_updates_text_locator.inner_text().strip()
+            return True, msg, [], 0
         except TimeoutError:
-            return False, f"Timeout waiting for updates after {TIMEOUT/1000:g} s.", None
+            msg = f"Timeout waiting for updates after {TIMEOUT/1000:g} s."
+            return False, msg, None, None
 
     # Get items
     item_locator_list = items_locator.all()
     item_list = []
     count = 0
-    quiet or logger.info(f"Checking updates in the past {n_days} days (collect first {nmax} items)...")
+    quiet or logger.info(
+        f"Checking updates in the past {n_days} days (collect first {nmax} items)..."
+    )
 
     for item_locator in item_locator_list:
         if count >= nmax:
@@ -105,7 +115,7 @@ def get_update_list(
 
         success, msg, res = parse_item(page, item_locator, logger, quiet)
         if not success:
-            return success, msg, None
+            return success, msg, None, None
 
         if res:
             # If within n days, append to the list
@@ -128,7 +138,7 @@ def get_update_list(
 
         sleep(random.uniform(1, 3))  # pause for a random interval
 
-    return success, f"{len(item_list)} updates collected.", item_list
+    return success, f"{len(item_list)} updates collected.", item_list, ntot
 
 
 def parse_item(
@@ -174,32 +184,12 @@ def get_details(
     title_locator = new_page.locator(DETAIL_TITLE_SELECTOR)
     date_locator = new_page.locator(DETAIL_DATE_SELECTOR)
     content_locator = new_page.locator(DETAIL_CONTENT_SELECTOR)
-    content = clear_content(content_locator.inner_html())
+    content = clear_content(content_locator.inner_html(), '    ')
     info['title'] = title_locator.inner_text().strip()
     info['date'] = date_locator.inner_text().strip()
 
     new_page.close()
     return success, msg, info, content
-
-
-def construct_content(item_list: list[dict], city: str, n_days: int, nmax: int) -> list[str]:
-    """Constructs HTML content as lines."""
-    if len(item_list) == 0:
-        return []
-
-    lines = [f"<h2>Updates regarding {city} in the past {n_days} days</h2>"]
-    lines.append(f"<p><strong>First {nmax} updates:</strong></p>")
-    lines.append("<ol>")
-    for item in item_list:
-        lines.append(
-            "<li><strong>"
-            + f"<a href=\"{item['url']}\">{item['title']}</a>"
-            + f" (Posted {item['date']})"
-            + "</strong></li>"
-        )
-        lines.append(item['content'])
-    lines.append("</ol>")
-    return lines
 
 
 # Main functionality
@@ -225,7 +215,7 @@ def run(
                 return True
 
             # Directly go to the search result page -------------------|
-            success, msg, item_list = get_update_list(
+            success, msg, item_list, ntot = get_update_list(
                 page, target_url,
                 args.days, args.nmax,
                 logger,
@@ -241,34 +231,33 @@ def run(
             # Print to stdout if --print
             if args.print:
                 if len(item_list) > 0:
-                    print(f"Showing first {args.nmax} updates regarding {args.city} in the past {args.days} days:")
+                    print(f"Showing {len(item_list)}/{ntot} updates "
+                          + f"regarding {args.city} in the past {args.days} days:\n")
                     for i, item in enumerate(item_list):
                         print(f"{i + 1}.")
                         print(f"{item['url']}")
                         print(f"{item['title']}")
                         print(f"{item['date']}")
                         print(f"{BeautifulSoup(item['content'], 'html.parser').get_text()}\n")
+                    if len(item_list) < ntot:
+                        print("(Go to website to view full list)\n")
                 else:
                     print(f"No updates regarding {args.city} in the past {args.days} days.")
 
             # Export to a file with main part of the HTML content (inside <body></body>)
             if args.output.strip():
                 if len(item_list) > 0:
-                    lines = construct_content(item_list, args.city, args.days, args.nmax)
+                    lines = construct_content(
+                        item_list, target_url, args.city, args.days, args.nmax, ntot
+                    )
                     content = '\n'.join(lines)
                     with open(args.output, "w") as f:
                         f.write(content)
                     args.quiet or logger.info(f"Saved to '{args.output}'.")
                 else:
-                    args.quiet or logger.info("No updates. No file export.")
+                    args.quiet or logger.info("No updates. No file exported.")
             else:
-                args.quiet or logger.info("Filename is empty. No file export.")
-
-            # Export to a file with the complete HTML content (for testing)
-            # lines = ["<!DOCTYPE html>", "<html>", "<body>"] + lines + ["</body>", "</html>"]
-            # content = '\n'.join(lines)
-            # with open(os.path.join(OUTPUT_DIR, "content_all.html"), "w") as f:
-            #     f.write(content)
+                args.quiet or logger.info("Filename is empty. No file exported.")
 
         except Exception:
             traceback.print_exc()

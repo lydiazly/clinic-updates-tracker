@@ -32,7 +32,7 @@ docker build --target base -t clinic-test:base -f docker/Dockerfile-multi .  # 3
 docker build --target test -t clinic-test:test -f docker/Dockerfile-multi .  # 341MB run:✓
 docker build --target run -t clinic-test:run -f docker/Dockerfile-multi .  # 1.02GB run:✓
 
-# [Debian-based (Linux 6.10.14-linuxkit), python3.12, multi-stage]
+# [Debian-based (Linux 6.10.14-linuxkit), python3.12, multi-stage] (use this)
 tag='test-py'
 tag='run-py'
 docker build --target builder -t clinic-test:builder-py -f docker/Dockerfile-multi-py .  # 327MB

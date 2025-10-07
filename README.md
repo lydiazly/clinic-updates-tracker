@@ -72,11 +72,11 @@ options:
   -q, --quiet           still show errors but suppress info output in stderr, unless --test or --debug is set
   --utc                 convert time to UTC before comparing dates
   -H, --headed          run in headed mode (default: headless)
-  --debug               print debug logs
   -b str, --browser str
                         specify a browser. Choices: chromium, firefox, webkit (default: chromium)
   --headless-shell      use a separate headless shell for chromium headless mode (see
                         https://playwright.dev/python/docs/browsers#chromium-headless-shell)
+  --debug               print debug logs
   --test                test the browser without any page operation
 ```
 
