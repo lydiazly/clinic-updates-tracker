@@ -14,6 +14,7 @@ if [ -n "${SECRETS_FILE}" ] && [ -s "${SECRETS_FILE}" ]; then
 fi
 
 echo -e "=== Environment Variables ===\n"
+echo "             TZ: ${TZ}"
 echo "      TEST_MODE: ${TEST_MODE}"
 echo "     KEEP_ALIVE: ${KEEP_ALIVE}"
 echo "    SEND_EMAILS: ${SEND_EMAILS}"
@@ -32,6 +33,8 @@ echo "GMAIL_REFRESH_TOKEN: ${GMAIL_REFRESH_TOKEN:0:32}***"
 echo "       GMAIL_SENDER: ${GMAIL_SENDER}"
 
 echo -e "\n=== Step: Run script and save to OUTPUT_NAME ===\n"
+date
+set +e
 for i in $(seq 1 ${RETRIES}); do
   clinic-updates-tracker --headless-shell \
     --url "${TARGET_BASE_URL}" \
@@ -44,12 +47,13 @@ for i in $(seq 1 ${RETRIES}); do
   echo "> Waiting to retry ($i/${RETRIES})..."
   sleep 5
 done
+set -e
 echo "✓ Script completed successfully."
 
 # Read the HTML file and set it as output, escaping newlines
 if [ -s "${OUTPUT_NAME}" ]; then
-  echo -e "\n=== Step: Read HTML content ===\n"
-  content=$(cat "${OUTPUT_NAME}" | tr '\n' ' ')
+  echo -e "\n=== Step: Check HTML content ===\n"
+  content=$(cat "${OUTPUT_NAME}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/')
   has_updates=true
   echo "has_updates=true"
   echo "✓ HTML content loaded (${#content} characters)"
@@ -108,7 +112,7 @@ if [ "${SEND_EMAILS}" = 'true' ] \
       subject="=?UTF-8?B?${subject_encoded}?="
 
       body="<body>"
-      body+="${content}"
+      body+=$(cat "${OUTPUT_NAME}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/' | tr '\n' ' ')
       body+="<br><hr><p style=\"color:gray\">"
       body+="You are receiving this email because "
       body+="a GitHub Actions workflow <strong>run-task</strong> "

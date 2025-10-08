@@ -208,11 +208,12 @@ def is_date_within_n_days(date_str: str, n_days: int, tz: str = '') -> tuple[boo
     # Get current date (native) for getting local time zone
     now_naive = datetime.now()  # native datetime
     now_local = now_naive.astimezone()  # presumed to be local time
-    now_naive_str = now_local.strftime('%B %d, %Y (%Z)')  # %Z: timezone name, not identifier
-    # Get current time in UTC
-    now_date_utc = datetime.now(timezone.utc).date()
+    # now_naive_str = now_local.strftime('%B %d, %Y (%Z)')  # %Z: timezone name, not identifier
+    # Get current time in UTC (for checking)
+    now_utc = datetime.now(timezone.utc)  # timezone-aware
+    now_date_utc = now_utc.date()
     now_utc_str = now_date_utc.strftime('%Y-%m-%d (UTC)')
-    now_str_all = f"{now_naive_str} / {now_utc_str}"
+    # now_str_all = f"{now_naive_str} / {now_utc_str}"
 
     msg = ''
     tzinfo = None
@@ -223,18 +224,28 @@ def is_date_within_n_days(date_str: str, n_days: int, tz: str = '') -> tuple[boo
             tzname = tzinfo.key  # or str(tzinfo)
         except ZoneInfoNotFoundError as e:
             msg = f"WARNING: {e}. Using local time zone...\n"
+        else:
+            # Convert to target timezone
+            # now_target = now_utc.astimezone(tzinfo)
+            now_target = now_local.astimezone(tzinfo)
     # Or use local timezone
     if tzinfo is None:
         tzinfo = now_local.tzinfo  # <class 'datetime.timezone'>
         tzname = str(tzinfo)
+        now_target = now_local  # assume same timezone as target
+
+    now_date_target = now_target.date()
+    now_target_str = now_target.strftime('%B %d, %Y (%Z)')  # %Z: timezone name, not identifier
+    now_str_all = f"{now_target_str} / {now_utc_str}"
 
     try:
         # Parse the date string (no time) using dateutil.parser with the determined timezone
         ref_time_str = ' 12:00:00'  # preset, adjust this if needed
-        parsed_date = parser.parse(date_str + ref_time_str, default=datetime.now(tzinfo))
+        parsed_datetime = parser.parse(date_str + ref_time_str, default=datetime.now(tzinfo))  # timezone-aware
+        parsed_date = parsed_datetime.date()
         date_str_with_tz = f"{date_str} ({tzname})"
-        # Convert to UTC
-        parsed_date_utc = parsed_date.astimezone(timezone.utc).date()
+        # Convert to UTC (for checking)
+        parsed_date_utc = parsed_datetime.astimezone(timezone.utc).date()
         date_utc_str = parsed_date_utc.strftime('%Y-%m-%d (UTC)')
         date_str_all = f"{date_str_with_tz} / {date_utc_str}"
 
@@ -245,15 +256,15 @@ def is_date_within_n_days(date_str: str, n_days: int, tz: str = '') -> tuple[boo
         # Calculate the earliest date (n days before ref_datetime)
         # min_datetime = ref_datetime - timedelta(days=n_days)
 
-        # Calculate the days between ref_datetime and parsed_date
-        # Check if parsed_date is within the range (between min_datetime and ref_datetime)
-        # is_within = min_datetime <= parsed_date <= ref_datetime
+        # Calculate the days between ref_datetime and parsed_datetime
+        # Check if parsed_datetime is within the range (between min_datetime and ref_datetime)
+        # is_within = min_datetime <= parsed_datetime <= ref_datetime
 
         # Compare the date
-        days_diff = (now_date_utc - parsed_date_utc).days
+        # days_diff = (now_date_utc - parsed_date_utc).days  # use UTC dates
+        days_diff = (now_date_target - parsed_date).days  # use target timezone
         is_within = days_diff <= n_days
-        # Note: Because ref_time_str is a preset value, days_diff might be < 0
-        # if converting ref_time_str to UTC derives one day ahead of now_date_utc
+        # Note: Because ref_time_str is preset, days_diff might be less than 0
 
         if is_within:
             msg += f"{date_str_all} is within {n_days} days before {now_str_all}. Collecting..."

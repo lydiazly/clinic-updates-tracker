@@ -53,6 +53,8 @@ tag='run-py'
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
   -v "$(pwd)"/output:/app/output \
   -e TEST_MODE=true -e DAYS_SINCE=3 -e SEND_EMAILS=true --rm clinic-test:$tag  # ✓
+docker run -it --name clinic-test --env-file .env --env-file .secrets \
+  -e TZ=UTC -e DAYS_SINCE=1 -e MAX_N_ITEMS=10 --rm clinic-test:$tag  # ✓
 
 #----------------------------------------------------------------------|
 # Compose

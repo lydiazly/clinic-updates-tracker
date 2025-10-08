@@ -238,7 +238,10 @@ def run(
                         print(f"{item['url']}")
                         print(f"{item['title']}")
                         print(f"{item['date']}")
-                        print(f"{BeautifulSoup(item['content'], 'html.parser').get_text()}\n")
+                        print(
+                            BeautifulSoup(item['content'], 'html.parser').get_text('\n', strip=True)
+                            + '\n'
+                        )
                     if len(item_list) < ntot:
                         print("(Go to website to view full list)\n")
                 else:
