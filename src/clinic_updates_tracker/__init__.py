@@ -22,3 +22,5 @@ DAYS_SINCE: int = int(os.getenv('DAYS_SINCE')) or 30  # default: 1 month
 MAX_N_ITEMS: int = int(os.getenv('MAX_N_ITEMS')) or 10  # default: 10 items
 
 BROWSER_CHOICES = ["chromium", "firefox", "webkit"]
+
+USER_JSON: str = "./input/users.json"
