@@ -11,8 +11,6 @@ from time import sleep
 import traceback
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Locator, TimeoutError
 
-# from . import LAST_RUN_AT_ABSOLUTE_PATH
-# from . import OUTPUT_DIR
 from .browsers import get_browser
 from .selectors import TITLE_SELECTOR, UPDATES_CONTAINER_SELECTOR, UPDATES_TITLE_SELECTOR, \
     UPDATE_LIST_SELECTOR, UPDATES_ITEM_SELECTOR, UPDATES_EMPTY_SELECTOR, \

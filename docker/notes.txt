@@ -104,10 +104,22 @@ clinic-updates-tracker -h
 
 #----------------------------------------------------------------------|
 # Database
+# use ./.pg_password as secrets
 docker compose up -d db
 
 psql -h localhost -p 5432 -U admin -d userservice  # use ~/.pgpass
+# or use ./.env.pg
+source .env.pg
+psql
+
+# Connection string
 postgresql://admin@localhost:5432/userservice
+
+# Stop and remove
+docker compose down -v db
+
+# Test
+python src/clinic_updates_tracker/db_manager.py
 
 #----------------------------------------------------------------------|
 # Exit and clean up
