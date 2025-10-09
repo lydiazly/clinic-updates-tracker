@@ -5,12 +5,14 @@
 import argparse
 from bs4 import BeautifulSoup
 import logging
+# import os
 import random
 import re
 from time import sleep
 import traceback
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Locator, TimeoutError
 
+from . import OUTPUT_HTML_NAME
 from .browsers import get_browser
 from .selectors import TITLE_SELECTOR, UPDATES_CONTAINER_SELECTOR, UPDATES_TITLE_SELECTOR, \
     UPDATE_LIST_SELECTOR, UPDATES_ITEM_SELECTOR, UPDATES_EMPTY_SELECTOR, \
@@ -24,7 +26,7 @@ TIMEOUT_UL = 3000  # milliseconds
 
 
 def close_everything(browser: Browser, context: BrowserContext) -> str:
-    """Gracefully close everything."""
+    """Gracefully closes everything."""
     try:
         context.close()
         browser.close()
@@ -34,7 +36,7 @@ def close_everything(browser: Browser, context: BrowserContext) -> str:
 
 
 def navigate_to_page(page: Page, url: str) -> tuple[bool, str]:
-    """Navigate to the page and returns a tuple of status and message."""
+    """Navigates to the page and returns a tuple of status and message."""
     try:
         page.goto(url)
         page.wait_for_load_state("networkidle")
@@ -89,7 +91,7 @@ def get_update_list(
         # If at least one <li> is loaded
         items_locator.locator("nth=0").wait_for(state="visible", timeout=TIMEOUT_UL)
         ntot = items_locator.count()
-        quiet or logger.info(f"List loaded. {ntot} updates found.")
+        quiet or logger.info(f"List with {ntot} items loaded.")
     except TimeoutError:
         try:
             no_updates_text_locator.wait_for(state="visible", timeout=TIMEOUT_UL)
@@ -104,7 +106,7 @@ def get_update_list(
     item_list = []
     count = 0
     quiet or logger.info(
-        f"Checking updates in the past {n_days} days (collect first {nmax} items)..."
+        f"Checking updates in the past {n_days} days (collecting at most {nmax}/{ntot} items)..."
     )
 
     for item_locator in item_locator_list:
@@ -226,10 +228,10 @@ def run(
                 logger.error(msg)
                 return False
 
-            # Print to stdout if --print
+            # Print to stdout if selecting '--print' ------------------|
             if args.print:
                 if len(item_list) > 0:
-                    print(f"Showing {len(item_list)}/{ntot} updates "
+                    print(f"Showing at most {len(item_list)}/{ntot} updates "
                           + f"regarding {args.city} in the past {args.days} days:\n")
                     for i, item in enumerate(item_list):
                         print(f"{i + 1}.")
@@ -241,24 +243,32 @@ def run(
                             + '\n'
                         )
                     if len(item_list) < ntot:
-                        print("(Go to website to view full list)\n")
+                        print(f"--> Go to website to view full list:\n{target_url}\n")
                 else:
                     print(f"No updates regarding {args.city} in the past {args.days} days.")
 
-            # Export to a file with main part of the HTML content (inside <body></body>)
-            if args.output.strip():
+            # Export to a HTML file if not selecting '--no-o' ---------|
+            if args.export:
                 if len(item_list) > 0:
                     lines = construct_content(
                         item_list, target_url, args.city, args.days, args.nmax, ntot
                     )
                     content = '\n'.join(lines)
-                    with open(args.output, "w") as f:
+
+                    output_path = args.output
+                    # os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                    if output_path.is_dir():
+                        output_path = output_path / OUTPUT_HTML_NAME
+                    else:
+                        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+                    with open(output_path, "w") as f:
                         f.write(content)
-                    args.quiet or logger.info(f"Saved to '{args.output}'.")
+                    args.quiet or logger.info(f"Exported to '{str(output_path)}'")
                 else:
                     args.quiet or logger.info("No updates. No file exported.")
             else:
-                args.quiet or logger.info("Filename is empty. No file exported.")
+                args.quiet or logger.info("'--no-o' selected. No file exported.")
 
         except Exception:
             traceback.print_exc()

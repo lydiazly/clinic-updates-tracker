@@ -3,8 +3,8 @@
 # pytest tests/test_url.py --browser-channel chromium
 import pytest
 from playwright.sync_api import Page, expect
-from src.clinic_updates_tracker import TARGET_BASE_URL
-from src.clinic_updates_tracker.helpers import get_full_url
+from clinic_updates_tracker import TARGET_BASE_URL
+from clinic_updates_tracker.helpers import get_full_url
 
 
 @pytest.mark.parametrize("full_url, full_url_expected", [

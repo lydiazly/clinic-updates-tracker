@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 import psycopg2
 
-from clinic_updates_tracker import DAYS_SINCE, MAX_N_ITEMS, USER_JSON
+from clinic_updates_tracker import DAYS_SINCE, MAX_N_ITEMS, INPUT_USERS_JSON_PATH
 
 
 @dataclass
@@ -206,15 +206,15 @@ class UserServiceDB:
         return None
 
 
-def load_json_data(json_file_path: str) -> list[User]:
+def load_json_data(json_file_path: Path) -> list[User]:
         """Load and validate JSON data from file."""
         try:
             with open(json_file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
         except FileNotFoundError:
-            raise FileNotFoundError(f"{json_file_path}: file not found")
+            raise FileNotFoundError(f"{str(json_file_path)}: file not found")
         except Exception as e:
-            raise RuntimeError(f"Failed to load file '{json_file_path}': {e}")
+            raise RuntimeError(f"Failed to load file '{str(json_file_path)}': {e}")
 
         if not isinstance(data, list):
             raise ValueError("JSON file must contain a list of user objects.")
@@ -241,7 +241,7 @@ def main():
 
     # Load data from JSON file
     print("--- Loading data from JSON ---")
-    users = load_json_data(USER_JSON)
+    users = load_json_data(INPUT_USERS_JSON_PATH)
 
     # Initialize database manager
     try:

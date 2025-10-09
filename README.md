@@ -63,17 +63,20 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --url str             target URL (default: read from .env)
-  time zone identifier of the target website (empty means native) (default: read from .env)
-  -d int, --days int    only show items within N days (default: read from .env)
-  -n int, --nmax int    only show first n items (default: read from .env)
+  --tz str              time zone identifier of the target website
+                        (empty string is regarded as native) (default: read from .env)
+  -d int, --days int    only show items within these days (default: read from .env)
+  -n int, --nmax int    maximum number of items to collect (default: read from .env)
   -a, --all             get all updates (only affects the clinic table but not the update list)
-  -p, --print           print result as plain text to STDOUT
-  -o str, --output str  path of output file. Empty indicates no export. (default: ./output/content.html)
-  -q, --quiet           still show errors but suppress info output in stderr, unless --test or --debug is set
+  -p, --print           print results as plain text to STDOUT
+  -o str, --output str  path of output file (empty string is regarded as '.') (default:
+                        output/content.html)
+  --no-o                no export (default: export HTML)
+  -q, --quiet           still show errors but suppress other output to STDERR, unless --test or --debug is set
   --utc                 convert time to UTC before comparing dates
   -H, --headed          run in headed mode (default: headless)
   -b str, --browser str
-                        specify a browser. Choices: chromium, firefox, webkit (default: chromium)
+                        specify a browser (choices: chromium, firefox, webkit) (default: chromium)
   --headless-shell      use a separate headless shell for chromium headless mode (see
                         https://playwright.dev/python/docs/browsers#chromium-headless-shell)
   --debug               print debug logs

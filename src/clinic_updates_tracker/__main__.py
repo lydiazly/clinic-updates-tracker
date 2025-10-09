@@ -1,14 +1,14 @@
 import sys
-from .helpers import get_options
+from .helpers import get_full_url, get_options
 from .core import run
 
 
 def main():
     """Gets options, runs program, cleans up on exception."""
-    args, logger, target_url = get_options()
+    args, logger = get_options()
 
-    if not args.url:
-        logger.error("Error: URL not given.")
+    if not args.url.strip():
+        logger.error("URL not given.")
         sys.exit(1)
 
     if args.days < 1:
@@ -18,6 +18,10 @@ def main():
     if args.nmax < 1:
         args.quiet or logger.info("nmax < 1. Nothing to do.")
         sys.exit(0)
+
+    # Note: argument 'only_accepting' only affects the clinic table but not the update list
+    query_dict = ({'only_accepting': 'yes'} if not args.all else {}) | {'list_town': args.city}
+    target_url = get_full_url(args.url, '?', query_dict)
 
     success = run(args, logger, target_url)
     if success:

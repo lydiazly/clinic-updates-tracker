@@ -31,3 +31,7 @@ clinic-updates-tracker = "clinic_updates_tracker.__main__:main"
 [project.urls]
 "Homepage" = "https://github.com/lydiazly/clinic-updates-tracker"
 "Bug Tracker" = "https://github.com/lydiazly/clinic-updates-tracker/issues"
+
+[tool.pytest.ini_options]
+addopts = "--browser-channel chromium -s"
+testpaths = ["tests"]

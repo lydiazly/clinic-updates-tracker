@@ -3,10 +3,10 @@
 # pytest tests/test_selector.py --browser-channel chromium -s
 import os
 from playwright.sync_api import Page, expect
-from src.clinic_updates_tracker.selectors import TITLE_SELECTOR, UPDATES_CONTAINER_SELECTOR, UPDATES_TITLE_SELECTOR, \
+from clinic_updates_tracker.selectors import TITLE_SELECTOR, UPDATES_CONTAINER_SELECTOR, UPDATES_TITLE_SELECTOR, \
     UPDATE_LIST_SELECTOR, UPDATES_ITEM_SELECTOR, UPDATES_EMPTY_SELECTOR, \
     DETAIL_TITLE_SELECTOR, DETAIL_DATE_SELECTOR, DETAIL_CONTENT_SELECTOR
-from src.clinic_updates_tracker.helpers import clear_content
+from clinic_updates_tracker.helpers import clear_content
 
 timeout = 500
 

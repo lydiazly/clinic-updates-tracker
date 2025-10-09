@@ -7,32 +7,32 @@ export SEND_EMAILS=${SEND_EMAILS:-false}
 export DAYS_SINCE=${DAYS_SINCE:-90}
 export MAX_N_ITEMS=${MAX_N_ITEMS:-10}
 export RETRIES=${RETRIES:-3}
-export OUTPUT_NAME="./output/content_docker.html"
+export OUTPUT_HTML_PATH="./output/content_docker.html"
 
 if [ -n "${SECRETS_FILE}" ] && [ -s "${SECRETS_FILE}" ]; then
   source "${SECRETS_FILE}"
 fi
 
-echo -e "=== Environment Variables ===\n"
-echo "             TZ: ${TZ}"
-echo "      TEST_MODE: ${TEST_MODE}"
-echo "     KEEP_ALIVE: ${KEEP_ALIVE}"
-echo "    SEND_EMAILS: ${SEND_EMAILS}"
-echo "     DAYS_SINCE: ${DAYS_SINCE}"
-echo "    MAX_N_ITEMS: ${MAX_N_ITEMS}"
-echo "        RETRIES: ${RETRIES}"
-echo "TARGET_BASE_URL: ${TARGET_BASE_URL}"
-echo "      TARGET_TZ: ${TARGET_TZ}"
-echo "           CITY: ${CITY}"
-echo "    OUTPUT_NAME: ${OUTPUT_NAME}"
-echo "   SECRETS_FILE: ${SECRETS_FILE:-none}"
+echo -e "=== Environment Variables & Secrets ===\n"
+echo "              TZ: ${TZ}"
+echo "       TEST_MODE: ${TEST_MODE}"
+echo "      KEEP_ALIVE: ${KEEP_ALIVE}"
+echo "     SEND_EMAILS: ${SEND_EMAILS}"
+echo "      DAYS_SINCE: ${DAYS_SINCE}"
+echo "     MAX_N_ITEMS: ${MAX_N_ITEMS}"
+echo "         RETRIES: ${RETRIES}"
+echo " TARGET_BASE_URL: ${TARGET_BASE_URL}"
+echo "       TARGET_TZ: ${TARGET_TZ}"
+echo "            CITY: ${CITY}"
+echo "OUTPUT_HTML_PATH: ${OUTPUT_HTML_PATH}"
+echo "    SECRETS_FILE: ${SECRETS_FILE:-none}"
 echo ""
 echo "    GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:0:13}***"
 echo "GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:0:7}***"
 echo "GMAIL_REFRESH_TOKEN: ${GMAIL_REFRESH_TOKEN:0:32}***"
 echo "       GMAIL_SENDER: ${GMAIL_SENDER}"
 
-echo -e "\n=== Step: Run script and save to OUTPUT_NAME ===\n"
+echo -e "\n=== Step: Run script and save to OUTPUT_HTML_PATH ===\n"
 date
 set +e
 for i in $(seq 1 ${RETRIES}); do
@@ -41,7 +41,7 @@ for i in $(seq 1 ${RETRIES}); do
     --tz "${TARGET_TZ}" \
     --days ${DAYS_SINCE} \
     --nmax ${MAX_N_ITEMS} \
-    --output "${OUTPUT_NAME}" \
+    --output "${OUTPUT_HTML_PATH}" \
     "${CITY}"
   if [ $? -eq 0 ]; then break; fi
   echo "> Waiting to retry ($i/${RETRIES})..."
@@ -51,9 +51,9 @@ set -e
 echo "✓ Script completed successfully."
 
 # Read the HTML file and set it as output, escaping newlines
-if [ -s "${OUTPUT_NAME}" ]; then
+if [ -s "${OUTPUT_HTML_PATH}" ]; then
   echo -e "\n=== Step: Check HTML content ===\n"
-  content=$(cat "${OUTPUT_NAME}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/')
+  content=$(cat "${OUTPUT_HTML_PATH}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/')
   has_updates=true
   echo "has_updates=true"
   echo "✓ HTML content loaded (${#content} characters)"
@@ -112,7 +112,7 @@ if [ "${SEND_EMAILS}" = 'true' ] \
       subject="=?UTF-8?B?${subject_encoded}?="
 
       body="<body>"
-      body+=$(cat "${OUTPUT_NAME}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/' | tr '\n' ' ')
+      body+=$(cat "${OUTPUT_HTML_PATH}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/' | tr '\n' ' ')
       body+="<br><hr><p style=\"color:gray\">"
       body+="You are receiving this email because "
       body+="a GitHub Actions workflow <strong>run-task</strong> "

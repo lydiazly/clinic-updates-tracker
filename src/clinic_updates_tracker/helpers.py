@@ -5,12 +5,13 @@ import argparse
 from datetime import datetime, timezone
 from dateutil import parser
 import logging
+from pathlib import Path
 import re
 import sys
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from . import OUTPUT_NAME, TARGET_BASE_URL, TARGET_TZ, CITY, DAYS_SINCE, MAX_N_ITEMS, BROWSER_CHOICES
+from . import OUTPUT_HTML_PATH, TARGET_BASE_URL, TARGET_TZ, CITY, DAYS_SINCE, MAX_N_ITEMS, BROWSER_CHOICES
 
 
 def get_full_url(base_url: str, delim: str = '?', sub: dict | str = {}) -> str:
@@ -70,7 +71,7 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
         type=str,
         metavar='str',
         default=TARGET_TZ,
-        help="time zone identifier of the target website (empty means native) (default: %(default)s)"
+        help="time zone identifier of the target website (empty string is regarded as native) (default: %(default)s)"
     )
     parser.add_argument(
         '-d', '--days',
@@ -84,7 +85,7 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
         type=int,
         metavar='int',
         default=MAX_N_ITEMS,
-        help="only show first n items (default: %(default)s)"
+        help="maximum number of items to collect (default: %(default)s)"
     )
     parser.add_argument(
         '-a', '--all',
@@ -94,19 +95,24 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
     parser.add_argument(
         '-p', '--print',
         action='store_true',
-        help="print result as plain text to STDOUT"
+        help="print results as plain text to STDOUT"
     )
     parser.add_argument(
         '-o', '--output',
-        type=str,
-        metavar='str',
-        default=OUTPUT_NAME,
-        help="path of output file. Empty indicates no export. (default: %(default)s)"
+        type=Path,
+        metavar='str',  # will call Path(str)
+        default=OUTPUT_HTML_PATH,
+        help="path of output file (empty string is regarded as '.') (default: %(default)s)"
     )
+    parser.add_argument(
+        '--no-o',
+        dest="export",
+        action="store_false",
+        help="no export (default: export HTML)")
     parser.add_argument(
         '-q', '--quiet',
         action='store_true',
-        help="still show errors but suppress info output in stderr, unless --test or --debug is set"
+        help="still show errors but suppress other output to STDERR, unless --test or --debug is set"
     )
     parser.add_argument(
         '-H', '--headed',
@@ -118,7 +124,7 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
         metavar='str',
         choices=BROWSER_CHOICES,
         default='chromium',
-        help="specify a browser. Choices: %(choices)s (default: %(default)s)"
+        help="specify a browser (choices: %(choices)s) (default: %(default)s)"
     )
     parser.add_argument(
         '--headless-shell',
@@ -138,13 +144,9 @@ def get_options() -> tuple[argparse.Namespace, logging.Logger]:
     )
     args = parser.parse_args()
 
-    # Note: argument 'only_accepting' only affects the clinic table but not the update list
-    query_dict = ({'only_accepting': 'yes'} if not args.all else {}) | {'list_town': args.city}
-    target_url = get_full_url(args.url, '?', query_dict)
-
     logger = setup_logger('' if args.debug else __name__)
 
-    return args, logger, target_url
+    return args, logger
 
 
 def preserve_tags(element) -> str:

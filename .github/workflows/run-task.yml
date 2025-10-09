@@ -32,7 +32,7 @@ jobs:
       TEST_MODE: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
       DAYS_SINCE: ${{ github.event.inputs.test_mode == 'true' && '90' || vars.DAYS_SINCE }}
       MAX_N_ITEMS: ${{ github.event.inputs.test_mode == 'true' && '10' || vars.MAX_N_ITEMS }}
-      OUTPUT_NAME: ./output/content.html
+      OUTPUT_HTML_PATH: ./output/content.html
 
     steps:
       - name: Debug variables
@@ -49,7 +49,7 @@ jobs:
           echo "               vars.TARGET_TZ: '${{ vars.TARGET_TZ }}'"
           echo "                    vars.CITY: '${{ vars.CITY }}'"
           echo "                 vars.RETRIES: '${{ vars.RETRIES }}'"
-          echo "              env.OUTPUT_NAME: '${{ env.OUTPUT_NAME }}'"
+          echo "         env.OUTPUT_HTML_PATH: '${{ env.OUTPUT_HTML_PATH }}'"
           echo "Debugging complete. Exiting workflow."
           exit 1
 
@@ -87,7 +87,7 @@ jobs:
         run: |
           python3 -m pip install --no-cache-dir --user .
 
-      - name: Run script and save to OUTPUT_NAME
+      - name: Run script and save to OUTPUT_HTML_PATH
         shell: bash
         run: |
           for i in $(seq 1 ${{ vars.RETRIES }}); do
@@ -96,7 +96,7 @@ jobs:
               --tz "${{ vars.TARGET_TZ }}" \
               --days ${{ env.DAYS_SINCE }} \
               --nmax ${{ env.MAX_N_ITEMS }} \
-              --output "${{ env.OUTPUT_NAME }}" \
+              --output "${{ env.OUTPUT_HTML_PATH }}" \
               "${{ vars.CITY }}"
             if [ $? -eq 0 ]; then break; fi
             echo "> Waiting to retry ($i/${{ vars.RETRIES }})..."
@@ -109,8 +109,8 @@ jobs:
         id: check_html
         shell: bash
         run: |
-          if [ -s "${{ env.OUTPUT_NAME }}" ]; then
-            content=$(cat "${{ env.OUTPUT_NAME }}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/')
+          if [ -s "${{ env.OUTPUT_HTML_PATH }}" ]; then
+            content=$(cat "${{ env.OUTPUT_HTML_PATH }}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/')
             echo "has_updates=true" >> $GITHUB_OUTPUT
             echo "✓ HTML content loaded (${#content} characters)"
           else
@@ -164,7 +164,7 @@ jobs:
           subject="=?UTF-8?B?${subject_encoded}?="
 
           body="<body>"
-          body+=$(cat "${{ env.OUTPUT_NAME }}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/' | tr '\n' ' ')
+          body+=$(cat "${{ env.OUTPUT_HTML_PATH }}" | sed -E 's/^.*<body>(.+)<\/body>.*$/\1/' | tr '\n' ' ')
           body+="<br><hr><p style=\"color:gray\">"
           body+="You are receiving this email because "
           body+="a GitHub Actions workflow <strong>run-task</strong> "
