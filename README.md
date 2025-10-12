@@ -37,8 +37,6 @@ python3 -m pip uninstall clinictracker
 
 ## Usage
 
-Example:
-
 ```sh
 clinictracker
 ```

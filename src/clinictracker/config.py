@@ -32,7 +32,7 @@ if OUTPUT_HTML_PATH.is_dir():
 TARGET_BASE_URL: str = os.getenv('TARGET_BASE_URL', '')
 TARGET_TZ: str = os.getenv('TARGET_TZ', '')
 CITY: str = os.getenv('CITY', '')
-DAYS_BACK: int = int(os.getenv('DAYS_BACK', 1))  # default: 1 day
+DAYS_BACK: int = int(os.getenv('DAYS_BACK', 2))  # default: 2 days
 MAX_ITEMS: int = int(os.getenv('MAX_ITEMS'), 10)  # default: 10 items
 
 # Available browsers
