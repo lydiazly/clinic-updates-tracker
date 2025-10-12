@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# src/clinic_updates_tracker/db_manager.py
+# db_manager.py
 
 from dataclasses import dataclass, field, asdict
 from getpass import getpass
@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 import psycopg2
 
-from clinic_updates_tracker import DAYS_SINCE, MAX_N_ITEMS, INPUT_USERS_JSON_PATH
+from clinictracker.config import DAYS_BACK, MAX_ITEMS, INPUT_USERS_JSON_PATH
 
 
 @dataclass
@@ -17,8 +17,8 @@ class User:
     nickname: str | None = None
     email_list: list[str] = field(default_factory=list)
     city_list: list[str] = field(default_factory=list)
-    intv: int = DAYS_SINCE
-    nmax: int = MAX_N_ITEMS
+    intv: int = DAYS_BACK
+    nmax: int = MAX_ITEMS
     id: int = -1  # assigned by database
 
     def __str__(self):
@@ -78,7 +78,7 @@ class UserServiceDB:
         - username: (str, unique, not null) the primary email
         - nickname: (str), default to null
         - email_list: (list(str), not empty) recipients (may include the primary email)
-        - city_list: (list(str), not empty) city/town list
+        - city_list: (list(str), not empty) town/city list
         - intv: (int, > 0) schedule interval in days, default to 1
         - nmax: (int, > 0) max number of items to show, default to 10
         """

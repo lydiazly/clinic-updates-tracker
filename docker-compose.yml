@@ -1,4 +1,4 @@
-name: clinic-updates-tracker
+name: clinictracker
 
 services:
   run-task:

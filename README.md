@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![python](https://img.shields.io/badge/Python-3.11,3.12-3776AB?logo=python&logoColor=white)](https://www.python.org)
 
-Fetches updates on a target public service platform such as Find a Doctor BC.
+A Python package for tracking updates across all clinics in specified regions from a target website.
 
 ***This tool is developed for educational and personal use only.***
 
@@ -26,16 +26,13 @@ Install this module:
 ```sh
 # Install from GitHub
 python3 -m pip install git+https://github.com/lydiazly/clinic-updates-tracker.git
-# Or install from local clone in editable/develop mode
-git clone https://github.com/lydiazly/clinic-updates-tracker.git
-cd clinic-updates-tracker
-python3 -m pip install -e .
+# Installs: clinictracker
 ```
 
 To uninstall:
 
 ```sh
-python3 -m pip uninstall clinic-updates-tracker
+python3 -m pip uninstall clinictracker
 ```
 
 ## Usage
@@ -43,53 +40,52 @@ python3 -m pip uninstall clinic-updates-tracker
 Example:
 
 ```sh
-clinic-updates-tracker
+clinictracker
 ```
 
 Usage:
 
 ```sh
-clinic-updates-tracker -h
+clinictracker -h
 ```
 
 ```text
-usage: clinic-updates-tracker [-h] [options] [town/city]
+usage: clinictracker [-h] [options] [town/city]
 
-Check updates on target URL.
+Check updates on target website.
 
 positional arguments:
-  town/city             target town/city
+  town/city             The town/city to be queried (default from $CITY)
 
 options:
   -h, --help            show this help message and exit
-  --url str             target URL (default: read from .env)
-  --tz str              time zone identifier of the target website
-                        (empty string is regarded as native) (default: read from .env)
-  -d int, --days int    only show items within these days (default: read from .env)
-  -n int, --nmax int    maximum number of items to collect (default: read from .env)
-  -a, --all             get all updates (only affects the clinic table but not the update list)
-  -p, --print           print results as plain text to STDOUT
-  -o str, --output str  path of output file (empty string is regarded as '.') (default:
-                        output/content.html)
-  --no-o                no export (default: export HTML)
-  -q, --quiet           still show errors but suppress other output to STDERR, unless --test or --debug is set
-  --utc                 convert time to UTC before comparing dates
-  -H, --headed          run in headed mode (default: headless)
+  --url str             The target base URL (default from $TARGET_BASE_URL)
+  --tz str              TZ identifier (IANA Time Zones) of the target website
+                        (use local time zone if empty) (default from $TARGET_TZ)
+  -d int, --days int    Number of days to look back for data collection
+                        (default to 1 or from $DAYS_BACK)
+  -n int, --nmax int    Maximum number of items to collect
+                        (default to 1 or from $MAX_ITEMS)
+  -p, --print           Print results as plain text to STDOUT (default: false)
+  -o str, --output str  Path of output file (empty is interpreted as '.')
+                        (default to './output/content.html' or from
+                        $OUTPUT_HTML_PATH)
+  --no-o                No export (default: export to a file)
+  -H, --headed          Run in headed mode (default: headless)
   -b str, --browser str
-                        specify a browser (choices: chromium, firefox, webkit) (default: chromium)
-  --headless-shell      use a separate headless shell for chromium headless mode (see
-                        https://playwright.dev/python/docs/browsers#chromium-headless-shell)
-  --debug               print debug logs
-  --test                test the browser without any page operation
+                        Select a browser from: chromium, firefox, webkit
+                        (default: chromium)
+  --headless-shell      Use a separate headless shell for chromium headless mode
+                        (https://playwright.dev/python/docs/browsers#chromium-headless-shell)
+  --debug               Set the logging level to DEBUG
+                        (default to false or from $DEBUG_MODE)
+  --test                Exit after opening a page without any further operation
+                        (default: false)
+  -q, --quiet           Suppress INFO level outputs unless selecting --test or --debug
+                        (default: print all)
 ```
 
 ## Testing
-
-Install requirements:
-
-```sh
-python3 -m pip install -r requirements.txt
-```
 
 Run tests:
 

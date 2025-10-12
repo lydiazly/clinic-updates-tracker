@@ -1,6 +1,10 @@
-# This workflow will install Python dependencies and run a script then notify the user about the result
-# [Actions secrets] GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER
-# [Actions variables] RECIPIENT_LIST(comma-separated), TARGET_BASE_URL, CITY, DAYS_SINCE, MAX_N_ITEMS, RETRIES
+# This workflow will install Python dependencies and run a script
+# then notify the user about the result
+# [Actions secrets] GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN,
+#                   GMAIL_SENDER
+# [Actions variables] TARGET_BASE_URL, TARGET_TZ, CITY,
+#                     DAYS_BACK, MAX_ITEMS, RETRIES,
+#                     RECIPIENT_LIST(comma-separated)
 
 name: Run and Notify
 
@@ -30,8 +34,8 @@ jobs:
 
     env:
       TEST_MODE: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
-      DAYS_SINCE: ${{ github.event.inputs.test_mode == 'true' && '90' || vars.DAYS_SINCE }}
-      MAX_N_ITEMS: ${{ github.event.inputs.test_mode == 'true' && '10' || vars.MAX_N_ITEMS }}
+      DAYS_BACK: ${{ github.event.inputs.test_mode == 'true' && '90' || vars.DAYS_BACK }}
+      MAX_ITEMS: ${{ github.event.inputs.test_mode == 'true' && '10' || vars.MAX_ITEMS }}
       OUTPUT_HTML_PATH: ./output/content.html
 
     steps:
@@ -41,10 +45,10 @@ jobs:
           echo "*** Debug Mode ***"
           echo "github.event.inputs.test_mode: '${{ github.event.inputs.test_mode }}'"
           echo "                env.TEST_MODE: '${{ env.TEST_MODE }}'"
-          echo "              vars.DAYS_SINCE: '${{ vars.DAYS_SINCE }}'"
-          echo "               env.DAYS_SINCE: '${{ env.DAYS_SINCE }}'"
-          echo "             vars.MAX_N_ITEMS: '${{ vars.MAX_N_ITEMS }}'"
-          echo "              env.MAX_N_ITEMS: '${{ env.MAX_N_ITEMS }}'"
+          echo "               vars.DAYS_BACK: '${{ vars.DAYS_BACK }}'"
+          echo "                env.DAYS_BACK: '${{ env.DAYS_BACK }}'"
+          echo "               vars.MAX_ITEMS: '${{ vars.MAX_ITEMS }}'"
+          echo "                env.MAX_ITEMS: '${{ env.MAX_ITEMS }}'"
           echo "         vars.TARGET_BASE_URL: '${{ vars.TARGET_BASE_URL }}'"
           echo "               vars.TARGET_TZ: '${{ vars.TARGET_TZ }}'"
           echo "                    vars.CITY: '${{ vars.CITY }}'"
@@ -83,7 +87,7 @@ jobs:
         run: |
           python3 -m playwright install --with-deps --only-shell chromium
 
-      - name: Install clinic_updates_tracker
+      - name: Install clinictracker
         run: |
           python3 -m pip install --no-cache-dir --user .
 
@@ -91,11 +95,11 @@ jobs:
         shell: bash
         run: |
           for i in $(seq 1 ${{ vars.RETRIES }}); do
-            clinic-updates-tracker --headless-shell \
+            clinictracker --headless-shell \
               --url "${{ vars.TARGET_BASE_URL }}" \
               --tz "${{ vars.TARGET_TZ }}" \
-              --days ${{ env.DAYS_SINCE }} \
-              --nmax ${{ env.MAX_N_ITEMS }} \
+              --days ${{ env.DAYS_BACK }} \
+              --nmax ${{ env.MAX_ITEMS }} \
               --output "${{ env.OUTPUT_HTML_PATH }}" \
               "${{ vars.CITY }}"
             if [ $? -eq 0 ]; then break; fi
@@ -115,7 +119,7 @@ jobs:
             echo "✓ HTML content loaded (${#content} characters)"
           else
           echo "has_updates=false" >> $GITHUB_OUTPUT
-          echo "No updates in ${{ vars.CITY }} in the past ${{ env.DAYS_SINCE }} days. Nothing to do."
+          echo "No updates. Nothing to do."
           fi
 
       - name: Parse recipient email list
@@ -160,7 +164,7 @@ jobs:
 
           subject_prefix=""
           [ "${is_test}" = "true" ] && subject_prefix=" [TEST]"
-          subject_encoded=$(echo -n "${subject_prefix} Clinic News Alert" | base64)
+          subject_encoded=$(echo -n "${subject_prefix} Clinic Update Alerts" | base64)
           subject="=?UTF-8?B?${subject_encoded}?="
 
           body="<body>"

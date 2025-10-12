@@ -18,27 +18,27 @@ python3 -V
 
 # [Ubuntu 24.04, python3.11]
 tag='ubuntu24.04-py3.11'
-docker build -t clinic-test:$tag -f docker/Dockerfile-py3.11 .  # 1.56GB run:✓
+docker build -t clinic-test:$tag -f docker/Dockerfile-py3.11 .  # ~1.56GB run:✓
 
 # [Ubuntu 24.04, python3.12]
 tag='ubuntu24.04'
-docker build -t clinic-test:$tag -f docker/Dockerfile-py3.12 .  # 1.37GB run:✓
+docker build -t clinic-test:$tag -f docker/Dockerfile-py3.12 .  # ~1.37GB run:✓
 
 # [Ubuntu 24.04, python3.12, multi-stage]
 tag='test'
 tag='run'
-docker build --target builder -t clinic-test:builder -f docker/Dockerfile-multi .  # 350MB
-docker build --target base -t clinic-test:base -f docker/Dockerfile-multi .  # 341MB
-docker build --target test -t clinic-test:test -f docker/Dockerfile-multi .  # 341MB run:✓
-docker build --target run -t clinic-test:run -f docker/Dockerfile-multi .  # 1.02GB run:✓
+docker build --target builder -t clinic-test:builder -f docker/Dockerfile-multi .  # ~350MB
+docker build --target base -t clinic-test:base -f docker/Dockerfile-multi .  # ~341MB
+docker build --target test -t clinic-test:test -f docker/Dockerfile-multi .  # ~341MB run:✓
+docker build --target run -t clinic-test:run -f docker/Dockerfile-multi .  # ~1.02GB run:✓
 
 # [Debian-based (Linux 6.10.14-linuxkit), python3.12, multi-stage] (use this)
 tag='test-py'
 tag='run-py'
-docker build --target builder -t clinic-test:builder-py -f docker/Dockerfile-multi-py .  # 327MB
-docker build --target base -t clinic-test:base-py -f docker/Dockerfile-multi-py .  # 322MB
-docker build --target test -t clinic-test:test-py -f docker/Dockerfile-multi-py .  # 322MB run:✓
-docker build --target run -t clinic-test:run-py -f docker/Dockerfile-multi-py .  # 957MB run:✓
+docker build --target builder -t clinic-test:builder-py -f docker/Dockerfile-multi-py .  # 340MB
+docker build --target base -t clinic-test:base-py -f docker/Dockerfile-multi-py .  # 335MB
+docker build --target test -t clinic-test:test-py -f docker/Dockerfile-multi-py .  # 335MB run:✓
+docker build --target run -t clinic-test:run-py -f docker/Dockerfile-multi-py .  # 970MB run:✓
 
 # Run
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
@@ -52,10 +52,10 @@ docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
 tag='run-py'
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
   -v "$(pwd)"/output:/app/output \
-  -e TEST_MODE=true -e DAYS_SINCE=3 -e SEND_EMAILS=true --rm clinic-test:$tag  # ✓
+  -e TEST_MODE=true -e DAYS_BACK=3 -e SEND_EMAILS=true --rm clinic-test:$tag  # ✓
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
   -v "$(pwd)"/output:/app/output \
-  -e TZ=UTC -e DAYS_SINCE=1 -e MAX_N_ITEMS=10 --rm clinic-test:$tag  # ✓
+  -e TZ=UTC -e DAYS_BACK=1 -e MAX_ITEMS=10 --rm clinic-test:$tag  # ✓
 
 #----------------------------------------------------------------------|
 # Compose
@@ -67,8 +67,8 @@ docker compose build run-task
 # Already set -it in test-mode
 docker compose run --name clinic-test --rm test-mode  # ✓
 docker compose run --name clinic-test -u root --rm test-mode  # ✓
-docker compose run --name clinic-test -e DAYS_SINCE=1 --rm test-mode ./docker/docker-entrypoint.sh # ✓
-docker compose run --name clinic-test -e DAYS_SINCE=1 \
+docker compose run --name clinic-test -e DAYS_BACK=1 --rm test-mode ./docker/docker-entrypoint.sh # ✓
+docker compose run --name clinic-test -e DAYS_BACK=1 \
   --entrypoint /app/docker/docker-entrypoint.sh --rm test-mode # ✓
 docker compose run --name clinic-test -e SEND_EMAILS=true --rm run-task  # ✓
 
@@ -87,7 +87,7 @@ docker compose down test-mode
 
 # Test (running)
 docker compose run --name clinic-test -e KEEP_ALIVE=true -d test-mode  # ✓
-docker compose exec -e DAYS_SINCE=1 test-mode ./docker/docker-entrypoint.sh  # ✓
+docker compose exec -e DAYS_BACK=1 test-mode ./docker/docker-entrypoint.sh  # ✓
 # Force stop & remove manually
 docker compose kill test-mode
 docker compose down --remove-orphans
@@ -99,7 +99,7 @@ df -h
 ls -la ./docker/*
 ls /run/secrets/
 python3 -V
-clinic-updates-tracker -h
+clinictracker -h
 ./docker/docker-entrypoint.sh
 
 #----------------------------------------------------------------------|
@@ -119,7 +119,7 @@ postgresql://admin@localhost:5432/userservice
 docker compose down -v db
 
 # Test
-python src/clinic_updates_tracker/db_manager.py
+python src/clinictracker/db_manager.py
 
 #----------------------------------------------------------------------|
 # Exit and clean up

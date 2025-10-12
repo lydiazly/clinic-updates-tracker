@@ -4,8 +4,8 @@ set -e
 export TEST_MODE=${TEST_MODE:-true}
 export KEEP_ALIVE=${KEEP_ALIVE:-false}
 export SEND_EMAILS=${SEND_EMAILS:-false}
-export DAYS_SINCE=${DAYS_SINCE:-90}
-export MAX_N_ITEMS=${MAX_N_ITEMS:-10}
+export DAYS_BACK=${DAYS_BACK:-90}
+export MAX_ITEMS=${MAX_ITEMS:-10}
 export RETRIES=${RETRIES:-3}
 export OUTPUT_HTML_PATH="./output/content_docker.html"
 
@@ -18,8 +18,8 @@ echo "              TZ: ${TZ}"
 echo "       TEST_MODE: ${TEST_MODE}"
 echo "      KEEP_ALIVE: ${KEEP_ALIVE}"
 echo "     SEND_EMAILS: ${SEND_EMAILS}"
-echo "      DAYS_SINCE: ${DAYS_SINCE}"
-echo "     MAX_N_ITEMS: ${MAX_N_ITEMS}"
+echo "       DAYS_BACK: ${DAYS_BACK}"
+echo "       MAX_ITEMS: ${MAX_ITEMS}"
 echo "         RETRIES: ${RETRIES}"
 echo " TARGET_BASE_URL: ${TARGET_BASE_URL}"
 echo "       TARGET_TZ: ${TARGET_TZ}"
@@ -36,11 +36,11 @@ echo -e "\n=== Step: Run script and save to OUTPUT_HTML_PATH ===\n"
 date
 set +e
 for i in $(seq 1 ${RETRIES}); do
-  clinic-updates-tracker --headless-shell \
+  clinictracker --headless-shell \
     --url "${TARGET_BASE_URL}" \
     --tz "${TARGET_TZ}" \
-    --days ${DAYS_SINCE} \
-    --nmax ${MAX_N_ITEMS} \
+    --days ${DAYS_BACK} \
+    --nmax ${MAX_ITEMS} \
     --output "${OUTPUT_HTML_PATH}" \
     "${CITY}"
   if [ $? -eq 0 ]; then break; fi
@@ -60,7 +60,7 @@ if [ -s "${OUTPUT_HTML_PATH}" ]; then
 else
   has_updates=false
   echo "has_updates=false"
-  echo "No updates in ${CITY} in the past ${DAYS_SINCE} days. Nothing to do."
+  echo "No updates. Nothing to do."
 fi
 
 if [ "${TEST_MODE}" = 'true' ] || [ "${has_updates}" = 'true' ]; then
@@ -108,7 +108,7 @@ if [ "${SEND_EMAILS}" = 'true' ] \
 
       subject_prefix=""
       [ "${is_test}" = "true" ] && subject_prefix=" [TEST]"
-      subject_encoded=$(echo -n "${subject_prefix} Clinic News Alert" | base64)
+      subject_encoded=$(echo -n "${subject_prefix} Clinic Update Alerts" | base64)
       subject="=?UTF-8?B?${subject_encoded}?="
 
       body="<body>"
