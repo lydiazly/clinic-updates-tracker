@@ -39,7 +39,7 @@ from clinictracker.models import (
 TIMEOUT_ERR_TEMPLATE = "Timeout loading %s after %gs."
 
 
-def log_error(
+def print_error(
     exc: Exception | BaseException, logger: Logger | MyLogger
 ) -> None:
     """Prints error messages and causes."""
@@ -361,7 +361,7 @@ def run(
 
         # Chained exceptions are handled here
         except (RuntimeError, TimeoutError) as e:
-            log_error(e, logger)
+            print_error(e, logger)
             raise
 
         # Other unexpected exceptions
@@ -369,7 +369,7 @@ def run(
             if config.debug:
                 traceback.print_exc()
             else:
-                log_error(e, logger)
+                print_error(e, logger)
             raise
 
         else:

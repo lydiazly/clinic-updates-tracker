@@ -15,7 +15,7 @@ def get_browser(
     p: Playwright,
     config: Config,
     logger: Logger | MyLogger = getLogger(),
-) -> Browser:
+) -> Browser | None:
     """Installs and returns a Browser object.
 
     If in headless mode without setting `--headless-shell`, use the

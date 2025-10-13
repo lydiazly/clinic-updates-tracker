@@ -241,11 +241,9 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
         ),
     )
     args = parser.parse_args()
-
-    logger = setup_logger('' if args.debug else __name__, args.quiet)
-
     validate_args(args)
 
+    logger = setup_logger('' if args.debug else __name__, args.quiet)
     logger.debug(f"Arguments: {args}")
 
     return args, logger
