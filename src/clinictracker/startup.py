@@ -5,6 +5,7 @@ from argparse import ArgumentParser, Namespace
 import logging
 from pathlib import Path
 import sys
+from typing import Any, NamedTuple
 from urllib.parse import urlencode
 
 from clinictracker.config import (
@@ -16,10 +17,66 @@ from clinictracker.config import (
     BROWSER_CHOICES,
     OUTPUT_HTML_PATH,
 )
-from clinictracker.models import QueryParams
 
 
-def setup_logger(name: str = '') -> logging.Logger:
+# ----------------------------------------------------------------------|
+# Query
+class QueryParams(NamedTuple):
+    """Query parameters.
+
+    Args:
+        url (str): The target full URL
+        city (str): The town/city to be queried
+        days_back (int): Number of days to look back for data collection
+        nmax (int): Maximum number of items to collect
+        tz (str): TZ identifier (IANA Time Zones) of the target website
+    """
+
+    url: str
+    city: str
+    days_back: int
+    nmax: int
+    tz: str
+
+
+def load_query(args: Namespace) -> QueryParams:
+    """Constructs query parameters."""
+    # Constructs full target URL.
+    # Note: argument 'only_accepting' only affects the clinic table
+    #       but not the update list
+    query_dict = ({'only_accepting': 'yes'} if not args.all else {}) | {
+        'list_town': args.city
+    }
+    full_url = get_full_url(args.url, '?', query_dict)
+    query = QueryParams(
+        url=full_url,
+        city=args.city,
+        days_back=args.days,
+        nmax=args.nmax,
+        tz=args.tz,
+    )
+    return query
+
+
+# ----------------------------------------------------------------------|
+# Logging
+class MyLogger:
+    def __init__(self, logger: logging.Logger, is_quiet: bool = False):
+        self.logger = logger
+        self.is_quiet = is_quiet
+
+    def info(self, msg: str) -> None:
+        if not self.is_quiet:
+            self.logger.info(msg)
+
+    # Delegate everything else
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.logger, name)
+
+
+def setup_logger(
+    name: str = '', is_quiet: bool = False
+) -> logging.Logger | MyLogger:
     """Sets and returns a logger."""
     if name:
         # Level: INFO, use a local logger with a name
@@ -33,6 +90,8 @@ def setup_logger(name: str = '') -> logging.Logger:
         logger.propagate = False
         # Suppress urllib3 warnings
         logging.getLogger('urllib3').setLevel(logging.ERROR)
+        # Wrap the logger
+        return MyLogger(logger, is_quiet)
     else:
         # Level: DEBUG, use the root logger
         logging.basicConfig(
@@ -40,29 +99,18 @@ def setup_logger(name: str = '') -> logging.Logger:
             format="%(asctime)s %(levelno)s - %(message)s",
         )
         logger = logging.getLogger()
-    return logger
+        return logger
 
 
-def validate_args(args: Namespace) -> None:
-    """Validates CLI arguments."""
-    if not args.url.strip():
-        raise ValueError("Missing URL. See --help")
-
-    if not args.city.strip():
-        raise ValueError("Missing town/city. See --help")
-
-    if args.days <= 0:
-        raise ValueError("Value of -d/--days must be positive.")
-
-    if args.nmax <= 0:
-        raise ValueError("Value of -n/--nmax must be positive.")
-
-
-def get_args_and_logger() -> tuple[Namespace, logging.Logger]:
+# ----------------------------------------------------------------------|
+# CLI arguments
+def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
     """Gets CLI arguments and sets the logger."""
-
     parser = ArgumentParser(
-        description="Check updates on target website."
+        description=(
+            "Fetches clinic updates across a specified region "
+            "from a target website."
+        )
     )
     parser.add_argument(
         'city',
@@ -194,7 +242,7 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger]:
     )
     args = parser.parse_args()
 
-    logger = setup_logger('' if args.debug else __name__)
+    logger = setup_logger('' if args.debug else __name__, args.quiet)
 
     validate_args(args)
 
@@ -203,7 +251,22 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger]:
     return args, logger
 
 
-def get_full_url(base_url: str, delim: str = '?', sub: dict | str = {}) -> str:
+def validate_args(args: Namespace) -> None:
+    """Validates CLI arguments."""
+    if not args.url.strip():
+        raise ValueError("Missing URL. See --help")
+
+    if not args.city.strip():
+        raise ValueError("Missing town/city. See --help")
+
+    if args.days <= 0:
+        raise ValueError("Value of -d/--days must be positive.")
+
+    if args.nmax <= 0:
+        raise ValueError("Value of -n/--nmax must be positive.")
+
+
+def get_full_url(base_url: str, delim: str = '?', sub: dict[str, str] | str = {}) -> str:
     """Appends `sub` (a query dict or a subdirectory string) to the base URL:
     `{base_url}?arg1=val1&...` or `{base_url}/...`"""
     # Query
@@ -214,21 +277,3 @@ def get_full_url(base_url: str, delim: str = '?', sub: dict | str = {}) -> str:
     else:
         full_url = f"{base_url}/{str(sub)}"
     return full_url
-
-
-def load_query(args: Namespace) -> QueryParams:
-    """Constructs query parameters."""
-    # Constructs full target URL.
-    # Note: argument 'only_accepting' only affects the clinic table but not the update list
-    query_dict = ({'only_accepting': 'yes'} if not args.all else {}) | {
-        'list_town': args.city
-    }
-    full_url = get_full_url(args.url, '?', query_dict)
-    query = QueryParams(
-        url=full_url,
-        city=args.city,
-        days_back=args.days,
-        nmax=args.nmax,
-        tz=args.tz,
-    )
-    return query

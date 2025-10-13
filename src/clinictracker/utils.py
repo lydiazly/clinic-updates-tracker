@@ -2,32 +2,36 @@
 # utils.py
 """Generic utility functions."""
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone, date
+from bs4.element import Tag, PageElement
+from datetime import datetime, timezone, date, tzinfo
 from dateutil.parser import parse, ParserError
 import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from clinictracker.models import Result, ListData, QueryParams
-
+from clinictracker.startup import QueryParams
+from clinictracker.models import Result, ListData
 
 TITLE_TEMPLATE = "%(city)s clinic updates in the past %(days_back)s days"
 
 
-def preserve_tags(element) -> str:
+def preserve_tags(element: PageElement) -> str:
     """Extracts the textual content of an HTML element while
     preserving certain tags.
     """
-    if element.name in ['br', 'p', 'i', 'b', 'a', 'em']:
-        text = str(element)
-    else:
+    if (
+        isinstance(element, Tag)
+        and element.name not in ['br', 'p', 'i', 'b', 'a', 'em']
+    ):
         text = element.get_text()
+    else:
+        text = str(element)
     text = re.sub(r"\s+", " ", text.replace("\n", " ")).strip()
     return text
 
 
-def clear_content(content: str) -> str:
-    """Clears content."""
-    soup = BeautifulSoup(content, 'html.parser')
+def clear_content(html_content: str) -> str:
+    """Clears HTML content."""
+    soup = BeautifulSoup(html_content, 'html.parser')
     cleared_content = "\n".join(
         s.strip() for s in map(preserve_tags, soup) if s.strip()
     )
@@ -48,9 +52,16 @@ def clear_content(content: str) -> str:
     return cleared_content
 
 
-def html_to_plain(content: str) -> str:
-    """Converts HTML to plain text."""
-    return BeautifulSoup(content, 'html.parser').get_text('\n', strip=True)
+def html_to_plain(html_content: str) -> str:
+    """Converts HTML to plain text. Removes extra links."""
+    remove_list = ["Clinic Website", "Contact Information & Map", "Contact"]
+    soup = BeautifulSoup(html_content, 'html.parser')
+    # Find all <a> tags and remove if matches any of remove_list
+    for tag in soup.find_all('a'):
+        if tag.string and tag.string.strip() in remove_list:
+            tag.decompose()
+    text = soup.get_text('\n', strip=True)
+    return text
 
 
 def construct_content(list_data: ListData, query: QueryParams) -> str:
@@ -93,11 +104,13 @@ def print_content(list_data: ListData, query: QueryParams) -> None:
         print("\n" + TITLE_TEMPLATE % query._asdict() + ":\n")
         for i, item in enumerate(list_data.item_list):
             print(f"{i + 1}.")
-            print(f"{item.url}")
+            if item.url:
+                print(f"{item.url}")
             print(f"{item.title}")
-            print(f"{item.date}")
+            print(f"(Date: {item.date})")
             if item.content:
-                print(html_to_plain(item.content) + '\n')
+                print(html_to_plain(item.content))
+            print('')
         if len(list_data.item_list) < list_data.n_tot:
             print(f"--> Go to website to view full list:\n{query.url}\n")
     else:
@@ -144,27 +157,27 @@ def is_date_within_n_days(
     now_utc_str: str = now_date_utc.strftime('%Y-%m-%d (UTC)')
     # now_str_all: str = f"{now_local_str} / {now_utc_str}"
 
-    messages: list = []
-    warnings: list = []
-    tzinfo: ZoneInfo | timezone | None = None
+    messages: list[str] = []
+    warnings: list[str] = []
+    tz_info: ZoneInfo | tzinfo | None = None
     tzname: str
     now_target: datetime
     # Use provided TZ identifier/name
     if tz:
         try:
-            tzinfo = ZoneInfo(tz.strip())  # <class 'zoneinfo.ZoneInfo'>
-            tzname = tzinfo.key  # or str(tzinfo)
+            tz_info = ZoneInfo(tz.strip())  # <class 'zoneinfo.ZoneInfo'>
+            tzname = tz_info.key  # or str(tz_info)
         except ZoneInfoNotFoundError as e:
             # Set now_target later
             warnings.append(f"{e}. System's local time zone used.")
         else:
             # Convert to target timezone
-            now_target = now_local.astimezone(tzinfo)
+            now_target = now_local.astimezone(tz_info)
 
     # Or use the system's local time zone
-    if tzinfo is None:
-        tzinfo = now_local.tzinfo  # <class 'datetime.timezone'>
-        tzname = str(tzinfo)
+    if tz_info is None:
+        tz_info = now_local.tzinfo  # <class 'datetime.timezone'>
+        tzname = str(tz_info)
         now_target = now_local
 
     now_date_target: date = now_target.date()
@@ -174,10 +187,10 @@ def is_date_within_n_days(
 
     is_within: bool = False
     try:
-        # Parse the string (just date) using dateutil.parser.parse with tzinfo
+        # Parse the string (just date) using dateutil.parser.parse with tz
         parsed_datetime: datetime = parse(
             date_str + ref_time_str,
-            default=datetime.now(tzinfo),
+            default=datetime.now(tz_info),
         )  # timezone-aware
         parsed_date: date = parsed_datetime.date()
 

@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
 # browsers.py
 """Installs and launches browsers."""
-import logging
+from logging import Logger, getLogger
 import os
 from playwright.sync_api import Playwright, Browser
 import subprocess
 import sys
 
 from clinictracker.config import Config
+from clinictracker.startup import MyLogger
 
 
 def get_browser(
     p: Playwright,
     config: Config,
-    logger: logging.Logger = logging.getLogger(),
+    logger: Logger | MyLogger = getLogger(),
 ) -> Browser:
     """Installs and returns a Browser object.
 
@@ -22,7 +23,7 @@ def get_browser(
     See:
     <https://playwright.dev/python/docs/browsers#chromium-new-headless-mode>
     """
-    kwargs = {'headless': not config.headed_mode}
+    kwargs: dict[str, bool | str] = {'headless': not config.headed_mode}
     # Add channel=chromium only for using new chromium headless mode
     if (
         config.browser_name == 'chromium'
@@ -60,7 +61,7 @@ def get_browser(
         cmd.append(config.browser_name)
 
         # Install system dependencies
-        config.quiet or logger.info(
+        logger.info(
             f"Installing system dependencies for {config.browser_name}..."
         )
         try:
@@ -75,17 +76,17 @@ def get_browser(
             )
             raise RuntimeError
         else:
-            config.quiet or logger.info("System dependencies installed.")
+            logger.info("System dependencies installed.")
 
         # Install browser
-        config.quiet or logger.info(f"Installing {config.browser_name}...")
+        logger.info(f"Installing {config.browser_name}...")
         try:
             subprocess.run(cmd, text=True, check=True, env=env)
         except subprocess.CalledProcessError as e:
             logger.error(f"Error installing '{config.browser_name}': {e}")
             raise RuntimeError
         else:
-            config.quiet or logger.info(f"{config.browser_name} installed.")
+            logger.info(f"{config.browser_name} installed.")
 
         # Launch
         try:

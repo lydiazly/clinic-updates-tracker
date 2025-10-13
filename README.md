@@ -50,7 +50,7 @@ clinictracker -h
 ```text
 usage: clinictracker [-h] [options] [town/city]
 
-Check updates on target website.
+Fetches clinic updates across a specified region from a target website.
 
 positional arguments:
   town/city             The town/city to be queried (default from $CITY)

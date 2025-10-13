@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # core.py
 """Main functions to fetch updates in a specified town/city."""
-import logging
+from logging import Logger, getLogger
+from tkinter import NO
 # import os
 from playwright.sync_api import (
     sync_playwright,
@@ -21,6 +22,7 @@ from clinictracker.selectors import (
     DetailPageSelectors,
 )
 from clinictracker.config import Config, TIMEOUT_PAGE, TIMEOUT_UL
+from clinictracker.startup import QueryParams, MyLogger
 from clinictracker.browsers import get_browser
 from clinictracker.utils import (
     clear_content,
@@ -32,14 +34,13 @@ from clinictracker.models import (
     Result,
     ItemData,
     ListData,
-    QueryParams,
 )
 
 
 TIMEOUT_ERR_TEMPLATE = "Timeout loading %s after %gs."
 
 
-def log_error(exc: Exception, logger: logging.Logger) -> None:
+def log_error(exc: Exception | BaseException, logger: Logger | MyLogger) -> None:
     """Prints error messages and causes."""
     current_exc = exc
     level_max = 5
@@ -73,11 +74,10 @@ def navigate_to_page(page: Page, url: str) -> None:
         raise RuntimeError(f"Unable to load {url}.") from e
 
 
-def get_list_data(
+def get_list(
     page: Page,
     query: QueryParams,
-    logger: logging.Logger,
-    quiet: bool = False,
+    logger: Logger | MyLogger,
 ) -> Result[ListData]:
     """Navigates to the page and collects the list items.
 
@@ -88,9 +88,7 @@ def get_list_data(
             warnings (list[str])
     """
     navigate_to_page(page, query.url)
-    quiet or logger.info(
-        f"Result page loaded: {query.url} (tz: {query.tz or 'local'})"
-    )
+    logger.info(f"Result page loaded: {query.url} (tz: {query.tz or 'local'})")
 
     # Find the <strong>Updates regarding...</strong> element,
     # then navigate to following sibling <ul>
@@ -107,9 +105,7 @@ def get_list_data(
     # Wait for the title to be loaded
     try:
         title_locator.wait_for(state="visible")
-        quiet or logger.info(
-            f"Result title: {title_locator.inner_text().strip()}"
-        )
+        logger.info(f"Result title: {title_locator.inner_text().strip()}")
     except TimeoutError:
         raise TimeoutError(
             TIMEOUT_ERR_TEMPLATE % ('title', TIMEOUT_PAGE / 1000)
@@ -118,9 +114,7 @@ def get_list_data(
     # Wait for the list title to be loaded
     try:
         list_title_locator.wait_for(state="visible")
-        quiet or logger.info(
-            f"List title: {list_title_locator.inner_text().strip()}"
-        )
+        logger.info(f"List title: {list_title_locator.inner_text().strip()}")
     except TimeoutError:
         raise TimeoutError(
             TIMEOUT_ERR_TEMPLATE % ('list', TIMEOUT_PAGE / 1000)
@@ -140,7 +134,7 @@ def get_list_data(
             state="visible", timeout=TIMEOUT_UL
         )
         n_tot = items_locator.count()
-        quiet or logger.info(f"List with {n_tot} items loaded.")
+        logger.info(f"List with {n_tot} items loaded.")
     except TimeoutError:
         # First, look for "There is no recent news/alerts for this town."
         try:
@@ -159,7 +153,7 @@ def get_list_data(
             )
 
     # Get items
-    quiet or logger.info(
+    logger.info(
         f"Checking updates in the past {query.days_back} days "
         f"(collecting {query.nmax}/{n_tot} items at most)..."
     )
@@ -173,13 +167,14 @@ def get_list_data(
         try:
             res = parse_item(page, item_locator)
         except Exception as e:
-            raise RuntimeError(f"Unable to parse item {count + 1}.") from e
+            raise RuntimeError(
+                f"(get_list) Unable to parse item {count + 1}."
+            ) from e
         else:
             for warn in res.warnings:
                 logger.warning(warn)
-            if not quiet:
-                for msg in res.messages:
-                    logger.info(msg)
+            for msg in res.messages:
+                logger.info(msg)
 
         # If within the time range, append the item to the list
         has_valid_date = False
@@ -195,9 +190,8 @@ def get_list_data(
             has_valid_date = True
             for warn in is_within_res.warnings:
                 logger.warning(warn)
-            if not quiet:
-                for msg in is_within_res.messages:
-                    logger.info(msg)
+            for msg in is_within_res.messages:
+                logger.info(msg)
             if is_within_res.data:
                 item_list.append(res.data)
                 count += 1
@@ -230,16 +224,16 @@ def parse_item(page: Page, item_locator: Locator) -> Result[ItemData]:
     """
     # Get title and link of the item from the current page
     try:
-        link = item_locator.get_by_role("link")
-        title = link.inner_text().strip()
-        url = link.get_attribute("href")
+        link_locator = item_locator.get_by_role("link")
+        title = link_locator.inner_text().strip() or "No Title"
+        url = link_locator.get_attribute("href") or ''
     except Exception as e:
-        raise RuntimeError("Unable to get the item link.") from e
+        raise RuntimeError("(parse_item) Unable to get the item link.") from e
 
     # Get post date by searching for '(Posted {date})'
     date_pattern = r"\(\s*[Pp]osted\s+([^\)]*)\s*\)"
     match = re.search(date_pattern, item_locator.inner_text())
-    date = '' if match is None else match.group(1)
+    date = '' if match is None else match.group(1).strip()
 
     # Get title, date, and content from the detail page in a new tab
     messages: list[str] = []
@@ -250,7 +244,7 @@ def parse_item(page: Page, item_locator: Locator) -> Result[ItemData]:
     except Exception as e:
         # If failed, set the content to empty and go on
         warnings.append(
-            f"Problems encountered when parsing detail page: {e}\n"
+            f"Problems encountered when getting details:\n{e}\n"
             "Empty content will be returned."
         )
         return Result(
@@ -286,6 +280,9 @@ def get_details(page: Page, url: str) -> ItemData:
             date: str
             content: str
     """
+    if not url.strip():
+        raise ValueError("(get_details) No link to the detail page.")
+
     # Get the current context to create a new page (tab)
     context = page.context
     # Create a new page (tab)
@@ -311,7 +308,7 @@ def get_details(page: Page, url: str) -> ItemData:
 def run(
     query: QueryParams,
     config: Config,
-    logger: logging.Logger = logging.getLogger(),
+    logger: Logger | MyLogger = getLogger(),
 ) -> None:
     """Main function to run the application."""
     with sync_playwright() as p:
@@ -329,18 +326,17 @@ def run(
         # Do everything in the block for cleanup on exit
         try:
             if config.test:
-                # Test and exit, ignoring config.quiet
+                # Test and exit, ignoring '--quiet'
                 logger.info("*** Test only (no operation) ***")
                 return
 
             # Go to the landing page and get data ---------------------|
-            res = get_list_data(page, query, logger, config.quiet)
+            res = get_list(page, query, logger)
 
             for warn in res.warnings:
                 logger.warning(warn)
-            if not config.quiet:
-                for msg in res.messages:
-                    logger.info(msg)
+            for msg in res.messages:
+                logger.info(msg)
 
             # Print to STDOUT if selecting '--print' ------------------|
             if config.to_stdout:
@@ -354,11 +350,11 @@ def run(
                     config.output_path.parent.mkdir(parents=True, exist_ok=True)
                     with open(config.output_path, "w") as f:
                         f.write(content)
-                    config.quiet or logger.info(f"Exported to '{str(config.output_path)}'")
+                    logger.info(f"Exported to '{str(config.output_path)}'")
                 else:
-                    config.quiet or logger.info("No updates. No file exported.")
+                    logger.info("No updates. No file exported.")
             else:
-                config.quiet or logger.info("'--no-o' selected. No file exported.")
+                logger.info("'--no-o' selected. No file exported.")
 
         # Chained exceptions are handled here
         except (RuntimeError, TimeoutError) as e:
@@ -374,9 +370,9 @@ def run(
             raise
 
         else:
-            config.quiet or logger.info("Done!")
+            logger.info("Done!")
 
         # Cleanup
         finally:
             close_everything(browser, context)
-            config.quiet or logger.info("Everything closed gracefully.")
+            logger.info("Closed.")

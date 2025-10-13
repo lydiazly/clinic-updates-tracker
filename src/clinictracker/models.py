@@ -44,20 +44,3 @@ class ListData(NamedTuple):
     """
     item_list: list[ItemData]
     n_tot: int
-
-
-class QueryParams(NamedTuple):
-    """Query parameters.
-
-    Args:
-        url (str): The target full URL
-        city (str): The town/city to be queried
-        days_back (int): Number of days to look back for data collection
-        nmax (int): Maximum number of items to collect
-        tz (str): TZ identifier (IANA Time Zones) of the target website
-    """
-    url: str
-    city: str
-    days_back: int
-    nmax: int
-    tz: str

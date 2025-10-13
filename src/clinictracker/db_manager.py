@@ -7,8 +7,17 @@ import json
 import re
 from pathlib import Path
 import psycopg2
+from typing import TypedDict
 
 from clinictracker.config import DAYS_BACK, MAX_ITEMS, INPUT_USERS_JSON_PATH
+
+
+class ConnParams(TypedDict):
+    host: str
+    port: int
+    database: str
+    user: str
+    password: str
 
 
 @dataclass
@@ -21,7 +30,7 @@ class User:
     nmax: int = MAX_ITEMS
     id: int = -1  # assigned by database
 
-    def __str__(self):
+    def __str__(self) -> str:
         return """id: %(id)d
 username: %(username)s
 nickname: %(nickname)s
@@ -40,40 +49,47 @@ class UserServiceDB:
 
     def __init__(
         self,
-        host='localhost',
-        port=5432,
-        database='userservice',
-        user='admin',
-        password='admin',
-    ):
-        self.conn_params = {
+        host: str = 'localhost',
+        port: int = 5432,
+        database: str = 'userservice',
+        user: str = 'admin',
+        password: str = 'admin',
+    ) -> None:
+        self.conn_params: ConnParams = {
             'host': host,
             'port': port,
             'database': database,
             'user': user,
             'password': password,
         }
-        self.conn = None
-        self.cursor = None
+        self.conn: psycopg2.extensions.connection | None = None
+        self.cursor: psycopg2.extensions.cursor | None = None
 
+    def _ensure_connected(
+        self,
+    ) -> tuple[psycopg2.extensions.connection, psycopg2.extensions.cursor]:
+        if self.conn is None or self.cursor is None:
+            raise RuntimeError("Not connected. Call connect() first.")
+        return self.conn, self.cursor
 
-    def connect(self):
+    def connect(self) -> None:
         """Establishes database connection."""
-        self.conn = psycopg2.connect(**self.conn_params)
-        self.cursor = self.conn.cursor()
+        try:
+            self.conn = psycopg2.connect(**self.conn_params)
+            self.cursor = self.conn.cursor()
+        except psycopg2.Error as e:
+            print(f"Error connecting to the database: {e}")
         print("Connected to PostgreSQL database.")
 
-
-    def close(self):
+    def close(self) -> None:
         """Closes database connection."""
-        if self.cursor:
+        if self.cursor is not None:
             self.cursor.close()
-        if self.conn:
+        if self.conn is not None:
             self.conn.close()
         print("Database connection closed.")
 
-
-    def create_table(self):
+    def create_table(self) -> None:
         """Creates the 'users' table with schema.
         - username: (str, unique, not null) the primary email
         - nickname: (str), default to null
@@ -90,8 +106,11 @@ class UserServiceDB:
             AND table_name = 'users'
         );
         """
-        self.cursor.execute(check_table_query)
-        table_exists = self.cursor.fetchone()[0]
+        conn, cursor = self._ensure_connected()
+
+        cursor.execute(check_table_query)
+        table_query_result = cursor.fetchone()
+        table_exists = table_query_result[0] if table_query_result else False
 
         if table_exists:
             print("Table 'users' already exists. Skipping creation.\n")
@@ -111,16 +130,14 @@ class UserServiceDB:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
-        self.cursor.execute(create_table_query)
-        self.conn.commit()
+        cursor.execute(create_table_query)
+        conn.commit()
         print("Table 'users' created successfully.\n")
-
 
     @classmethod
     def is_valid_email(cls, email: str) -> bool:
         """Checks if email format is valid."""
         return bool(cls.EMAIL_PATTERN.match(email)) if email else False
-
 
     def validate_user(self, user: User) -> User:
         """Validates user data."""
@@ -140,15 +157,20 @@ class UserServiceDB:
             raise ValueError(f"{user.username}: empty 'city_list'")
         # Validate numeric fields
         if user.intv <= 0:
-            raise ValueError(f"{user.username}: 'intv' must be positive, got {user.intv}")
+            raise ValueError(
+                f"{user.username}: 'intv' must be positive, got {user.intv}"
+            )
         if user.nmax <= 0:
-            raise ValueError(f"{user.username}: 'nmax' must be positive, got {user.nmax}")
+            raise ValueError(
+                f"{user.username}: 'nmax' must be positive, got {user.nmax}"
+            )
 
         return user
 
-
-    def insert_users(self, users: list[User]):
+    def insert_users(self, users: list[User]) -> None:
         """Insert users into database."""
+        conn, cursor = self._ensure_connected()
+
         validated_users = []
         for user in users:
             try:
@@ -178,29 +200,31 @@ class UserServiceDB:
             for u in validated_users
         ]
 
-        self.cursor.executemany(insert_query, values)
-        self.conn.commit()
+        cursor.executemany(insert_query, values)
+        conn.commit()
         print(f"Inserted/Updated {len(validated_users)} users")
-
 
     def get_all_users(self) -> list[User]:
         """Retrieve all users from database."""
+        conn, cursor = self._ensure_connected()
+
         query = "SELECT username, nickname, email_list, city_list, intv, nmax, id FROM users ORDER BY username;"
-        self.cursor.execute(query)
+        cursor.execute(query)
 
         users = []
-        for row in self.cursor.fetchall():
+        for row in cursor.fetchall():
             users.append(User(*row))
 
         return users
 
-
     def get_user_by_username(self, username: str) -> User | None:
         """Retrieve a specific user by username"""
-        query = "SELECT username, nickname, email_list, city_list, intv, nmax, id FROM users WHERE username = %s;"
-        self.cursor.execute(query, (username,))
+        conn, cursor = self._ensure_connected()
 
-        row = self.cursor.fetchone()
+        query = "SELECT username, nickname, email_list, city_list, intv, nmax, id FROM users WHERE username = %s;"
+        cursor.execute(query, (username,))
+
+        row = cursor.fetchone()
         if row:
             return User(*row)
         return None
@@ -230,13 +254,13 @@ def load_json_data(json_file_path: Path) -> list[User]:
 
 
 # TODO
-def compose_email(user):
+def compose_email(user: User) -> None:
     """Compose emails."""
     pass
 
 
 # def get_user_data():
-def main():
+def main() -> None:
     """Get user data from the database."""
 
     # Load data from JSON file
