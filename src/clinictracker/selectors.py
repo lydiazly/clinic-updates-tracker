@@ -15,10 +15,7 @@ class HomePageSelectors:
 # Detail page of an item
 class DetailPageSelectors:
     TITLE = 'div.elementor-page-title h4.elementor-heading-title'
-    DATE = (
-        'ul.elementor-post-info > '
-        'li[itemprop="datePublished"] time'
-    )
+    DATE = 'ul.elementor-post-info > li[itemprop="datePublished"] time'
     CONTENT = (
         'div.elementor-widget-theme-post-content > '
         'div.elementor-widget-container'

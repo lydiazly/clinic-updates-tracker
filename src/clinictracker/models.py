@@ -15,6 +15,7 @@ class Result(NamedTuple, Generic[T]):
         messages (list[str]): Each message will be printed by logger.info()
         warnings (list[str]): Each warning will be printed by logger.warning()
     """
+
     data: T
     messages: list[str]
     warnings: list[str]
@@ -29,6 +30,7 @@ class ItemData(NamedTuple):
         date (str): Post date
         content (str): The HTML content on the detail page of the item
     """
+
     title: str
     url: str
     date: str
@@ -42,5 +44,6 @@ class ListData(NamedTuple):
         item_list (list[ItemData]): List of item objects
         n_tot (int): Total number of items on the page
     """
+
     item_list: list[ItemData]
     n_tot: int

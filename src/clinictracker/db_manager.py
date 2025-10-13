@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # db_manager.py
-
+"""PostSQL database manager."""
 from dataclasses import dataclass, field, asdict
 from getpass import getpass
 import json
@@ -231,26 +231,26 @@ class UserServiceDB:
 
 
 def load_json_data(json_file_path: Path) -> list[User]:
-        """Load and validate JSON data from file."""
+    """Load and validate JSON data from file."""
+    try:
+        with open(json_file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"{str(json_file_path)}: file not found")
+    except Exception as e:
+        raise RuntimeError(f"Failed to load file '{str(json_file_path)}': {e}")
+
+    if not isinstance(data, list):
+        raise ValueError("JSON file must contain a list of user objects.")
+
+    users = []
+    for user_dict in data:
         try:
-            with open(json_file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"{str(json_file_path)}: file not found")
-        except Exception as e:
-            raise RuntimeError(f"Failed to load file '{str(json_file_path)}': {e}")
+            users.append(User(**user_dict))
+        except TypeError as e:
+            raise TypeError(f"{user_dict}: {e}")
 
-        if not isinstance(data, list):
-            raise ValueError("JSON file must contain a list of user objects.")
-
-        users = []
-        for user_dict in data:
-            try:
-                users.append(User(**user_dict))
-            except TypeError as e:
-                raise TypeError(f"{user_dict}: {e}")
-
-        return users
+    return users
 
 
 # TODO

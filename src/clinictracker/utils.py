@@ -18,10 +18,8 @@ def preserve_tags(element: PageElement) -> str:
     """Extracts the textual content of an HTML element while
     preserving certain tags.
     """
-    if (
-        isinstance(element, Tag)
-        and element.name not in ['br', 'p', 'i', 'b', 'a', 'em']
-    ):
+    keep_tag_list = ['br', 'p', 'i', 'b', 'a', 'em']
+    if isinstance(element, Tag) and element.name not in keep_tag_list:
         text = element.get_text()
     else:
         text = str(element)

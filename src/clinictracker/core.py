@@ -2,7 +2,6 @@
 # core.py
 """Main functions to fetch updates in a specified town/city."""
 from logging import Logger, getLogger
-from tkinter import NO
 # import os
 from playwright.sync_api import (
     sync_playwright,
@@ -40,7 +39,9 @@ from clinictracker.models import (
 TIMEOUT_ERR_TEMPLATE = "Timeout loading %s after %gs."
 
 
-def log_error(exc: Exception | BaseException, logger: Logger | MyLogger) -> None:
+def log_error(
+    exc: Exception | BaseException, logger: Logger | MyLogger
+) -> None:
     """Prints error messages and causes."""
     current_exc = exc
     level_max = 5
@@ -347,7 +348,9 @@ def run(
                 if len(res.data.item_list) > 0:
                     content = construct_content(res.data, query)
                     # os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                    config.output_path.parent.mkdir(parents=True, exist_ok=True)
+                    config.output_path.parent.mkdir(
+                        parents=True, exist_ok=True
+                    )
                     with open(config.output_path, "w") as f:
                         f.write(content)
                     logger.info(f"Exported to '{str(config.output_path)}'")

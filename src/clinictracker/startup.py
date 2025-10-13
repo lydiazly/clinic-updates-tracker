@@ -19,7 +19,7 @@ from clinictracker.config import (
 )
 
 
-# ----------------------------------------------------------------------|
+# ---------------------------------------------------------------------|
 # Query
 class QueryParams(NamedTuple):
     """Query parameters.
@@ -58,7 +58,7 @@ def load_query(args: Namespace) -> QueryParams:
     return query
 
 
-# ----------------------------------------------------------------------|
+# ---------------------------------------------------------------------|
 # Logging
 class MyLogger:
     def __init__(self, logger: logging.Logger, is_quiet: bool = False):
@@ -102,7 +102,7 @@ def setup_logger(
         return logger
 
 
-# ----------------------------------------------------------------------|
+# ---------------------------------------------------------------------|
 # CLI arguments
 def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
     """Gets CLI arguments and sets the logger."""
@@ -266,7 +266,9 @@ def validate_args(args: Namespace) -> None:
         raise ValueError("Value of -n/--nmax must be positive.")
 
 
-def get_full_url(base_url: str, delim: str = '?', sub: dict[str, str] | str = {}) -> str:
+def get_full_url(
+    base_url: str, delim: str = '?', sub: dict[str, str] | str = {}
+) -> str:
     """Appends `sub` (a query dict or a subdirectory string) to the base URL:
     `{base_url}?arg1=val1&...` or `{base_url}/...`"""
     # Query
