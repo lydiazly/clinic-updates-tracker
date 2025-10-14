@@ -65,7 +65,7 @@ def close_everything(
     """Gracefully closes everything."""
     context.close()
     browser.close()
-    logger.info("Closed.")
+    logger.info("Browser closed.")
 
 
 def navigate_to_page(page: Page, url: str) -> None:
@@ -93,7 +93,7 @@ def get_list(
             warnings (list[str])
     """
     navigate_to_page(page, query.url)
-    logger.info(f"Result page loaded: {query.url} (tz: {query.tz or 'local'})")
+    logger.info(f"Page loaded: {query.url} (tz: {query.tz or 'local'})")
 
     # Find the <strong>Updates regarding...</strong> element,
     # then navigate to following sibling <ul>
@@ -115,7 +115,7 @@ def get_list(
             TIMEOUT_ERR_TEMPLATE % ('title', TIMEOUT_PAGE / 1000)
         )
     else:
-        logger.info(f"Result title: {title_locator.inner_text().strip()}")
+        logger.info(f"Page title: {title_locator.inner_text().strip()}")
 
     # Wait for the list title to be loaded
     try:
