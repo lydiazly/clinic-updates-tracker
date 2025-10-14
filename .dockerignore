@@ -3,7 +3,9 @@
 
 # Allow specific files and directories
 !docker/*.sh
-!src/
+!src/clinictracker/*.py
+!tests/*.py
+!tests/*.html
 !pyproject.toml
 !README.md
 !requirements.txt

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # tests/test_page.py
-# pytest tests/test_page.py --browser-channel chromium
 import logging
+import platform
 
 from clinictracker.config import Config, TARGET_BASE_URL, OUTPUT_HTML_PATH
 from clinictracker.startup import QueryParams, get_full_url
@@ -16,12 +16,13 @@ from clinictracker.selectors import (
 def test_page(caplog):
     """Tests loading result page (chromium new headless mode)."""
     city = 'Dummy'
+    headless_shell = platform.system() == 'Linux'
     config = Config(
         debug=False,
         test=False,
         headed_mode=False,
         browser_name='chromium',
-        headless_shell=False,
+        headless_shell=headless_shell,
         export=False,
         output_path=OUTPUT_HTML_PATH,
         to_stdout=False,

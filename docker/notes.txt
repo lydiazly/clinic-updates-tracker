@@ -36,9 +36,9 @@ docker build --target run -t clinic-test:run -f docker/Dockerfile-multi .  # ~1.
 tag='test-py'
 tag='run-py'
 docker build --target builder -t clinic-test:builder-py -f docker/Dockerfile-multi-py .  # 340MB
-docker build --target base -t clinic-test:base-py -f docker/Dockerfile-multi-py .  # 335MB
-docker build --target test -t clinic-test:test-py -f docker/Dockerfile-multi-py .  # 335MB run:✓
-docker build --target run -t clinic-test:run-py -f docker/Dockerfile-multi-py .  # 970MB run:✓
+docker build --target base -t clinic-test:base-py -f docker/Dockerfile-multi-py .  # 334MB
+docker build --target test -t clinic-test:test-py -f docker/Dockerfile-multi-py .  # 334MB run:✓
+docker build --target run -t clinic-test:run-py -f docker/Dockerfile-multi-py .  # 969MB run:✓
 
 # Run
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
@@ -56,6 +56,8 @@ docker run -it --name clinic-test --env-file .env --env-file .secrets \
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
   -v "$(pwd)"/output:/app/output \
   -e TZ=UTC -e DAYS_BACK=1 -e MAX_ITEMS=10 --rm clinic-test:$tag  # ✓
+docker run -it --name clinic-test --env-file .env --env-file .secrets \
+  --entrypoint pytest --rm clinic-test:$tag  # ✓
 
 #----------------------------------------------------------------------|
 # Compose
