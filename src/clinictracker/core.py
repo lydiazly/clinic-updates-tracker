@@ -109,20 +109,22 @@ def get_list(
     # Wait for the title to be loaded
     try:
         title_locator.wait_for(state="visible")
-        logger.info(f"Result title: {title_locator.inner_text().strip()}")
     except TimeoutError:
         raise TimeoutError(
             TIMEOUT_ERR_TEMPLATE % ('title', TIMEOUT_PAGE / 1000)
         )
+    else:
+        logger.info(f"Result title: {title_locator.inner_text().strip()}")
 
     # Wait for the list title to be loaded
     try:
         list_title_locator.wait_for(state="visible")
-        logger.info(f"List title: {list_title_locator.inner_text().strip()}")
     except TimeoutError:
         raise TimeoutError(
             TIMEOUT_ERR_TEMPLATE % ('list', TIMEOUT_PAGE / 1000)
         )
+    else:
+        logger.info(f"List title: {list_title_locator.inner_text().strip()}")
 
     n_tot: int = 0  # total number of updates on the page
     item_list: list[ItemData] = []
@@ -137,8 +139,6 @@ def get_list(
         items_locator.locator("nth=0").wait_for(
             state="visible", timeout=TIMEOUT_UL
         )
-        n_tot = items_locator.count()
-        logger.info(f"List with {n_tot} items loaded.")
     except TimeoutError:
         # First, look for "There is no recent news/alerts for this town."
         try:
@@ -155,6 +155,9 @@ def get_list(
                 TIMEOUT_ERR_TEMPLATE
                 % ('updates', (TIMEOUT_PAGE + TIMEOUT_UL) / 1000)
             )
+    else:
+        n_tot = items_locator.count()
+        logger.info(f"List with {n_tot} items loaded.")
 
     # Get items
     logger.info(
