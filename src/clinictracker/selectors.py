@@ -2,14 +2,19 @@
 # selectors.py
 
 
+TITLE_PREFIX = "Family Clinics in"
+LIST_TITLE_PREFIX = "Updates regarding"
+EMPTY_CUE_PREFIX = "There is no recent news"
+
+
 # Home page, landing page, or the result page
 class HomePageSelectors:
-    TITLE = 'h2:has-text("Family Clinics in")'
+    TITLE = f'h2:has-text("{TITLE_PREFIX}")'
     CONTAINER = 'div.elementor-widget-container:has(' + TITLE + ')'
-    LIST_TITLE = 'strong:has-text("Updates regarding")'  # CONTAINER >
+    LIST_TITLE = f'strong:has-text("{LIST_TITLE_PREFIX}")'  # CONTAINER >
     LIST = 'ul'  # CONTAINER >
     ITEM = 'li'  # LIST >
-    EMPTY_CUE = 'p:has-text("There is no recent news")'  # CONTAINER >
+    EMPTY_CUE = f'p:has-text("{EMPTY_CUE_PREFIX}")'  # CONTAINER >
 
 
 # Detail page of an item

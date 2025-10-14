@@ -14,7 +14,7 @@ TIMEOUT = 500
 
 
 def test_selectors_home(page: Page):
-    """Tests selectors on landing page."""
+    """Tests selectors on landing page using sample HTML."""
     # Load HTML file
     html_file_path = os.path.abspath("./tests/sample1.html")
     page.goto(f"file://{html_file_path}")
@@ -57,7 +57,7 @@ def test_selectors_home(page: Page):
 
 
 def test_selectors_detail(page: Page):
-    """Tests selectors on detail page."""
+    """Tests selectors on detail page using sample HTML."""
     # Load HTML file
     html_file_path = os.path.abspath("./tests/sample2.html")
     page.goto(f"file://{html_file_path}")

@@ -37,6 +37,8 @@ from clinictracker.models import (
 
 
 TIMEOUT_ERR_TEMPLATE = "Timeout loading %s after %gs."
+TEST_MSG = "*** Test only (no operation) ***"
+CLOSED_MSG = "Browser closed."
 
 
 def print_error(
@@ -65,7 +67,7 @@ def close_everything(
     """Gracefully closes everything."""
     context.close()
     browser.close()
-    logger.info("Browser closed.")
+    logger.info(CLOSED_MSG)
 
 
 def navigate_to_page(page: Page, url: str) -> None:
@@ -335,7 +337,7 @@ def run(
         try:
             if config.test:
                 # Test and exit, ignoring '--quiet'
-                logger.info("*** Test only (no operation) ***")
+                logger.info(TEST_MSG)
                 return
 
             # Go to the landing page and get data ---------------------|
