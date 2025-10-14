@@ -275,5 +275,5 @@ def get_full_url(
         # will encode special characters as well
     # Subdirectory
     else:
-        full_url = f"{base_url}/{str(sub)}"
+        full_url = f"{base_url.rstrip('/')}/{str(sub)}"
     return full_url

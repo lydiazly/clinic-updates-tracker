@@ -40,13 +40,14 @@ TIMEOUT_ERR_TEMPLATE = "Timeout loading %s after %gs."
 
 
 def print_error(
-    exc: Exception | BaseException, logger: Logger | MyLogger
+    exc: Exception | BaseException,
+    logger: Logger | MyLogger,
+    max_level: int = 5,
 ) -> None:
     """Prints error messages and causes."""
     current_exc = exc
-    level_max = 5
     level = 1
-    while current_exc is not None and level <= level_max:
+    while current_exc is not None and level <= max_level:
         logger.error(f"{'  └─ ' if level > 1 else ''}{current_exc}")
         if current_exc.__cause__ is not None:
             current_exc = current_exc.__cause__
@@ -365,8 +366,12 @@ def run(
             else:
                 logger.info("'--no-o' selected. No file exported.")
 
+        except TimeoutError as e:
+            print_error(e, logger, max_level=2)
+            raise
+
         # Chained exceptions are handled here
-        except (RuntimeError, TimeoutError) as e:
+        except RuntimeError as e:
             print_error(e, logger)
             raise
 
