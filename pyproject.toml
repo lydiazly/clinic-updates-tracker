@@ -4,22 +4,25 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clinictracker"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
-  { name = "Lydia Zhang", email = "lydiazly2@gmail.com" },
+    { name = "Lydia Zhang" },
 ]
 description = "Fetches clinic updates across specified regions from a target website."
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Natural Language :: English",
 ]
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
 dependencies = [
     "beautifulsoup4>=4.13.5",
-    "pytest>=8.4.2",
     "pytest-playwright>=0.7.1",
     "python-dateutil",
     "python-dotenv",
