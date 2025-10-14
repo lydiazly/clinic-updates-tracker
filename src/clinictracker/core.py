@@ -58,10 +58,13 @@ def print_error(
             return
 
 
-def close_everything(browser: Browser, context: BrowserContext) -> None:
+def close_everything(
+    browser: Browser, context: BrowserContext, logger: Logger | MyLogger
+) -> None:
     """Gracefully closes everything."""
     context.close()
     browser.close()
+    logger.info("Closed.")
 
 
 def navigate_to_page(page: Page, url: str) -> None:
@@ -377,5 +380,4 @@ def run(
 
         # Cleanup
         finally:
-            close_everything(browser, context)
-            logger.info("Closed.")
+            close_everything(browser, context, logger)
