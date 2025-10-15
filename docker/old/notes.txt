@@ -1,0 +1,44 @@
+#----------------------------------------------------------------------|
+# Test images
+# ARG DEBIAN_FRONTEND=noninteractive
+# ENV PYTHONDONTWRITEBYTECODE=1 \
+#     PYTHONUNBUFFERED=1 \
+#     PIP_ROOT_USER_ACTION=ignore
+
+docker run -it --name clinic-test --env-file .env --rm ubuntu:24.04
+# Other commands for verifying
+apt list --installed
+uname -a
+bash -c 'echo $SHELL'
+python3 -V
+
+#----------------------------------------------------------------------|
+# Build
+
+(no db)
+
+# [Ubuntu 24.04, python3.11]
+tag='ubuntu24.04-py3.11'
+docker build -t clinic-test:$tag -f docker/Dockerfile-py3.11 .  # ~1.56GB run:✓
+
+# [Ubuntu 24.04, python3.12]
+tag='ubuntu24.04'
+docker build -t clinic-test:$tag -f docker/Dockerfile-py3.12 .  # ~1.37GB run:✓
+
+# [Ubuntu 24.04, python3.12, multi-stage]
+tag='test'
+tag='run'
+docker build --target builder -t clinic-test:builder -f docker/Dockerfile-multi .  # 350MB
+docker build --target base -t clinic-test:base -f docker/Dockerfile-multi .  # 341MB
+docker build --target test -t clinic-test:test -f docker/Dockerfile-multi .  # 341MB run:✓
+docker build --target run -t clinic-test:run -f docker/Dockerfile-multi .  # 1.02GB run:✓
+
+# Run
+docker run -it --name clinic-test --env-file .env --env-file .secrets \
+  -e TEST_MODE=false -e SEND_EMAILS=false --rm clinic-test:$tag
+
+#----------------------------------------------------------------------|
+# Exit and clean up
+docker compose down
+docker image prune
+docker builder prune

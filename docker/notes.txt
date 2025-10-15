@@ -16,23 +16,7 @@ python3 -V
 #----------------------------------------------------------------------|
 # Build
 
-# [Ubuntu 24.04, python3.11]
-tag='ubuntu24.04-py3.11'
-docker build -t clinic-test:$tag -f docker/Dockerfile-py3.11 .  # ~1.56GB run:✓
-
-# [Ubuntu 24.04, python3.12]
-tag='ubuntu24.04'
-docker build -t clinic-test:$tag -f docker/Dockerfile-py3.12 .  # ~1.37GB run:✓
-
-# [Ubuntu 24.04, python3.12, multi-stage]
-tag='test'
-tag='run'
-docker build --target builder -t clinic-test:builder -f docker/Dockerfile-multi .  # ~350MB
-docker build --target base -t clinic-test:base -f docker/Dockerfile-multi .  # ~341MB
-docker build --target test -t clinic-test:test -f docker/Dockerfile-multi .  # ~341MB run:✓
-docker build --target run -t clinic-test:run -f docker/Dockerfile-multi .  # ~1.02GB run:✓
-
-# [Debian-based (Linux 6.10.14-linuxkit), python3.12, multi-stage] (use this)
+# [Debian-based (Linux 6.10.14-linuxkit), python3.12, multi-stage]
 tag='test-py'
 tag='run-py'
 docker build --target builder -t clinic-test:builder-py -f docker/Dockerfile-multi-py .  # 340MB
