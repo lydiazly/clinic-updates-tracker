@@ -161,23 +161,21 @@ def is_date_within(
         raise ValueError("(is_date_within) Target date is missing.")
 
     if ref_datetime is None:
-        ref_datetime = datetime.now()
+        ref_datetime = datetime.now().astimezone()  # timezone-aware
 
     # date_fmt = '%B %d, %Y'
     # datet_utc_fmt = '%Y-%m-%d (UTC)'
     datetime_fmt = '%Y-%m-%d %H:%M:%S'
-    datetime_utc_fmt = '%Y-%m-%d %H:%M:%S (UTC)'
+    datetime_utc_fmt = '%Y-%m-%dT%H:%M:%SZ'
 
+    # Prepare reference time ------------------------------------------|
     # Preset time (**adjust this if needed**)
     ref_time: time = time(12, 0, 0)
     # ref_time_str: str = ref_time.strftime('%H:%M:%S')
 
     buffer: timedelta = timedelta(hours=1)
 
-    # Get current time (naive)
-    # ref_naive: datetime = datetime.now()
-
-    # Presumed to be in the system's local time zone
+    # Presumed to be in the current system's local time zone
     ref_local: datetime = (
         ref_datetime.astimezone()
         if ref_datetime.tzinfo is None
@@ -187,29 +185,29 @@ def is_date_within(
     # Apply a buffer
     ref_local -= buffer
 
-    # Get reference time in UTC (for logging only)
-    ref_utc: datetime = ref_local.astimezone(timezone.utc)  # timezone-aware
-    # ref_utc_date: date = ref_utc.date()
-    # ref_utc_str: str = ref_utc_date.strftime(datet_utc_fmt)
-    ref_utc_str: str = ref_utc.strftime(datetime_utc_fmt)
+    if ref_local.tzname() == 'UTC':
+        ref_str_all = ref_local.strftime(datetime_utc_fmt)
+    else:
+        ref_local_str = ref_local.strftime(datetime_fmt + ' (%Z)')
+        # Note: '%Z' may be different from the TZ name
+        # Get reference time in UTC (for logging only)
+        ref_utc: datetime = ref_local.astimezone(timezone.utc)
+        ref_utc_str = ref_utc.strftime(datetime_utc_fmt)
+        ref_str_all = f"{ref_local_str} ({ref_utc_str})"
 
+    # Verify TZ info --------------------------------------------------|
     messages: list[str] = []
     warnings: list[str] = []
     tz_info: ZoneInfo | tzinfo | None = None
     tzname: str
-    ref_target: datetime
-
-    # Use provided TZ identifier/name
+    # Use provided TZ identifier/name for target time
     if tz:
         try:
             tz_info = ZoneInfo(tz.strip())  # <class 'zoneinfo.ZoneInfo'>
             tzname = tz_info.key  # or str(tz_info)
         except ZoneInfoNotFoundError:
-            # Set ref_target later
+            # Set to the local time zone later
             warnings.append(f"Time zone not found: {tz}")
-        else:
-            # Convert reference time to target timezone
-            ref_target = ref_local.astimezone(tz_info)
 
     if tz_info is None:
         # If the object includes tzinfo, use it
@@ -219,22 +217,14 @@ def is_date_within(
         ):
             tz_info = target_date.tzinfo
             tzname = target_date.tzname()
-        # Otherwise, use the system's local time zone
+        # Otherwise, use the local time zone
         else:
             tz_info = ref_local.tzinfo  # <class 'datetime.timezone'>
             tzname = ref_local.tzname()
             warnings.append("Applying local time zone to the target time.")
-        ref_target = ref_local
 
-    # ref_target_date: date = ref_target.date()
-    # ref_target_str: str = ref_target.strftime(date_fmt + ' (%Z)')
-    ref_target_str: str = ref_target.strftime(datetime_fmt + ' (%Z)')
-    # Note: '%Z' may be different from the TZ name
-    ref_str_all: str = f"{ref_target_str} / {ref_utc_str}"
-
-    is_within: bool = False
+    # Parse target time -----------------------------------------------|
     target_parsed: datetime  # timezone-aware
-    # target_parsed_date: date
     try:
         if isinstance(target_date, str):
             # Parse the string using dateutil.parser.parse
@@ -244,61 +234,52 @@ def is_date_within(
                     datetime.today(), ref_time.replace(tzinfo=tz_info)
                 ),  # use this time and tz if not specified
             )
-            # target_parsed_date = target_parsed.date()
         elif isinstance(target_date, datetime):
             target_parsed = target_date.astimezone(tz_info)
-            # target_parsed_date = target_parsed.date()
         elif isinstance(target_date, date):
             target_parsed = datetime.combine(
                 target_date, ref_time.replace(tzinfo=tz_info)
             )
-            # target_parsed_date = target_date
         else:
             raise TypeError(
                 "Target date must be a string, datetime, or date object."
             )
-
     except (ParserError, TypeError) as e:
         raise ParserError(f"(is_date_within) Error parsing date:\n{e}")
-
     else:
-        # Convert to UTC (for logging only)
-        target_parsed_utc: datetime = target_parsed.astimezone(timezone.utc)
-        # target_parsed_utc_date: date = target_parsed_utc.date()
-        # target_utc_str: str = target_parsed_utc_date.strftime(datet_utc_fmt)
-        target_utc_str: str = target_parsed_utc.strftime(datetime_utc_fmt)
-        # target_str_with_tz: str = (
-        #     target_date
-        #     if isinstance(target_date, str)
-        #     else target_parsed_date.strftime(date_fmt)
-        # ) + f" ({tzname})"
-        target_str_with_tz: str = (
-            f"{target_parsed.strftime(datetime_fmt)} ({tzname})"
-        )
-        target_str_all: str = f"{target_str_with_tz} / {target_utc_str}"
-
-        # Compare dates
-        # Note: days_diff might be less than 0
-        # days_diff: int = (ref_target_date - target_parsed_date).days
-        # days_diff: int = (ref_target - target_parsed).days
-        hours_diff: float = (ref_target - target_parsed).total_seconds() / 3600
-        days_diff: float = hours_diff / 24
-        is_within = days_diff <= days_back
-
-        if is_within:
-            messages.append(
-                f"{target_str_all} is within {days_back} days before "
-                f"{ref_str_all}. Collecting..."
-            )
+        if tzname == 'UTC':
+            target_str_all = target_parsed.strftime(datetime_utc_fmt)
         else:
-            messages.append(
-                f"{target_str_all} is {days_diff:.3g} "
-                f"day{'' if days_diff == 1 else 's'} earlier than "
-                f"{ref_str_all}. Returning..."
+            target_str_with_tz = (
+                f"{target_parsed.strftime(datetime_fmt)} ({tzname})"
             )
+            # Convert to UTC (for logging only)
+            target_utc: datetime = target_parsed.astimezone(timezone.utc)
+            target_utc_str = target_utc.strftime(datetime_utc_fmt)
+            target_str_all = f"{target_str_with_tz} ({target_utc_str})"
 
-        return Result(
-            data=is_within,
-            messages=messages,
-            warnings=warnings,
+    # Compare dates ---------------------------------------------------|
+    # Automatically handles timezone conversion for timezone-aware objects
+    time_diff: timedelta = ref_local - target_parsed
+    # days_diff: int = time_diff.days
+    days_diff: float = time_diff.total_seconds() / 3600 / 24
+    is_within: bool = days_diff <= days_back
+
+    days_diff_str = f"{days_diff:.3g}"
+    _days = 'day' if days_diff_str == '1' else 'days'
+    if is_within:
+        messages.append(
+            f"{target_str_all} is within {days_back} {_days} before "
+            f"{ref_str_all}. Collecting..."
         )
+    else:
+        messages.append(
+            f"{target_str_all} is {days_diff_str} {_days} earlier than "
+            f"{ref_str_all}. Returning..."
+        )
+
+    return Result(
+        data=is_within,
+        messages=messages,
+        warnings=warnings,
+    )
