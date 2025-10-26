@@ -65,17 +65,16 @@ fi
 
 if [ "${TEST_MODE}" = 'true' ] || [ "${has_updates}" = 'true' ]; then
   echo -e "\n=== Step: Parse recipient email list ===\n"
-  recipient_list=$(echo "${RECIPIENT_LIST}" | xargs | sed -E 's/ *[\t ,]+ */, /g')
-  if [ -z "${recipient_list}" ]; then
+  emails=$(echo "${RECIPIENT_LIST}" | xargs | sed -E 's/ *[\t ,]+ */, /g')
+  if [ -z "${emails}" ]; then
     echo "WARNING: No emails found in RECIPIENT_LIST" >&2
     has_recipients=false
     echo "has_recipients=false"
   else
-    echo "> Parsed emails: ${recipient_list}"
+    echo "> Parsed emails: ${emails}"
     has_recipients=true
     echo "has_recipients=true"
-    emails=${recipient_list}
-    echo "emails=${recipient_list}"
+    echo "emails=${emails}"
   fi
 else
   echo "> Skipping email parsing (no updates)."

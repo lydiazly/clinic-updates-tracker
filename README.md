@@ -63,11 +63,10 @@ options:
   -d int, --days int    Number of days to look back for data collection
                         (default to 1 or from $DAYS_BACK)
   -n int, --nmax int    Maximum number of items to collect
-                        (default to 1 or from $MAX_ITEMS)
+                        (default to 10 or from $MAX_ITEMS)
   -p, --print           Print results as plain text to STDOUT (default: false)
-  -o str, --output str  Path of output file (empty is interpreted as '.')
-                        (default to './output/content.html' or from
-                        $OUTPUT_HTML_PATH)
+  -o str, --output str  Path of output file
+                        (default to './output/content.html' or from $OUTPUT_HTML_PATH)
   --no-o                No export (default: export to a file)
   -H, --headed          Run in headed mode (default: headless)
   -b str, --browser str
@@ -79,7 +78,7 @@ options:
                         (default to false or from $DEBUG_MODE)
   --test                Exit after opening a page without any further operation
                         (default: false)
-  -q, --quiet           Suppress INFO level outputs unless selecting --test or --debug
+  -q, --quiet           Suppress INFO level outputs unless --debug is selected
                         (default: print all)
 ```
 

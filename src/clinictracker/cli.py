@@ -19,7 +19,7 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        run(query, config, logger)
+        _ = run(query=query, config=config, logger=logger, check_date=True)
     except KeyboardInterrupt:
         print("\nInterrupted by user.", file=sys.stderr)
         sys.exit(130)

@@ -30,6 +30,7 @@ dependencies = [
 
 [project.scripts]
 clinictracker = "clinictracker.cli:main"
+clinictracker-user = "clinictracker.user.cli:main"
 
 [project.urls]
 "Homepage" = "https://github.com/lydiazly/clinic-updates-tracker"

@@ -2,7 +2,6 @@
 # core.py
 """Main functions to fetch updates in a specified town/city."""
 from logging import Logger, getLogger
-# import os
 from playwright.sync_api import (
     sync_playwright,
     Browser,
@@ -20,14 +19,14 @@ from clinictracker.selectors import (
     HomePageSelectors,
     DetailPageSelectors,
 )
-from clinictracker.config import Config, TIMEOUT_PAGE, TIMEOUT_UL
+from clinictracker.config import RunConfig, TIMEOUT_PAGE, TIMEOUT_UL
 from clinictracker.startup import QueryParams, MyLogger
 from clinictracker.browsers import get_browser
 from clinictracker.utils import (
     clear_content,
     construct_content,
     print_content,
-    is_date_within_n_days,
+    is_date_within,
 )
 from clinictracker.models import (
     Result,
@@ -39,6 +38,8 @@ from clinictracker.models import (
 TIMEOUT_ERR_TEMPLATE = "Timeout loading %s after %gs."
 TEST_MSG = "*** Test only (no operation) ***"
 CLOSED_MSG = "Browser closed."
+NO_UPDATES_MSG = "No updates. No file exported."
+NO_EXPORT_MSG = "'--no-o' selected. No file exported."
 
 
 def print_error(
@@ -85,12 +86,13 @@ def get_list(
     page: Page,
     query: QueryParams,
     logger: Logger | MyLogger,
+    check_date: bool = True,
 ) -> Result[ListData]:
     """Navigates to the page and collects the list items.
 
     Returns:
         Result: A namedtuple with fields:
-            data (ListData): (item_list: list, n_tot: int)
+            data (ListData): (items, n_tot, query)
             messages (list[str])
             warnings (list[str])
     """
@@ -130,7 +132,7 @@ def get_list(
         logger.info(f"List title: {list_title_locator.inner_text().strip()}")
 
     n_tot: int = 0  # total number of updates on the page
-    item_list: list[ItemData] = []
+    items: list[ItemData] = []
     messages: list[str] = []
     warnings: list[str] = []
 
@@ -148,7 +150,7 @@ def get_list(
             empty_cue_locator.wait_for(state="visible", timeout=TIMEOUT_UL)
             messages.append(empty_cue_locator.inner_text().strip())
             return Result(
-                data=ListData(item_list=item_list, n_tot=n_tot),
+                data=ListData(items=items, n_tot=n_tot, query=query),
                 messages=messages,
                 warnings=warnings,
             )
@@ -164,8 +166,9 @@ def get_list(
 
     # Get items
     logger.info(
-        f"Checking updates in the past {query.days_back} days "
-        f"(collecting {query.nmax}/{n_tot} items at most)..."
+        "Checking updates "
+        + (f"in the past {query.days_back} days " if check_date else '')
+        + f"(collecting {query.nmax}/{n_tot} items at most)..."
     )
     count = 0
     res: Result[ItemData]
@@ -186,39 +189,47 @@ def get_list(
             for msg in res.messages:
                 logger.info(msg)
 
-        # If within the time range, append the item to the list
         has_valid_date = False
-        is_within_res: Result[bool]
-        try:
-            is_within_res = is_date_within_n_days(
-                res.data.date, query.days_back, query.tz
-            )
-        except Exception as e:
-            # If errors occur, set to 'Unknown' later
-            logger.warning(f"{type(e).__name__}: {e}")
-        else:
-            has_valid_date = True
-            for warn in is_within_res.warnings:
-                logger.warning(warn)
-            for msg in is_within_res.messages:
-                logger.info(msg)
-            if is_within_res.data:
-                item_list.append(res.data)
-                count += 1
+        # If within the time range, append the item to the list
+        if check_date:
+            is_within_res: Result[bool]
+            try:
+                is_within_res = is_date_within(
+                    res.data.date, query.days_back, tz=query.tz
+                )
+            except Exception as e:
+                # If errors occur, warn and collect it later
+                logger.warning(f"{type(e).__name__}: {e}")
             else:
-                break
+                has_valid_date = True
+                for warn in is_within_res.warnings:
+                    logger.warning(warn)
+                for msg in is_within_res.messages:
+                    logger.info(msg)
+                if is_within_res.data:
+                    items.append(res.data)
+                    count += 1
+                else:
+                    break
+        elif res.data.date.strip():
+            has_valid_date = True
 
-        # If no valid date found, set to 'Unknown' and still append
+        # If no valid date found, still append
         if not has_valid_date:
-            logger.info("No valid date found. Set to 'Unknown'. Collecting...")
-            item_list.append(res.data._replace(date='Unknown'))
+            logger.warning("Date unknown. Still collecting...")
+            items.append(res.data)
+            count += 1
+        # If not checking the dates, append
+        elif not check_date:
+            items.append(res.data)
+            count += 1
 
         # Pause for a random interval
         sleep(random.uniform(1, 3))
 
     return Result(
-        data=ListData(item_list=item_list, n_tot=n_tot),
-        messages=[f"{len(item_list)} updates collected."],
+        data=ListData(items=items, n_tot=n_tot, query=query),
+        messages=[f"{len(items)} updates collected."],
         warnings=[],
     )
 
@@ -228,7 +239,7 @@ def parse_item(page: Page, item_locator: Locator) -> Result[ItemData]:
 
     Returns:
         Result: A namedtuple with fields:
-            data (ItemData): (title: str, url: str, date: str, content: str)
+            data (ItemData): (title, url, date, content, digest)
             messages (list[str])
             warnings (list[str])
     """
@@ -258,7 +269,7 @@ def parse_item(page: Page, item_locator: Locator) -> Result[ItemData]:
             "Empty content will be returned."
         )
         return Result(
-            data=ItemData(title=title, url=url, date=date, content=''),
+            data=ItemData(title=title, url=url, date=date),
             messages=messages,
             warnings=warnings,
         )
@@ -289,6 +300,7 @@ def get_details(page: Page, url: str) -> ItemData:
             url: str
             date: str
             content: str
+            digest: str
     """
     if not url.strip():
         raise ValueError("(get_details) No link to the detail page.")
@@ -317,9 +329,10 @@ def get_details(page: Page, url: str) -> ItemData:
 
 def run(
     query: QueryParams,
-    config: Config,
+    config: RunConfig,
     logger: Logger | MyLogger = getLogger(),
-) -> None:
+    check_date: bool = True,
+) -> ListData | None:
     """Main function to run the application."""
     with sync_playwright() as p:
         browser = get_browser(p, config, logger)
@@ -336,12 +349,12 @@ def run(
         # Do everything in the block for cleanup on exit
         try:
             if config.test:
-                # Test and exit, ignoring '--quiet'
                 logger.info(TEST_MSG)
-                return
+                return None
 
             # Go to the landing page and get data ---------------------|
-            res = get_list(page, query, logger)
+            res = get_list(page, query, logger, check_date)
+            list_data = res.data
 
             for warn in res.warnings:
                 logger.warning(warn)
@@ -350,12 +363,14 @@ def run(
 
             # Print to STDOUT if selecting '--print' ------------------|
             if config.to_stdout:
-                print_content(res.data, query)
+                print_content(list_data.items, list_data.n_tot, query)
 
             # Export to a file if not selecting '--no-o' --------------|
             if config.export:
-                if len(res.data.item_list) > 0:
-                    content = construct_content(res.data, query)
+                if len(list_data.items) > 0:
+                    content = construct_content(
+                        list_data.items, list_data.n_tot, query
+                    )
                     # os.makedirs(os.path.dirname(output_path), exist_ok=True)
                     config.output_path.parent.mkdir(
                         parents=True, exist_ok=True
@@ -364,9 +379,9 @@ def run(
                         f.write(content)
                     logger.info(f"Exported to '{str(config.output_path)}'")
                 else:
-                    logger.info("No updates. No file exported.")
+                    logger.info(NO_UPDATES_MSG)
             else:
-                logger.info("'--no-o' selected. No file exported.")
+                logger.info(NO_EXPORT_MSG)
 
         except TimeoutError as e:
             print_error(e, logger, max_level=2)
@@ -387,6 +402,7 @@ def run(
 
         else:
             logger.info("Done!")
+            return list_data
 
         # Cleanup
         finally:

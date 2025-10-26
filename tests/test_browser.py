@@ -3,7 +3,7 @@
 import logging
 import platform
 
-from clinictracker.config import Config, TARGET_BASE_URL, OUTPUT_HTML_PATH
+from clinictracker.config import Config, TARGET_BASE_URL
 from clinictracker.startup import QueryParams, get_full_url
 from clinictracker.core import run, TEST_MSG, CLOSED_MSG
 
@@ -17,9 +17,6 @@ def test_chromium(caplog):
         headed_mode=False,
         browser_name='chromium',
         headless_shell=headless_shell,
-        export=False,
-        output_path=OUTPUT_HTML_PATH,
-        to_stdout=False,
     )
     query_dict = {'only_accepting': 'yes', 'list_town': 'Dummy'}
     full_url = get_full_url(TARGET_BASE_URL, '?', query_dict)

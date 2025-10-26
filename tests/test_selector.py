@@ -23,16 +23,21 @@ def test_selectors_home(page: Page):
     expect(container, "Container not found on landing page").to_be_visible(
         timeout=TIMEOUT
     )
-    print(
-        "\nTitle on landing page: "
-        + container.locator(HomePageSelectors.TITLE).inner_text()
+    assert (
+        "Family Clinics in"
+        in container.locator(HomePageSelectors.TITLE).inner_text()
     )
+    # print(
+    #     "\nTitle on landing page: "
+    #     + container.locator(HomePageSelectors.TITLE).inner_text()
+    # )
 
     title = container.locator(HomePageSelectors.LIST_TITLE)
     expect(title, "List title not found on landing page").to_be_visible(
         timeout=TIMEOUT
     )
-    print("List title on landing page: " + title.inner_text())
+    assert "Updates regarding" in title.inner_text()
+    # print("List title on landing page: " + title.inner_text())
 
     # list = container.locator(HomePageSelectors.LIST).first
     list = container.locator(HomePageSelectors.LIST).locator('nth=0')
@@ -44,16 +49,19 @@ def test_selectors_home(page: Page):
     expect(items.first, "Item not found on landing page").to_be_visible(
         timeout=TIMEOUT
     )
-    print(f"{items.count()} items on landing page:")
+    assert items.count() == 2
+    # print(f"{items.count()} items on landing page:")
     for item in items.all():
-        print(item.get_by_role("link").inner_text())
-        print(item.get_by_role("link").get_attribute("href"))
+        assert "https://" in item.get_by_role("link").get_attribute("href")
+    #     print(item.get_by_role("link").inner_text())
+    #     print(item.get_by_role("link").get_attribute("href"))
 
     text = container.locator(HomePageSelectors.EMPTY_CUE)
     expect(text, "Text not found on landing page").to_be_visible(
         timeout=TIMEOUT
     )
-    print("Text on landing page: " + text.inner_text())
+    assert text.inner_text() == "There is no recent news/alerts for this town."
+    # print("Text on landing page: " + text.inner_text())
 
 
 def test_selectors_detail(page: Page):
@@ -66,21 +74,40 @@ def test_selectors_detail(page: Page):
     expect(title, "Title not found on detail page").to_be_visible(
         timeout=TIMEOUT
     )
-    print("\nTitle on detail page: " + title.inner_text())
+    assert title.inner_text() == "Detail title"
+    # print("\nTitle on detail page: " + title.inner_text())
 
     date = page.locator(DetailPageSelectors.DATE)
     expect(date, "Date not found on detail page").to_be_visible(
         timeout=TIMEOUT
     )
-    print("Date on detail page: " + date.inner_text())
+    assert date.inner_text() == "September 1, 2025"
+    # print("Date on detail page: " + date.inner_text())
 
     content = page.locator(DetailPageSelectors.CONTENT)
     expect(content, "Content not found on detail page").to_be_visible(
         timeout=TIMEOUT
     )
+    substring_in_html_list = [
+        "<p>",
+        "<strong>",
+        "<a href",
+        "<br>",
+        ">Clinic Website<",
+        ">Contact Information &amp; Map<",
+    ]
+    content_html = clear_content(content.inner_html())
+    content_plain = html_to_plain(content.inner_html())
+    assert len(content_html.split('\n')) == 4
+    assert all(
+        [
+            s in content_html and s not in content_plain
+            for s in substring_in_html_list
+        ]
+    )
     # print("Content:")
     # print(content.inner_html())
-    print("Cleared content:")
-    print(clear_content(content.inner_html()))
-    print("Plain text content:")
-    print(html_to_plain(content.inner_html()))
+    # print("Cleared content:")
+    # print(content_html)
+    # print("Plain text content:")
+    # print(content_plain)

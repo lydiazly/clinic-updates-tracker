@@ -5,4 +5,4 @@ __all__ = ['run']
 __version__ = '0.1.0'
 __author__ = 'Lydia Zhang'
 
-# from clinictracker.core import run
+from clinictracker.core import run

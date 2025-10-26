@@ -129,14 +129,14 @@ jobs:
           RECIPIENT_LIST: ${{ vars.RECIPIENT_LIST }}
         shell: bash
         run: |
-          recipient_list=$(echo "${RECIPIENT_LIST}" | xargs | sed -E 's/ *[\t ,]+ */, /g')
-          if [ -z "${recipient_list}" ]; then
+          emails=$(echo "${RECIPIENT_LIST}" | xargs | sed -E 's/ *[\t ,]+ */, /g')
+          if [ -z "${emails}" ]; then
             echo "WARNING: No emails found in vars.RECIPIENT_LIST" >&2
             echo "has_recipients=false" >> $GITHUB_OUTPUT
           else
-            echo "> Parsed emails: ${recipient_list}"
+            echo "> Parsed emails: ${emails}"
             echo "has_recipients=true" >> $GITHUB_OUTPUT
-            echo "emails=${recipient_list}" >> $GITHUB_OUTPUT
+            echo "emails=${emails}" >> $GITHUB_OUTPUT
           fi
 
       - name: Send email to all listed users via Gmail API

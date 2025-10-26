@@ -1,0 +1,26 @@
+# -*- coding: utf-8 -*-
+# user/cli.py
+"""CLI interface and main entry point for database management."""
+import sys
+
+from clinictracker.user.config import load_config_for_service
+from clinictracker.user.startup import get_args_and_logger_for_service
+from clinictracker.user.user_service import run_service
+
+
+def main() -> None:
+    """Gets CLI arguments and runs the user service."""
+    try:
+        args, logger = get_args_and_logger_for_service()
+        config = load_config_for_service(args)
+    except Exception as e:
+        print(f"{type(e).__name__}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        run_service(config=config, logger=logger)
+    except KeyboardInterrupt:
+        print("\nInterrupted by user.", file=sys.stderr)
+        sys.exit(130)
+    except Exception:
+        sys.exit(1)

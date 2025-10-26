@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # startup.py
 """Logger setter and CLI argument parsers."""
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 import logging
 from pathlib import Path
 import sys
@@ -24,7 +24,7 @@ from clinictracker.config import (
 class QueryParams(NamedTuple):
     """Query parameters.
 
-    Args:
+    Attributes:
         url (str): The target full URL
         city (str): The town/city to be queried
         days_back (int): Number of days to look back for data collection
@@ -96,7 +96,7 @@ def setup_logger(
         # Level: DEBUG, use the root logger
         logging.basicConfig(
             level=logging.DEBUG,
-            format="%(asctime)s %(levelno)s - %(message)s",
+            format="[%(asctime)s #%(levelno)s] %(message)s",
         )
         logger = logging.getLogger()
         return logger
@@ -107,11 +107,14 @@ def setup_logger(
 def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
     """Gets CLI arguments and sets the logger."""
     parser = ArgumentParser(
+        usage="%(prog)s [-h] [options] [town/city]",
         description=(
             "Fetches clinic updates across a specified region "
             "from a target website."
-        )
+        ),
+        formatter_class=RawTextHelpFormatter,
     )
+    # Query args
     parser.add_argument(
         'city',
         type=str,
@@ -133,7 +136,7 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
         metavar='str',
         default=TARGET_TZ,
         help=(
-            "TZ identifier (IANA Time Zones) of the target website "
+            "TZ identifier (IANA Time Zones) of the target website\n"
             "(use local time zone if empty) (default from $TARGET_TZ)"
         ),
     )
@@ -156,7 +159,7 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
         default=MAX_ITEMS,
         help=(
             "Maximum number of items to collect "
-            "(default to 1 or from $MAX_ITEMS)"
+            "(default to 10 or from $MAX_ITEMS)"
         ),
     )
     parser.add_argument(
@@ -168,6 +171,7 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
             "but not the update list)"
         ),
     )
+    # Output args
     parser.add_argument(
         '-p',
         '--print',
@@ -182,8 +186,8 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
         metavar='str',
         default=OUTPUT_HTML_PATH,
         help=(
-            "Path of output file (empty is interpreted as '.') "
-            "(default to './output/content.html' or from $OUTPUT_HTML_PATH)"
+            "Path of output file (default to './output/content.html' "
+            "or from $OUTPUT_HTML_PATH)"
         ),
     )
     parser.add_argument(
@@ -192,6 +196,7 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
         action='store_false',
         help="No export (default: export to a file)",
     )
+    # Browser args
     parser.add_argument(
         '-H',
         '--headed',
@@ -211,10 +216,11 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
         dest='shell',
         action='store_true',
         help=(
-            "Use a separate headless shell for chromium headless mode "
+            "Use a separate headless shell for chromium headless mode\n"
             "(https://playwright.dev/python/docs/browsers#chromium-headless-shell)"
         ),
     )
+    # Debugging args
     parser.add_argument(
         '--debug',
         action='store_true',
@@ -236,15 +242,20 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
         '--quiet',
         action='store_true',
         help=(
-            "Suppress INFO level outputs unless selecting "
-            "--test or --debug (default: print all)"
+            "Suppress INFO level outputs unless --debug is selected "
+            "(default: print all)"
         ),
     )
+
     args = parser.parse_args()
     validate_args(args)
 
-    logger = setup_logger('' if args.debug else __name__, args.quiet)
-    logger.debug(f"Arguments: {args}")
+    logger = setup_logger(
+        name='' if args.debug else __name__,
+        is_quiet=args.quiet if not args.debug else False,
+    )
+
+    logger.debug(f"Args:\n{vars(args)}")
 
     return args, logger
 

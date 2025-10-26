@@ -3,7 +3,8 @@
 import logging
 import platform
 
-from clinictracker.config import Config, TARGET_BASE_URL, OUTPUT_HTML_PATH
+from clinictracker.models import ListData
+from clinictracker.config import RunConfig, TARGET_BASE_URL, OUTPUT_HTML_PATH
 from clinictracker.startup import QueryParams, get_full_url
 from clinictracker.core import run, CLOSED_MSG
 from clinictracker.selectors import (
@@ -17,7 +18,7 @@ def test_page(caplog):
     """Tests loading result page (chromium new headless mode)."""
     city = 'Dummy'
     headless_shell = platform.system() == 'Linux'
-    config = Config(
+    config = RunConfig(
         debug=False,
         test=False,
         headed_mode=False,
@@ -39,8 +40,8 @@ def test_page(caplog):
 
     with caplog.at_level(logging.INFO):
         res = run(query, config)
-        # Assert returns None
-        assert res is None
+        # Assert returns ListData
+        assert isinstance(res, ListData)
         # Check the log records more specifically
         assert len(caplog.records) >= 5
         assert full_url in caplog.records[0].message

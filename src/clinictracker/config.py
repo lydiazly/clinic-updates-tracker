@@ -2,10 +2,10 @@
 # config.py
 """Configuration and constants."""
 from argparse import Namespace
+from dataclasses import dataclass
 from dotenv import load_dotenv
 import os
 from pathlib import Path
-from typing import NamedTuple
 
 
 load_dotenv()
@@ -39,18 +39,36 @@ MAX_ITEMS: int = int(os.getenv('MAX_ITEMS', 10))  # default: 10 items
 BROWSER_CHOICES = ['chromium', 'firefox', 'webkit']
 
 # Users JSON file to import
-# INPUT_USERS_JSON_PATH: str = os.getenv(
-#     'INPUT_USERS_JSON_PATH', './input/users.json'
+# USERS_JSON_PATH: str = os.getenv(
+#     'USERS_JSON_PATH', './data/users.json'
 # )
-INPUT_USERS_JSON_PATH: Path = Path(
-    os.getenv('INPUT_USERS_JSON_PATH', './input/users.json')
-)
+USERS_JSON_PATH: Path = Path(os.getenv('USERS_JSON_PATH', './data/users.json'))
 
 
-class Config(NamedTuple):
+@dataclass(frozen=True)
+class Config:
+    """Basic configuration.
+
+    Attributes:
+        debug (bool): Set the logging level to DEBUG
+        test (bool): Exit after opening a page without any further operation
+        headed_mode (bool): Headed mode
+        browser_name (str): Browser name
+        headless_shell (bool): Use a separate chromium headless shell
+    """
+
+    debug: bool
+    test: bool
+    headed_mode: bool
+    browser_name: str
+    headless_shell: bool
+
+
+@dataclass(frozen=True)
+class RunConfig(Config):
     """Application configuration.
 
-    Args:
+    Attributes:
         debug (bool): Set the logging level to DEBUG
         test (bool): Exit after opening a page without any further operation
         headed_mode (bool): Headed mode
@@ -71,13 +89,13 @@ class Config(NamedTuple):
     to_stdout: bool
 
 
-def load_config(args: Namespace) -> Config:
+def load_config(args: Namespace) -> RunConfig:
     """Loads configuration from args and environment."""
     output_path: Path = args.output
     # Append a filename if needed
     if output_path.is_dir():
         output_path = output_path / OUTPUT_HTML_NAME
-    return Config(
+    return RunConfig(
         debug=args.debug or DEBUG_MODE,
         test=args.test,
         headed_mode=args.headed,
