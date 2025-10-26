@@ -35,10 +35,7 @@ def create_user_from_dict(
     # If no email specified and username is an email, use it
     if not user_dict['emails'] and is_valid_email(username):
         amended_dict['emails'] = [username]
-    try:
-        user: User = validate_user(User(**(user_dict | amended_dict)))
-    except TypeError as e:
-        raise TypeError(f"{user_dict | amended_dict}: {e}")
+    user: User = validate_user(User(**(user_dict | amended_dict)))
     return user
 
 
@@ -54,6 +51,7 @@ def load_users_from_json(
         raise FileNotFoundError(f"{str(json_path)}: file not found")
     except Exception as e:
         raise RuntimeError(f"Failed to load file '{str(json_path)}': {e}")
+
     # Validate the data
     if (
         not data
@@ -63,10 +61,20 @@ def load_users_from_json(
         raise ValueError(
             "Data in the JSON file must be a non-empty list of objects."
         )
+
     # Create and validate User objects
-    users: list[User] = list(map(create_user_from_dict, data))
-    logger.info(f"Loaded {len(users)} users from: {json_path}")
-    return users
+    valid_users: list[User] = []
+    for user_dict in data:
+        try:
+            user = create_user_from_dict(user_dict)
+        except Exception as e:
+            logger.warning(f"Skipping invalid user: {e}")
+            continue
+        else:
+            valid_users.append(user)
+
+    logger.info(f"Loaded {len(valid_users)} users from: {json_path}")
+    return valid_users
 
 
 def save_users_to_json(
@@ -112,8 +120,12 @@ def save_users_to_json(
 
 def validate_user(user: User) -> User:
     """Validates all fields of a user."""
+    if not user.username:
+        raise ValueError(f"{asdict(user)}: 'username' is required")
+
     for field in ALLOWED_COLS[1:]:  # exclude 'username'
         validate_user_field(user.username, field, getattr(user, field))
+
     return user
 
 

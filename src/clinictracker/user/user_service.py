@@ -296,11 +296,16 @@ def crud_and_get_users(
 
     # Print users in database
     if users_db:
-        users_str = '\n'.join(
-            f"{'-' * 60}\n#{i}\n{user!s}\n{'-' * 60}"
-            for i, user in enumerate(users_db)
+        users_str = (
+            '\n'.join(
+                f"{'-' * 60}\n{user!s}" for i, user in enumerate(users_db)
+            )
+            + f"\n{'-' * 60}"
         )
-        if config.command.name == CommandName.LIST:
+        if (
+            config.command is not None
+            and config.command.name == CommandName.LIST
+        ):
             logger.info(users_str)
         else:
             logger.debug("Current users in database:\n" + users_str)

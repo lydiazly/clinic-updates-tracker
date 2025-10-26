@@ -92,23 +92,24 @@ class ServiceConfig(Config):
 def load_config_for_service(args: Namespace) -> ServiceConfig:
     """Loads configuration from args and environment for user service."""
     command_request: CommandRequest | None = None
-    command_name = CommandName(args.command)
-    match command_name:
-        case CommandName.ADD:
-            command_request = CommandRequest(
-                name=command_name,
-                data=list(map(create_user_from_dict, args.user)),
-            )
-        case CommandName.UPD:
-            command_request = CommandRequest(
-                name=command_name,
-                data=args.user,
-            )
-        case CommandName.LIST | CommandName.DEL:
-            command_request = CommandRequest(
-                name=command_name,
-                data=args.usernames,
-            )
+    if args.command is not None:
+        command_name = CommandName(args.command)
+        match command_name:
+            case CommandName.ADD:
+                command_request = CommandRequest(
+                    name=command_name,
+                    data=list(map(create_user_from_dict, args.user)),
+                )
+            case CommandName.UPD:
+                command_request = CommandRequest(
+                    name=command_name,
+                    data=args.user,
+                )
+            case CommandName.LIST | CommandName.DEL:
+                command_request = CommandRequest(
+                    name=command_name,
+                    data=args.usernames,
+                )
     return ServiceConfig(
         debug=args.debug or DEBUG_MODE,
         test=args.test,

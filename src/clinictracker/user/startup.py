@@ -359,22 +359,19 @@ def get_args_and_logger_for_service() -> (
                 "Users to insert:\n"
                 + '\n'.join(
                     '-' * 60
-                    + f"#{i}\n"
                     + '\n'.join(f"{k:>20}: {user[k]}" for k in ALLOWED_COLS)
-                    + '-' * 60
                     for i, user in enumerate(args.user)
                 )
+                + f"\n{'-' * 60}"
             )
         case CommandName.UPD:
             logger.debug(
                 "Users to update:\n"
                 + '\n'.join(
-                    '-' * 60
-                    + f"#{i}\n"
-                    + '\n'.join(f"{k:>20}: {v}" for k, v in user)
-                    + '-' * 60
+                    '-' * 60 + '\n'.join(f"{k:>20}: {v}" for k, v in user)
                     for i, user in enumerate(args.user)
                 )
+                + f"\n{'-' * 60}"
             )
         case CommandName.DEL:
             logger.debug(f"Users to delete: {', '.join(args.usernames)}")
