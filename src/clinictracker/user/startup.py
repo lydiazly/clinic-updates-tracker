@@ -147,7 +147,17 @@ def get_args_and_logger_for_service() -> (
         ),
     )
     # Subcommand: list
-    subparsers.add_parser(CommandName.LIST, description="List all users")
+    list_parser: ArgumentParser = subparsers.add_parser(
+        CommandName.LIST, description="List all users"
+    )
+    list_parser.add_argument(
+        '-u',
+        '--usernames',
+        nargs='*',
+        type=str,
+        metavar='str',
+        help="List of usernames (if not provided, list all)",
+    )
     # Subcommand: add
     add_parser: ArgumentParser = subparsers.add_parser(
         CommandName.ADD,
@@ -155,6 +165,7 @@ def get_args_and_logger_for_service() -> (
         formatter_class=RawTextHelpFormatter,
     )
     add_parser.add_argument(
+        '-u',
         '--user',
         metavar='FIELDS',
         action='append',  # allows multiple --user flags
@@ -168,6 +179,7 @@ def get_args_and_logger_for_service() -> (
         formatter_class=RawTextHelpFormatter,
     )
     update_parser.add_argument(
+        '-u',
         '--user',
         metavar='FIELDS',
         action='append',  # allows multiple --user flags
@@ -176,11 +188,10 @@ def get_args_and_logger_for_service() -> (
     )
     # Subcommand: delete
     delete_parser: ArgumentParser = subparsers.add_parser(
-        CommandName.DEL,
-        description="Delete users (overridden by --load)",
-        formatter_class=RawTextHelpFormatter,
+        CommandName.DEL, description="Delete users (overridden by --load)"
     )
     delete_parser.add_argument(
+        '-u',
         '--usernames',
         nargs='+',
         type=str,
@@ -338,6 +349,11 @@ def get_args_and_logger_for_service() -> (
     logger.debug(f"Args:\n{vars(args)}")
 
     match args.command:
+        case CommandName.LIST:
+            logger.debug(
+                "Users to list: "
+                f"{', '.join(args.usernames) if args.usernames else 'all'}"
+            )
         case CommandName.ADD:
             logger.debug(
                 "Users to insert:\n"
@@ -361,7 +377,7 @@ def get_args_and_logger_for_service() -> (
                 )
             )
         case CommandName.DEL:
-            logger.debug(f"Users to delete: {args.username}")
+            logger.debug(f"Users to delete: {', '.join(args.usernames)}")
 
     return args, logger
 

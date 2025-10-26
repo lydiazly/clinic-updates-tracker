@@ -85,7 +85,7 @@ def fetch_data_and_send(
             continue
 
         # Send items to user
-        current_time = datetime.now()
+        current_time = datetime.now().astimezone()  # timezone-aware
         try:
             EmailService.send_to_user(user, body_to_send)
         except Exception as e:
@@ -116,7 +116,7 @@ def process_user(
     nmax: int = user.nmax
 
     # Check if enough time has passed since last_sent_at
-    current_time = datetime.now()
+    current_time = datetime.now().astimezone()  # timezone-aware
     if not db.should_send_to_user(user, current_time):
         logger.info(
             f"Skipping {username}: Not enough time passed since last send."
@@ -183,9 +183,15 @@ def crud_and_get_users(
     - If `config.load_users` is `True` and `config.delete_users` is `True`,
     delete the users in database that are not in the JSON file.
     """
+    users_db: list[User] = []
     # Retrieve all current users in database
-    users_db: list[User] = db.get_all_users()
-    logger.info(f"Total users in database: {len(users_db)}")
+    if (
+        config.command is None
+        or config.command.name != CommandName.LIST
+        or config.command.data is None
+    ):
+        users_db = db.get_all_users()
+        logger.info(f"Total users in database: {len(users_db)}")
 
     # Load data from JSON file and upsert
     users_src: list[User] = []
@@ -219,7 +225,16 @@ def crud_and_get_users(
     if config.command is not None:
         match config.command.name:
             case CommandName.LIST:
-                pass  # print later
+                usernames: list[str] = config.command.data
+                if config.command.data is not None:
+                    usernames: list[str] = config.command.data
+                    for username in usernames:
+                        user = db.get_user_by_username(username)
+                        if user is not None:
+                            users_db.append(user)
+                        else:
+                            logger.warning(f"User not found: {username}")
+                # print users_db later
 
             case CommandName.ADD:
                 if config.load_users:
@@ -266,24 +281,29 @@ def crud_and_get_users(
                 )
 
     # Retrieve all users again
-    if users_src or config.command.name in [
-        CommandName.ADD,
-        CommandName.UPD,
-        CommandName.DEL,
-        CommandName.CLEAR,
-    ]:
+    if users_src or (
+        config.command is not None
+        and config.command.name
+        in [
+            CommandName.ADD,
+            CommandName.UPD,
+            CommandName.DEL,
+            CommandName.CLEAR,
+        ]
+    ):
         users_db = db.get_all_users()
         logger.info(f"Total users in database: {len(users_db)}")
 
-    # Print all users in database
-    users_str = "Current users in database:\n" + '\n'.join(
-        f"{'-' * 60}\n#{i}\n{user!s}\n{'-' * 60}"
-        for i, user in enumerate(users_db)
-    )
-    if config.command == CommandName.LIST:
-        logger.info(users_str)
-    else:
-        logger.debug(users_str)
+    # Print users in database
+    if users_db:
+        users_str = '\n'.join(
+            f"{'-' * 60}\n#{i}\n{user!s}\n{'-' * 60}"
+            for i, user in enumerate(users_db)
+        )
+        if config.command.name == CommandName.LIST:
+            logger.info(users_str)
+        else:
+            logger.debug("Current users in database:\n" + users_str)
 
     return users_db
 
@@ -332,18 +352,22 @@ def run_service(
                 logger.info(f"Cities to check: {', '.join(query_all.cities)}")
 
                 # Prepare data and send to all users
+                current_time = datetime.now().astimezone()  # timezone-aware
                 fetch_data_and_send(db, users, query_all, config, logger)
 
                 # Cleanup old records
                 stale_days = query_all.max_days_back + CLEANUP_BUFFER_DAYS
-                logger.info(f"Cleaning up records >= {stale_days} days...")
-                cutoff_date = datetime.now() - timedelta(days=stale_days)
+                logger.info(
+                    f"Cleaning up records more than {stale_days} days old..."
+                )
+                cutoff_date = current_time - timedelta(days=stale_days)
                 db.cleanup_old_sent_items(cutoff_date)
                 sent_items_count = db.count_all_sent_items()
-                logger.info(f"Current records: {sent_items_count}")
+                logger.info(f"Current records count: {sent_items_count}")
 
             # Save user objects to JSON -------------------------------|
-            save_users_to_json(users, config.json_path, logger)
+            if config.save_users:
+                save_users_to_json(users, config.json_path, logger)
 
         # Chained exceptions are handled here
         except RuntimeError as e:

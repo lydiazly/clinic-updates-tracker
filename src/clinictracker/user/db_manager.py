@@ -138,6 +138,7 @@ class UserServiceDB:
             return
 
         create_table_query = """
+        -- 1. Create columns with default values
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
@@ -147,9 +148,22 @@ class UserServiceDB:
             period INTEGER DEFAULT 1 CHECK (period > 0),
             nmax INTEGER DEFAULT 10 CHECK (nmax > 0),
             last_sent_at TIMESTAMP,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT now(),
+            updated_at TIMESTAMP DEFAULT now()
         );
+        -- 2. Create a trigger function (once per database)
+        CREATE OR REPLACE FUNCTION update_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = now();
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        -- 3. Create the trigger on the table
+        CREATE TRIGGER update_users_updated_at
+            BEFORE UPDATE ON users
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
         """
         try:
             cursor.execute(create_table_query)
@@ -182,7 +196,7 @@ class UserServiceDB:
         CREATE TABLE IF NOT EXISTS sent_items (
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             item_hash VARCHAR(64) NOT NULL,
-            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            sent_at TIMESTAMP DEFAULT now(),
             PRIMARY KEY (user_id, item_hash)
         );
         CREATE INDEX IF NOT EXISTS idx_sent_items_hash ON sent_items(item_hash);
@@ -299,7 +313,8 @@ class UserServiceDB:
         try:
             cursor.execute(query, values)
             if cursor.rowcount == 0:
-                raise ValueError("User not found.")
+                self.logger.warning(f"User not found: {username}")
+                return
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -314,6 +329,9 @@ class UserServiceDB:
         query = "DELETE FROM users WHERE username = %s;"
         try:
             cursor.execute(query, (username,))
+            if cursor.rowcount == 0:
+                self.logger.warning(f"User not found: {username}")
+                return
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -325,12 +343,12 @@ class UserServiceDB:
         """Retrieves all users from database."""
         conn, cursor = self._ensure_connected()
 
-        query = sql.SQL(
-            "SELECT {cols} FROM users ORDER BY id;".format(
-                cols=sql.SQL(', ').join(map(sql.Identifier, fields(User)))
-            )
+        field_names = [field.name for field in fields(User)]
+        query = sql.SQL("SELECT {cols} FROM users ORDER BY id;").format(
+            cols=sql.SQL(', ').join(map(sql.Identifier, field_names))
         )
-        self.logger.debug(query.as_string(conn))
+
+        # self.logger.debug(query.as_string(cursor))
 
         try:
             cursor.execute(query)
@@ -343,12 +361,12 @@ class UserServiceDB:
         """Retrieves a specific user by username."""
         conn, cursor = self._ensure_connected()
 
+        field_names = [field.name for field in fields(User)]
         query = sql.SQL(
-            "SELECT {cols} FROM users WHERE username = %s;".format(
-                cols=sql.SQL(', ').join(map(sql.Identifier, fields(User)))
-            )
-        )
-        self.logger.debug(query.as_string(conn))
+            "SELECT {cols} FROM users WHERE username = %s;"
+        ).format(cols=sql.SQL(', ').join(map(sql.Identifier, field_names)))
+
+        # self.logger.debug(query.as_string(conn))
 
         try:
             cursor.execute(query, (username,))
@@ -382,7 +400,9 @@ class UserServiceDB:
 
     @staticmethod
     def should_send_to_user(user: User, current_time: datetime) -> bool:
-        """Checks if enough time has passed based on user's period."""
+        """Checks if enough time has passed based on user's period.
+        Automatically handles timezone conversion for timezone-aware objects.
+        """
         # Never sent before, should send
         if user.last_sent_at is None:
             return True
@@ -402,7 +422,7 @@ class UserServiceDB:
         conn, cursor = self._ensure_connected()
 
         if sent_at is None:
-            sent_at = datetime.now()
+            sent_at = datetime.now().astimezone()  # timezone-aware
 
         insert_query = """
         INSERT INTO sent_items (user_id, item_hash, sent_at)
@@ -428,7 +448,7 @@ class UserServiceDB:
         conn, cursor = self._ensure_connected()
 
         if sent_at is None:
-            sent_at = datetime.now()
+            sent_at = datetime.now().astimezone()  # timezone-aware
 
         try:
             update_query = "UPDATE users SET last_sent_at = %s WHERE id = %s;"

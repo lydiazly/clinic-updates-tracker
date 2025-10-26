@@ -71,18 +71,13 @@ def load_users_from_json(
 
 def save_users_to_json(
     users: list[User], json_path: Path, logger: Logger | MyLogger
-):
+) -> None:
     """Saves `User` objects to a JSON file, dropping `None` values.
     If the file exists, back up by renaming it with its modification time.
     """
-    # If file exists and non-empty, create backup
-    if json_path.is_file() and json_path.stat().st_size > 0:
-        mtime = datetime.fromtimestamp(json_path.stat().st_mtime)
-        mtime_str = mtime.strftime('%Y%m%d%H%M%S')
-        backup_name = f"{json_path.stem}_{mtime_str}{json_path.suffix}"
-        backup_path = json_path.parent / backup_name
-        json_path.rename(backup_path)
-        logger.info(f"Backed up existing file to: {backup_name}")
+    if not users:
+        logger.info("No users to save.")
+        return
 
     # Convert each object to dict, filtering out None values
     data: list[dict[str, str | int | list[str]]] = [
@@ -91,7 +86,7 @@ def save_users_to_json(
     ]
 
     # Serialize as JSON, not escaping non-ASCII characters
-    s = json.dump(data, indent=2, ensure_ascii=False)
+    s = json.dumps(data, indent=2, ensure_ascii=False)
 
     # Format JSON with compact lists
     def replace_func(match: re.Match[str]) -> str:
@@ -99,6 +94,15 @@ def save_users_to_json(
         return ' '.join(match.group().split())
 
     compact_json = re.sub(r"(?<=\[)[^\[\]\{]+(?=\])", replace_func, s)
+
+    # If file exists and non-empty, create backup
+    if json_path.is_file() and json_path.stat().st_size > 0:
+        mtime = datetime.fromtimestamp(json_path.stat().st_mtime)
+        mtime_str = mtime.strftime('%Y%m%d%H%M%S')
+        backup_name = f"{json_path.stem}_{mtime_str}{json_path.suffix}"
+        backup_path = json_path.parent / backup_name
+        json_path.rename(backup_path)
+        logger.info(f"Backed up existing file to: {backup_name}")
 
     # Save to file
     with open(json_path, 'w', encoding='utf-8') as f:

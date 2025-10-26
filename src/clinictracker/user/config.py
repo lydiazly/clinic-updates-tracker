@@ -104,7 +104,7 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
                 name=command_name,
                 data=args.user,
             )
-        case CommandName.DEL:
+        case CommandName.LIST | CommandName.DEL:
             command_request = CommandRequest(
                 name=command_name,
                 data=args.usernames,

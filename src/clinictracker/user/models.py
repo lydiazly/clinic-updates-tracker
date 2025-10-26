@@ -46,8 +46,8 @@ class User:
     cities: list[str] = field(default_factory=list)
     period: int = PERIOD_USER
     nmax: int = MAX_ITEMS_USER
-    last_sent_at: datetime | None = field(default=None, init=False)
-    id: int = field(default=-1, init=False)
+    last_sent_at: datetime | None = None
+    id: int = -1
 
     def __str__(self) -> str:
         return '\n'.join(
