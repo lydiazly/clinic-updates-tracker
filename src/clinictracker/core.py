@@ -35,7 +35,7 @@ from clinictracker.models import (
 )
 
 
-TIMEOUT_ERR_TEMPLATE = "Timeout loading %s after %gs."
+TIMEOUT_ERR = "Timeout loading %s after %gs."
 TEST_MSG = "*** Test only (no operation) ***"
 CLOSED_MSG = "Browser closed."
 NO_UPDATES_MSG = "No updates. No file exported."
@@ -77,7 +77,7 @@ def navigate_to_page(page: Page, url: str) -> None:
         page.goto(url)
         page.wait_for_load_state("networkidle")
     except TimeoutError:
-        raise TimeoutError(TIMEOUT_ERR_TEMPLATE % (url, TIMEOUT_PAGE / 1000))
+        raise TimeoutError(TIMEOUT_ERR % (url, TIMEOUT_PAGE / 1000))
     except Exception as e:
         raise RuntimeError(f"Unable to load {url}.") from e
 
@@ -115,9 +115,7 @@ def get_list(
     try:
         title_locator.wait_for(state="visible")
     except TimeoutError:
-        raise TimeoutError(
-            TIMEOUT_ERR_TEMPLATE % ('title', TIMEOUT_PAGE / 1000)
-        )
+        raise TimeoutError(TIMEOUT_ERR % ('title', TIMEOUT_PAGE / 1000))
     else:
         logger.info(f"Page title: {title_locator.inner_text().strip()}")
 
@@ -125,9 +123,7 @@ def get_list(
     try:
         list_title_locator.wait_for(state="visible")
     except TimeoutError:
-        raise TimeoutError(
-            TIMEOUT_ERR_TEMPLATE % ('list', TIMEOUT_PAGE / 1000)
-        )
+        raise TimeoutError(TIMEOUT_ERR % ('list', TIMEOUT_PAGE / 1000))
     else:
         logger.info(f"List title: {list_title_locator.inner_text().strip()}")
 
@@ -157,8 +153,7 @@ def get_list(
         # Now timeout
         except TimeoutError:
             raise TimeoutError(
-                TIMEOUT_ERR_TEMPLATE
-                % ('updates', (TIMEOUT_PAGE + TIMEOUT_UL) / 1000)
+                TIMEOUT_ERR % ('updates', (TIMEOUT_PAGE + TIMEOUT_UL) / 1000)
             )
     else:
         n_tot = items_locator.count()

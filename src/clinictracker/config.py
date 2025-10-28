@@ -10,28 +10,28 @@ from pathlib import Path
 
 load_dotenv()
 
-DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
+DEBUG_MODE = os.getenv("DEBUG_MODE", "false").strip().lower() == "true"
 
 # Timeout in milliseconds
 TIMEOUT_PAGE = int(os.getenv('TIMEOUT_PAGE', 30000))  # for loading page
 TIMEOUT_UL = int(os.getenv('TIMEOUT_UL', 3000))  # for loading list
 
 # File to export
-OUTPUT_HTML_NAME = os.getenv('OUTPUT_HTML_NAME', 'content.html')
+OUTPUT_HTML_NAME = os.getenv('OUTPUT_HTML_NAME', 'content.html').strip()
 # OUTPUT_HTML_PATH: str = os.getenv(
 #     'OUTPUT_HTML_PATH', f'./output/{OUTPUT_HTML_NAME}'
 # )
 OUTPUT_HTML_PATH: Path = Path(
-    os.getenv('OUTPUT_HTML_PATH', f'./output/{OUTPUT_HTML_NAME}')
+    os.getenv('OUTPUT_HTML_PATH', f'./output/{OUTPUT_HTML_NAME}').strip()
 )
 # Append a filename if needed
 if OUTPUT_HTML_PATH.is_dir():
     OUTPUT_HTML_PATH = OUTPUT_HTML_PATH / OUTPUT_HTML_NAME
 
 # Target website
-TARGET_BASE_URL: str = os.getenv('TARGET_BASE_URL', '')
-TARGET_TZ: str = os.getenv('TARGET_TZ', '')
-CITY: str = os.getenv('CITY', '')
+TARGET_BASE_URL: str = os.getenv('TARGET_BASE_URL', '').strip().lower()
+TARGET_TZ: str = os.getenv('TARGET_TZ', '').strip()
+CITY: str = os.getenv('CITY', '').strip()
 DAYS_BACK: int = int(os.getenv('DAYS_BACK', 2))  # default: 2 days
 MAX_ITEMS: int = int(os.getenv('MAX_ITEMS', 10))  # default: 10 items
 
@@ -42,7 +42,9 @@ BROWSER_CHOICES = ['chromium', 'firefox', 'webkit']
 # USERS_JSON_PATH: str = os.getenv(
 #     'USERS_JSON_PATH', './data/users.json'
 # )
-USERS_JSON_PATH: Path = Path(os.getenv('USERS_JSON_PATH', './data/users.json'))
+USERS_JSON_PATH: Path = Path(
+    os.getenv('USERS_JSON_PATH', './data/users.json').strip()
+)
 
 
 @dataclass(frozen=True)

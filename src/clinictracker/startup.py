@@ -2,6 +2,7 @@
 # startup.py
 """Logger setter and CLI argument parsers."""
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
+from enum import StrEnum  # python 3.11+
 import logging
 from pathlib import Path
 import sys
@@ -17,6 +18,11 @@ from clinictracker.config import (
     BROWSER_CHOICES,
     OUTPUT_HTML_PATH,
 )
+
+
+def trim_str(s: str) -> str:
+    """Removes leading and trailing spaces and quotes."""
+    return s.strip().strip('"').strip("'")
 
 
 # ---------------------------------------------------------------------|
@@ -47,19 +53,29 @@ def load_query(args: Namespace) -> QueryParams:
     query_dict = ({'only_accepting': 'yes'} if not args.all else {}) | {
         'list_town': args.city
     }
-    full_url = get_full_url(args.url, '?', query_dict)
+    full_url = get_full_url(trim_str(args.url), '?', query_dict)
     query = QueryParams(
         url=full_url,
-        city=args.city,
+        city=trim_str(args.city),
         days_back=args.days,
         nmax=args.nmax,
-        tz=args.tz,
+        tz=trim_str(args.tz),
     )
     return query
 
 
 # ---------------------------------------------------------------------|
 # Logging
+class Color(StrEnum):
+    """Preset ANSI color escape codes: GRAY, YELLOW, RED, RED_B, END"""
+
+    GRAY = '\x1b[90m'
+    YELLOW = '\x1b[33m'
+    RED = '\x1b[31m'
+    RED_B = '\x1b[31;1m'
+    END = '\x1b[0m'
+
+
 class MyLogger:
     def __init__(self, logger: logging.Logger, is_quiet: bool = False):
         self.logger = logger
@@ -74,6 +90,39 @@ class MyLogger:
         return getattr(self.logger, name)
 
 
+class CustomInfoFormatter(logging.Formatter):
+    FMT = "[%(levelname)s] %(message)s"
+    FORMATTERS = {
+        logging.DEBUG: logging.Formatter(Color.GRAY + FMT + Color.END),
+        logging.INFO: logging.Formatter(FMT),
+        logging.WARNING: logging.Formatter(Color.YELLOW + FMT + Color.END),
+        logging.ERROR: logging.Formatter(Color.RED + FMT + Color.END),
+        logging.CRITICAL: logging.Formatter(Color.RED_B + FMT + Color.END),
+    }
+
+    def format(self, record):
+        formatter = self.FORMATTERS.get(record.levelno)
+        return formatter.format(record)
+
+
+class CustomDebugFormatter(logging.Formatter):
+    """Logging Formatter for --debug to add colors and count warning / errors"""
+
+    FMT1 = "[%(asctime)s %(levelno)s] %(message)s"
+    FMT2 = "[%(asctime)s %(levelno)s] (%(levelname)s) %(message)s (%(filename)s:%(lineno)d)"
+    FORMATTERS = {
+        logging.DEBUG: logging.Formatter(Color.GRAY + FMT1 + Color.END),
+        logging.INFO: logging.Formatter(FMT1),
+        logging.WARNING: logging.Formatter(Color.YELLOW + FMT2 + Color.END),
+        logging.ERROR: logging.Formatter(Color.RED + FMT2 + Color.END),
+        logging.CRITICAL: logging.Formatter(Color.RED_B + FMT2 + Color.END),
+    }
+
+    def format(self, record):
+        formatter = self.FORMATTERS.get(record.levelno)
+        return formatter.format(record)
+
+
 def setup_logger(
     name: str = '', is_quiet: bool = False
 ) -> logging.Logger | MyLogger:
@@ -84,8 +133,9 @@ def setup_logger(
         logger.setLevel(logging.INFO)
         handler = logging.StreamHandler(stream=sys.stderr)
         handler.setLevel(logging.INFO)
-        formatter = logging.Formatter("[%(levelname)s] %(message)s")
-        handler.setFormatter(formatter)
+        # formatter = logging.Formatter("[%(levelname)s] %(message)s")
+        # handler.setFormatter(formatter)
+        handler.setFormatter(CustomInfoFormatter())
         logger.addHandler(handler)
         logger.propagate = False
         # Suppress urllib3 warnings
@@ -94,9 +144,12 @@ def setup_logger(
         return MyLogger(logger, is_quiet)
     else:
         # Level: DEBUG, use the root logger
+        # Create handler with custom formatter
+        handler = logging.StreamHandler(stream=sys.stderr)
+        handler.setFormatter(CustomDebugFormatter())
         logging.basicConfig(
             level=logging.DEBUG,
-            format="[%(asctime)s #%(levelno)s] %(message)s",
+            handlers=[handler],
         )
         logger = logging.getLogger()
         return logger
@@ -125,7 +178,7 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
     )
     parser.add_argument(
         '--url',
-        type=str,
+        type=str.lower,
         metavar='str',
         default=TARGET_BASE_URL,
         help="The target base URL (default from $TARGET_BASE_URL)",
@@ -262,10 +315,10 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
 
 def validate_args(args: Namespace) -> None:
     """Validates CLI arguments."""
-    if not args.url.strip():
+    if not trim_str(args.url):
         raise ValueError("Missing URL. See --help")
 
-    if not args.city.strip():
+    if not trim_str(args.city):
         raise ValueError("Missing town/city. See --help")
 
     if args.days <= 0:
