@@ -9,41 +9,69 @@ from pathlib import Path
 import re
 from typing import Any
 
+from clinictracker.startup import trim_str, MyLogger, Color
 from clinictracker.user.models import User, ALLOWED_COLS
-from clinictracker.startup import MyLogger
 
 
-def is_valid_email(email: str) -> bool:
+HR = '-' * 60  # horizontal line
+
+NAME_LEN_MAX = 30
+USERNAME_RULES = """Username rules:
+- 3-30 characters
+- Only contains Latin letters, numbers, underscores, hyphens,
+  or is a valid email address
+- Starts with a Latin letter
+- Doesn't end with underscore, hyphen, or '@'
+- Case insensitive
+"""
+EMAIL_PATTERN = re.compile(
+    r'^[A-Za-z0-9][A-Za-z0-9\._%+\-]*'
+    r'@[A-Za-z0-9]([A-Za-z0-9\-]*[A-Za-z0-9])?'
+    r'(\.[A-Za-z0-9]([A-Za-z0-9\-]*[A-Za-z0-9])?)+$'
+)
+NAME_PATTERN = re.compile(r'^[A-Za-z][A-Za-z0-9_\-]*[a-zA-Z0-9]$')
+
+
+def is_valid_email(email: str | None) -> bool:
     """Checks if a string is a valid email address."""
-    EMAIL_PATTERN = re.compile(
-        r'^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?'
-        r'(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$'
-    )
-    return bool(EMAIL_PATTERN.match(email)) if email else False
+    if email is None:
+        return False
+    if len(email) > NAME_LEN_MAX:
+        return False
+    return bool(EMAIL_PATTERN.match(email))
 
 
-def create_user_from_dict(
-    user_dict: dict[str, str | int | list[str] | None],
-) -> User:
-    """Create a valid User object from a dict.
+def is_valid_username(username: str | None) -> bool:
+    """Checks if a username is valid based on USERNAME_RULES."""
+    if username is None:
+        return False
+    if not (3 <= len(username) <= NAME_LEN_MAX):
+        return False
+    return is_valid_email(username) or bool(NAME_PATTERN.match(username))
+
+
+def create_user_from_dict(user_dict: dict[str, Any]) -> User:
+    """Create a valid `User` object from a dict.
     If `emails` is None or empty, and `username` is a valid email address,
     add this email into `emails`.
     """
     amended_dict: dict[str, str | list[str]] = {}
-    username = user_dict['username'].strip()
-    amended_dict['username'] = username
+    username: str | None = user_dict.get('username')
+    if username is not None:
+        username = trim_str(username)
+        amended_dict['username'] = username
     # If no email specified and username is an email, use it
-    if not user_dict['emails'] and is_valid_email(username):
+    if not user_dict.get('emails') and is_valid_email(username):
         amended_dict['emails'] = [username]
-    user: User = validate_user(User(**(user_dict | amended_dict)))
+    user: User = get_valid_user(User(**(user_dict | amended_dict)))
     return user
 
 
 def load_users_from_json(
     json_path: Path, logger: Logger | MyLogger
 ) -> list[User]:
-    """Loads valid user objects from a JSON file."""
-    data: list[dict[str, str | int | list[str] | None]]
+    """Loads valid `User` objects from a JSON file."""
+    data: list[dict[str, Any]]
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -88,7 +116,7 @@ def save_users_to_json(
         return
 
     # Convert each object to dict, filtering out None values
-    data: list[dict[str, str | int | list[str]]] = [
+    data: list[dict[str, Any]] = [
         {k: v for k, v in asdict(user).items() if v is not None}
         for user in users
     ]
@@ -118,13 +146,24 @@ def save_users_to_json(
     logger.info(f"Saved {len(users)} users to: {json_path}")
 
 
-def validate_user(user: User) -> User:
-    """Validates all fields of a user."""
+def get_valid_user(user: User) -> User:
+    """Returns valid `User` object."""
     if not user.username:
         raise ValueError(f"{asdict(user)}: 'username' is required")
 
-    for field in ALLOWED_COLS[1:]:  # exclude 'username'
+    for field in ALLOWED_COLS:
         validate_user_field(user.username, field, getattr(user, field))
+
+    return user
+
+
+def get_valid_user_dict(user: dict[str, Any]) -> dict[str, Any]:
+    """Returns valid user dict."""
+    if not user.get('username'):
+        raise ValueError(f"{user}: 'username' is required")
+
+    for k in user.keys():
+        validate_user_field(user.get('username'), k, user.get(k))
 
     return user
 
@@ -133,24 +172,31 @@ def validate_user_field(username: str, field: str, data: Any) -> None:
     """Validates a specified field of a user."""
     ERR_TEMPLATE = username + ": %s"
     match field:
-        case 'emails':
-            if not data:
-                raise ValueError(ERR_TEMPLATE % "'emails' is null or empty")
-            for email in data:
-                if not is_valid_email(email):
-                    raise ValueError(ERR_TEMPLATE % f"Invalid email: {email}")
-        case 'cities':
-            if not data:
-                raise ValueError(ERR_TEMPLATE % "'cities' is null or empty")
-        case 'period':
-            if data <= 0:
+        case 'username':
+            if not is_valid_username(username):
                 raise ValueError(
-                    ERR_TEMPLATE % f"'period' must be positive, got {data}"
+                    f"Invalid username: {username}\n{USERNAME_RULES}"
                 )
-        case 'nmax':
-            if data <= 0:
+        case 'nickname':
+            if data and len(data) > NAME_LEN_MAX:
                 raise ValueError(
-                    ERR_TEMPLATE % f"'nmax' must be positive, got {data}"
+                    ERR_TEMPLATE
+                    % f"Maximum length of '{field}': {NAME_LEN_MAX}"
+                )
+        case 'emails' | 'cities':
+            if not data:
+                raise ValueError(ERR_TEMPLATE % f"'{field}' is null or empty.")
+            if field == 'emails':
+                for email in data:
+                    if not is_valid_email(email):
+                        raise ValueError(
+                            ERR_TEMPLATE % f"Invalid email: {email}"
+                        )
+        case 'period' | 'nmax':
+            if not isinstance(data, int) or data <= 0:
+                raise ValueError(
+                    ERR_TEMPLATE
+                    % f"'{field}' must be a positive integer, got: {data}"
                 )
 
 
@@ -165,3 +211,35 @@ def prompt_to_confirm(description: str) -> bool:
             return True
         else:
             print("Please enter 'y' or 'n' (or press Enter for No).")
+
+
+def users_to_str(users: list[User]) -> str:
+    """Formats `User` objects."""
+    users_str_list = [f"{user!s}" for user in users]
+    users_str = (f"\n{HR}\n".join(['', *users_str_list, ''])).strip()
+    return users_str
+
+
+def user_dicts_to_str(user_dicts: list[dict[str, Any]]) -> str:
+    """Formats user dicts."""
+    users_str_list = [
+        '\n'.join(f"{k:>20}: {user.get(k)}" for k in ALLOWED_COLS if k in user)
+        for user in user_dicts
+    ]
+    users_str = (f"\n{HR}\n".join(['', *users_str_list, ''])).strip()
+    return users_str
+
+
+def user_updates_to_str(user: User, updates: dict[str, Any]) -> str:
+    """Formats user dicts."""
+    user_str = '\n'.join(
+        f"{field:>20}: {getattr(user, field)}"
+        + (
+            f"{Color.YELLOW}  ->  {updates.get(field)}{Color.END}"
+            if field in updates
+            else ''
+        )
+        for field in ['id'] + ALLOWED_COLS + ['last_sent_at']
+    )
+    user_str = f"{HR}\n{user_str}\n{HR}"
+    return user_str

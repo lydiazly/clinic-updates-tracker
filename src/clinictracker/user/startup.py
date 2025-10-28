@@ -9,16 +9,17 @@ from argparse import (
 )
 import logging
 from pathlib import Path
-from typing import NamedTuple, Any
+from typing import Any, NamedTuple, Callable
 
 from clinictracker.config import TARGET_BASE_URL, TARGET_TZ, BROWSER_CHOICES
-from clinictracker.user.models import User, ALLOWED_COLS
+from clinictracker.user.models import User, PERIOD_USER, MAX_ITEMS_USER
 from clinictracker.user.config import (
     CommandName,
     ServiceConfig,
     DAYS_BACK_MIN,
     MAX_ITEMS_MIN,
     USERS_JSON_PATH,
+    TABLE_NAMES,
 )
 from clinictracker.startup import (
     QueryParams,
@@ -26,6 +27,8 @@ from clinictracker.startup import (
     setup_logger,
     get_full_url,
 )
+from clinictracker.startup import trim_str
+from clinictracker.user.helpers import is_valid_email, user_dicts_to_str
 
 
 # ---------------------------------------------------------------------|
@@ -76,35 +79,61 @@ def load_query_for_each(
 # ---------------------------------------------------------------------|
 # CLI arguments
 USER_ARGS_HINT = (
-    "Fields format:\n  username=str nickname=str emails=str,str,... "
-    "cities=str,str,... period=int nmax=int\n"
-    "username: a unique string\n"
-    "nickname: default to null\n"
-    "emails: recipients (if not given and username is an email address, "
+    "Format:\n  -u \"username=str emails=str,str,... ...\"\n"
+    "Fields:\n"
+    "  username: a unique string (case insensitive)\n"
+    "  nickname: default to null\n"
+    "  emails: recipients (if not given and username is a valid email, "
     "set it as a recipient)\n"
-    "cities: town/city list\n"
-    "period: schedule period in days (default to 1 or from $PERIOD_USER)\n"
-    "nmax: maximum number of items to collect "
-    "(default to 10 or from $MAX_ITEMS_USER)\n"
+    "  cities: town/city list\n"
+    "  period: schedule period in days (default to 1 or from $PERIOD_USER)\n"
+    "  nmax: maximum number of items to collect "
+    "  (default to 10 or from $MAX_ITEMS_USER)\n"
 )
 
 
-def parse_user_args(user_string: str) -> dict:
-    """Parses a user string in format:
-    'username=str emails=str,str,... ...'
-    """
-    parts = user_string.split()
-    user_data: dict[str, Any] = {}
-    for part in parts:
-        if '=' in part:
-            key, value = [s.strip() for s in part.split('=', maxsplit=1)]
-            if key in ['emails', 'cities']:
-                # Split comma-separated items
-                user_data[key] = [s.strip() for s in value.split(',')]
-            else:
-                user_data[key] = value
+def user_parser_closure(
+    command_name: CommandName,
+) -> Callable[[str], dict[str, Any]]:
+    """Factory function that creates a parser for a specific command."""
 
-    return user_data
+    def parse_user_args(user_string: str) -> dict[str, Any]:
+        """Parses a user in format: 'username=str emails=str,... ...'
+        User fields will be validated when creating `User` objects.
+        """
+        parts = user_string.split()
+        user_dict: dict[str, Any] = {}
+        for part in parts:
+            if '=' in part:
+                key, value = [trim_str(s) for s in part.split('=', maxsplit=1)]
+                match key:
+                    case 'username':
+                        user_dict[key] = value.lower()
+                    case 'emails':
+                        user_dict[key] = [
+                            trim_str(s).lower() for s in value.split(',')
+                        ]
+                    case 'cities':
+                        user_dict[key] = [
+                            trim_str(s) for s in value.split(',')
+                        ]
+                    case 'period' | 'nmax':
+                        if value.isdigit():
+                            user_dict[key] = int(value)
+                        else:
+                            raise ValueError(f"'{key}' must be a number.")
+        if command_name == CommandName.ADD:
+            # If no email specified and username is an email, use it
+            username = user_dict.get('username')
+            if not user_dict.get('emails') and is_valid_email(username):
+                user_dict['emails'] = [username]
+            # Fill with defaults
+            user_dict['period'] = user_dict.get('period', PERIOD_USER)
+            user_dict['nmax'] = user_dict.get('nmax', MAX_ITEMS_USER)
+
+        return user_dict
+
+    return parse_user_args
 
 
 def get_args_and_logger_for_service() -> (
@@ -121,7 +150,7 @@ def get_args_and_logger_for_service() -> (
     # Query args
     parser.add_argument(
         '--url',
-        type=str,
+        type=str.lower,
         metavar='str',
         default=TARGET_BASE_URL,
         help="The target base URL (default from $TARGET_BASE_URL)",
@@ -153,10 +182,10 @@ def get_args_and_logger_for_service() -> (
     list_parser.add_argument(
         '-u',
         '--usernames',
-        nargs='*',
-        type=str,
+        nargs='+',
+        type=str.lower,
         metavar='str',
-        help="List of usernames (if not provided, list all)",
+        help="Usernames (if not provided, list all users)",
     )
     # Subcommand: add
     add_parser: ArgumentParser = subparsers.add_parser(
@@ -167,37 +196,48 @@ def get_args_and_logger_for_service() -> (
     add_parser.add_argument(
         '-u',
         '--user',
-        metavar='FIELDS',
+        required=True,
+        metavar='"FIELDS"',
         action='append',  # allows multiple --user flags
-        type=parse_user_args,
+        type=user_parser_closure(CommandName.ADD),
         help=USER_ARGS_HINT,
     )
     # Subcommand: update
     update_parser: ArgumentParser = subparsers.add_parser(
         CommandName.UPD,
-        description="Update users (overridden by --load)",
+        description=(
+            "Update users\n"
+            "(overridden by --load; will prompt for confirmation)"
+        ),
         formatter_class=RawTextHelpFormatter,
     )
     update_parser.add_argument(
         '-u',
         '--user',
-        metavar='FIELDS',
+        required=True,
+        metavar='"FIELDS"',
         action='append',  # allows multiple --user flags
-        type=parse_user_args,
+        type=user_parser_closure(CommandName.UPD),
         help=USER_ARGS_HINT,
     )
     # Subcommand: delete
     delete_parser: ArgumentParser = subparsers.add_parser(
-        CommandName.DEL, description="Delete users (overridden by --load)"
+        CommandName.DEL,
+        description=(
+            "Delete users\n"
+            "(overridden by --load; will prompt for confirmation)"
+        ),
     )
     delete_parser.add_argument(
         '-u',
         '--usernames',
         nargs='+',
-        type=str,
+        type=str.lower,
+        required=True,
         metavar='str',
         help="List of usernames",
     )
+    # Subcommand: reset
     subparsers.add_parser(
         CommandName.RESET,
         description=(
@@ -207,14 +247,24 @@ def get_args_and_logger_for_service() -> (
         ),
         formatter_class=RawTextHelpFormatter,
     )
-    subparsers.add_parser(
+    # Subcommand: clear
+    clear_parser: ArgumentParser = subparsers.add_parser(
         CommandName.CLEAR,
         description=(
-            "**CAUTION** Empty all tables and reset user id sequence\n"
+            "**CAUTION** Empty tables and reset user id sequence\n"
             "(overridden by --load; will prompt for confirmation) "
             "(default: false)"
         ),
         formatter_class=RawTextHelpFormatter,
+    )
+    clear_parser.add_argument(
+        '-t',
+        '--tables',
+        nargs='+',
+        type=str.lower,
+        metavar='str',
+        choices=TABLE_NAMES,
+        help="Table names: %(choices)s (if not provided, clear all tables)",
     )
     # Table args
     parser.add_argument(
@@ -258,7 +308,7 @@ def get_args_and_logger_for_service() -> (
         help=(
             "**CAUTION** When --load is selected and the JSON file specified "
             "by -f is non-empty,\ndelete users that are not in the file "
-            "(will prompt to confirm) (default: false)"
+            "(will prompt for confirmation) (default: false)"
         ),
     )
     parser.add_argument(
@@ -271,10 +321,10 @@ def get_args_and_logger_for_service() -> (
     )
     # Other database args
     parser.add_argument(
-        '--upsert-only',
+        '--crud-only',
         action='store_true',
         help=(
-            "Exit after updating users without any further operation\n"
+            "Exit after managing user data without any further operation\n"
             "(no effect if COMMAND is specified) (default: false)"
         ),
     )
@@ -351,46 +401,30 @@ def get_args_and_logger_for_service() -> (
     match args.command:
         case CommandName.LIST:
             logger.debug(
-                "Users to list: "
+                "Users to look up: "
                 f"{', '.join(args.usernames) if args.usernames else 'all'}"
             )
-        case CommandName.ADD:
+        case CommandName.ADD | CommandName.UPD:
             logger.debug(
-                "Users to insert:\n"
-                + '\n'.join(
-                    '-' * 60
-                    + '\n'.join(f"{k:>20}: {user[k]}" for k in ALLOWED_COLS)
-                    for i, user in enumerate(args.user)
-                )
-                + f"\n{'-' * 60}"
-            )
-        case CommandName.UPD:
-            logger.debug(
-                "Users to update:\n"
-                + '\n'.join(
-                    '-' * 60 + '\n'.join(f"{k:>20}: {v}" for k, v in user)
-                    for i, user in enumerate(args.user)
-                )
-                + f"\n{'-' * 60}"
+                f"Users to {args.command}:\n" + user_dicts_to_str(args.user)
             )
         case CommandName.DEL:
-            logger.debug(f"Users to delete: {', '.join(args.usernames)}")
+            logger.debug(f"Users to delete: {', '.join(set(args.usernames))}")
+        case CommandName.CLEAR:
+            logger.debug(
+                "Tables to clear: "
+                f"{', '.join(set(args.tables) if args.tables else TABLE_NAMES)}"
+            )
 
     return args, logger
 
 
 def validate_args_for_service(args: Namespace) -> None:
     """Validates CLI arguments.
-    User fields will be validated when creating User objects.
+    User fields will be validated when creating `User` objects.
     """
-    if not args.url.strip():
+    if not trim_str(args.url):
         raise ValueError("Missing URL. See --help")
 
     if (args.load or args.save) and not args.file:
         raise ValueError("A file path must be specified by -f/--file.")
-
-    if args.command in [CommandName.ADD, CommandName.UPD] and not args.user:
-        raise ValueError("No user data provided.")
-
-    if args.command == CommandName.DEL and not args.usernames:
-        raise ValueError("No usernames provided.")

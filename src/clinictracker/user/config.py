@@ -7,16 +7,20 @@ from dotenv import load_dotenv
 from enum import StrEnum  # python 3.11+
 import os
 from pathlib import Path
-from typing import NamedTuple, Any
+from typing import Any, NamedTuple
 
 from clinictracker.config import Config
+from clinictracker.startup import trim_str
 from clinictracker.user.models import User
-from clinictracker.user.helpers import create_user_from_dict
+from clinictracker.user.helpers import (
+    create_user_from_dict,
+    get_valid_user_dict,
+)
 
 
 load_dotenv()
 
-DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
+DEBUG_MODE = os.getenv("DEBUG_MODE", "false").strip().lower() == "true"
 
 # Minimum days to look back (before filtering by hash values)
 DAYS_BACK_MIN: int = 2
@@ -26,7 +30,12 @@ MAX_ITEMS_MIN: int = 10
 CLEANUP_BUFFER_DAYS: int = 7
 
 # Source file containing a list of user data
-USERS_JSON_PATH: Path = Path(os.getenv('USERS_JSON_PATH', './data/users.json'))
+USERS_JSON_PATH: Path = Path(
+    os.getenv('USERS_JSON_PATH', './data/users.json').strip()
+)
+
+# Tables in database
+TABLE_NAMES = ['sent_items', 'users']
 
 
 class CommandName(StrEnum):
@@ -70,9 +79,9 @@ class ServiceConfig(Config):
         json_path (Path): JSON file containing user data
         load_users (bool): Update user data from the JSON file
         delete_users (bool): If load_users, delete users that are not in
-                             the JSON file
+            the JSON file
         save_users (bool): Save/Overwrite all user data to the JSON file
-        upsert_only (bool): Exit after updating users
+        crud_only (bool): Exit after CRUD operations on users
         send (bool): Send fetched data to users
     """
 
@@ -85,7 +94,7 @@ class ServiceConfig(Config):
     load_users: bool
     delete_users: bool
     save_users: bool
-    upsert_only: bool
+    crud_only: bool
     send: bool
 
 
@@ -103,21 +112,44 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
             case CommandName.UPD:
                 command_request = CommandRequest(
                     name=command_name,
-                    data=args.user,
+                    data=list(map(get_valid_user_dict, args.user)),
                 )
             case CommandName.LIST | CommandName.DEL:
                 command_request = CommandRequest(
                     name=command_name,
-                    data=args.usernames,
+                    data=(
+                        list(
+                            dict.fromkeys(
+                                [trim_str(u).lower() for u in args.usernames]
+                            )
+                        )
+                        if args.usernames is not None
+                        else None
+                    ),  # list[str] | None
                 )
+            case CommandName.CLEAR:
+                command_request = CommandRequest(
+                    name=command_name,
+                    data=(
+                        list(
+                            dict.fromkeys(
+                                [trim_str(t).lower() for t in args.tables]
+                            )
+                        )
+                        if args.tables is not None
+                        else TABLE_NAMES
+                    ),  # list[str]
+                )
+            case _:
+                command_request = CommandRequest(name=command_name, data=None)
     return ServiceConfig(
         debug=args.debug or DEBUG_MODE,
         test=args.test,
         headed_mode=args.headed,
         browser_name=args.browser,
         headless_shell=args.shell,
-        url=args.url,
-        tz=args.tz,
+        url=trim_str(args.url),
+        tz=trim_str(args.tz),
         command=command_request,
         skip_creation=args.skip_creation,
         creation_only=args.creation_only,
@@ -125,6 +157,6 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
         load_users=args.load,
         delete_users=args.delete if args.load and args.file else False,
         save_users=args.save,
-        upsert_only=args.upsert_only,
+        crud_only=args.crud_only,
         send=args.send,
     )

@@ -13,7 +13,7 @@ from clinictracker.user.config import (
 )
 from clinictracker.models import ItemData, ListData
 from clinictracker.user.models import User
-from clinictracker.startup import MyLogger
+from clinictracker.startup import MyLogger, Color
 from clinictracker.user.startup import (
     QueryParamsForAll,
     load_query_for_all,
@@ -23,6 +23,8 @@ from clinictracker.user.helpers import (
     load_users_from_json,
     save_users_to_json,
     prompt_to_confirm,
+    users_to_str,
+    user_updates_to_str,
 )
 from clinictracker.core import run, print_error, TEST_MSG
 from clinictracker.utils import construct_content
@@ -31,8 +33,10 @@ from clinictracker.user.email_service import EmailService
 
 
 CREATION_ONLY_MSG = "*** Creation only (no data fetching) ***"
-UPSERT_ONLY_MSG = "*** Upsert only (no data fetching) ***"
+CRUD_ONLY_MSG = "*** CRUD only (no data fetching) ***"
 SKIP_CREATION_MSG = "'--skip-creation' selected. Table creation skipped."
+ABORT_MSG = "Operation cancelled."
+CAUTION_FLG = f"{Color.YELLOW}**CAUTION**{Color.END} "
 
 
 def get_lists_for_all(
@@ -41,7 +45,8 @@ def get_lists_for_all(
     logger: Logger | MyLogger,
 ) -> dict[str, ListData]:
     """Fetches data in all cities.
-    Calls `core.run(query, config, logger, check_date=False)`"""
+    Calls `core.run(query, config, logger, check_date=False)`
+    """
     list_data: ListData
     data_all: dict[str, ListData] = {}
     for city in query_all.cities:
@@ -79,8 +84,8 @@ def fetch_data_and_send(
     for user in users:
         logger.info(f"Processing user {user.username}...")
         res = process_user(db, user, data_all, logger)
-        body_to_send = res['body']
-        hashes_to_record = res['hashes']
+        body_to_send = res.get('body')
+        hashes_to_record = res.get('hashes')
         if not body_to_send or hashes_to_record:
             continue
 
@@ -184,16 +189,9 @@ def crud_and_get_users(
     delete the users in database that are not in the JSON file.
     """
     users_db: list[User] = []
-    # Retrieve all current users in database
-    if (
-        config.command is None
-        or config.command.name != CommandName.LIST
-        or config.command.data is None
-    ):
-        users_db = db.get_all_users()
-        logger.info(f"Total users in database: {len(users_db)}")
+    fetch_all: bool = True
 
-    # Load data from JSON file and upsert
+    # Load data from JSON file and insert/update into database
     users_src: list[User] = []
     if config.load_users:
         logger.info("Loading data from JSON...")
@@ -204,41 +202,53 @@ def crud_and_get_users(
             )
             db.insert_users(users_src, update=True)
             if config.delete_users:
-                if prompt_to_confirm(
-                    "**CAUTION** About to delete users in database that "
-                    "are not in the JSON file"
-                ):
-                    username_set_src = {user.username for user in users_src}
-                    username_set_db = {user.username for user in users_db}
-                    username_diff = username_set_db - username_set_src
-                    logger.info(
-                        f"Deleting {len(username_diff)} users in database..."
-                    )
-                    for username in username_diff:
-                        db.delete_user(username)
+                # Retrieve all current users in database
+                users_db = db.get_all_users()
+                logger.info(f"Total users in database: {len(users_db)}")
+                username_set_src = {user.username for user in users_src}
+                username_set_db = {user.username for user in users_db}
+                username_diff = username_set_db - username_set_src
+                if len(username_diff) > 0:
+                    if prompt_to_confirm(
+                        f"{CAUTION_FLG}About to delete users in database that "
+                        f"are not in the JSON file: {', '.join(username_diff)}"
+                    ):
+                        logger.info(
+                            f"Deleting {len(username_diff)} users "
+                            "in database..."
+                        )
+                        for username in username_diff:
+                            db.delete_user(username)
+                    else:
+                        logger.info(ABORT_MSG)
                 else:
-                    logger.info("Operation cancelled.")
+                    fetch_all = False
         else:
             logger.info("Skipping updating users in database...")
 
     # Handle commands
     if config.command is not None:
+        fetch_all = False
         match config.command.name:
             case CommandName.LIST:
-                usernames: list[str] = config.command.data
-                if config.command.data is not None:
-                    usernames: list[str] = config.command.data
+                usernames: list[str] | None = config.command.data
+                if usernames is None:
+                    fetch_all = True
+                else:
+                    # Retrieve specified users in database
                     for username in usernames:
                         user = db.get_user_by_username(username)
                         if user is not None:
                             users_db.append(user)
                         else:
-                            logger.warning(f"User not found: {username}")
-                # print users_db later
+                            logger.warning(db.USER_NOT_FOUND_MSG % username)
+                    logger.info(f"Retrieved {len(users_db)} users.")
+                # Print users_db later
 
             case CommandName.ADD:
                 if config.load_users:
                     pass
+                # Users in config.command.data are validated
                 users: list[User] = config.command.data
                 logger.info(f"Inserting {len(users)} users into database...")
                 db.insert_users(users)
@@ -246,69 +256,87 @@ def crud_and_get_users(
             case CommandName.UPD:
                 if config.load_users:
                     pass
-                user_dicts: list[dict[str, Any]] = config.command.data
-                logger.info(f"Updating {len(user_dicts)} users in database...")
-                for user in user_dicts:
-                    db.update_user(user.pop('username'), user)
+                # Users in config.command.data are validated
+                updates_list: list[dict[str, Any]] = config.command.data
+                logger.info(
+                    f"Updating {len(updates_list)} users in database..."
+                )
+                for updates in updates_list:
+                    username = updates.pop('username')
+                    user_db = db.get_user_by_username(username)
+                    if user_db is not None:
+                        if prompt_to_confirm(
+                            f"About to update user:\n"
+                            f"{user_updates_to_str(user_db, updates)}"
+                        ):
+                            logger.info(f"Updating {username} in database...")
+                            db.update_user(username, updates)
+                        else:
+                            logger.info(ABORT_MSG)
+                    else:
+                        logger.warning(db.USER_NOT_FOUND_MSG % username)
 
             case CommandName.DEL:
                 if config.load_users:
                     pass
                 usernames: list[str] = config.command.data
-                logger.info(f"Deleting {len(usernames)} users in database...")
                 for username in usernames:
-                    db.delete_user(username)
+                    user_db = db.get_user_by_username(username)
+                    if user_db is not None:
+                        if prompt_to_confirm(
+                            f"About to delete user:\n{user_db!s}"
+                        ):
+                            logger.info(f"Deleting {username} in database...")
+                            db.delete_user(username)
+                        else:
+                            logger.info(ABORT_MSG)
+                    else:
+                        logger.warning(db.USER_NOT_FOUND_MSG % username)
 
             case CommandName.RESET:
                 if prompt_to_confirm(
-                    "**CAUTION** About to reset user id sequence in database"
+                    f"{CAUTION_FLG}About to reset user id sequence in database"
                 ):
+                    logger.info("Resetting user id sequence...")
                     db.reset_id_seq()
+                else:
+                    logger.info(ABORT_MSG)
 
             case CommandName.CLEAR:
                 if config.load_users:
                     pass
-                if prompt_to_confirm(
-                    "**CAUTION** About to empty all tables and "
-                    "reset user id sequence"
-                ):
-                    db.truncate_tables(cascade=False, restart_identity=True)
+                tables: list[str] = config.command.data
+                # Clear specified tables in database
+                for tb in tables:
+                    if prompt_to_confirm(
+                        f"{CAUTION_FLG}About to remove all rows from "
+                        f"table: {tb}"
+                    ):
+                        logger.info(f"Truncating {tb} in database...")
+                        db.truncate_table(tb)
+                    else:
+                        logger.info(ABORT_MSG)
 
             case _:
                 raise ValueError(
-                    f"Unknown command: {config.command.name}\n"
-                    f"Valid commands: {', '.join(name for name in CommandName)}"
+                    f"Unknown command: {config.command.name}\nValid commands: "
+                    + ', '.join(name for name in CommandName)
                 )
 
-    # Retrieve all users again
-    if users_src or (
-        config.command is not None
-        and config.command.name
-        in [
-            CommandName.ADD,
-            CommandName.UPD,
-            CommandName.DEL,
-            CommandName.CLEAR,
-        ]
-    ):
+    # Retrieve all users after operations
+    if config.save_users or fetch_all:
         users_db = db.get_all_users()
         logger.info(f"Total users in database: {len(users_db)}")
 
     # Print users in database
     if users_db:
-        users_str = (
-            '\n'.join(
-                f"{'-' * 60}\n{user!s}" for i, user in enumerate(users_db)
-            )
-            + f"\n{'-' * 60}"
-        )
         if (
             config.command is not None
             and config.command.name == CommandName.LIST
         ):
-            logger.info(users_str)
+            logger.info("Users retrieved:\n" + users_to_str(users_db))
         else:
-            logger.debug("Current users in database:\n" + users_str)
+            logger.debug("All users:\n" + users_to_str(users_db))
 
     return users_db
 
@@ -338,8 +366,8 @@ def run_service(
             # Perform CRUD operations and retrieve all users ----------|
             users: list[User] = crud_and_get_users(db, config, logger)
 
-            if config.upsert_only:
-                logger.info(UPSERT_ONLY_MSG)
+            if config.crud_only:
+                logger.info(CRUD_ONLY_MSG)
                 return
 
             # Go fetch and send data ----------------------------------|
@@ -370,7 +398,7 @@ def run_service(
                 sent_items_count = db.count_all_sent_items()
                 logger.info(f"Current records count: {sent_items_count}")
 
-            # Save user objects to JSON -------------------------------|
+            # Save User objects to JSON -------------------------------|
             if config.save_users:
                 save_users_to_json(users, config.json_path, logger)
 
