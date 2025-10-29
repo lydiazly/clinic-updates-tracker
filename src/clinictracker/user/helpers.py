@@ -7,10 +7,10 @@ import json
 from logging import Logger
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, cast
 
 from clinictracker.startup import trim_str, MyLogger, Color
-from clinictracker.user.models import User, ALLOWED_COLS
+from clinictracker.user.models import User, UserDict, ALLOWED_COLS
 
 
 HR = '-' * 60  # horizontal line
@@ -50,20 +50,17 @@ def is_valid_username(username: str | None) -> bool:
     return is_valid_email(username) or bool(NAME_PATTERN.match(username))
 
 
-def create_user_from_dict(user_dict: dict[str, Any]) -> User:
+def create_user_from_dict(user_dict: UserDict) -> User:
     """Create a valid `User` object from a dict.
     If `emails` is None or empty, and `username` is a valid email address,
     add this email into `emails`.
     """
-    amended_dict: dict[str, str | list[str]] = {}
-    username: str | None = user_dict.get('username')
-    if username is not None:
-        username = trim_str(username)
-        amended_dict['username'] = username
+    _username: str = trim_str(user_dict.get('username', ''))
+    user_dict['username'] = _username
     # If no email specified and username is an email, use it
-    if not user_dict.get('emails') and is_valid_email(username):
-        amended_dict['emails'] = [username]
-    user: User = get_valid_user(User(**(user_dict | amended_dict)))
+    if not user_dict.get('emails') and is_valid_email(_username):
+        user_dict['emails'] = [_username]
+    user: User = get_valid_user(User(**user_dict))
     return user
 
 
@@ -71,7 +68,7 @@ def load_users_from_json(
     json_path: Path, logger: Logger | MyLogger
 ) -> list[User]:
     """Loads valid `User` objects from a JSON file."""
-    data: list[dict[str, Any]]
+    data: list[UserDict]
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -116,8 +113,10 @@ def save_users_to_json(
         return
 
     # Convert each object to dict, filtering out None values
-    data: list[dict[str, Any]] = [
-        {k: v for k, v in asdict(user).items() if v is not None}
+    data: list[UserDict] = [
+        cast(
+            UserDict, {k: v for k, v in asdict(user).items() if v is not None}
+        )
         for user in users
     ]
 
@@ -147,7 +146,7 @@ def save_users_to_json(
 
 
 def get_valid_user(user: User) -> User:
-    """Returns valid `User` object."""
+    """Returns a valid `User` object."""
     if not user.username:
         raise ValueError(f"{asdict(user)}: 'username' is required")
 
@@ -157,15 +156,16 @@ def get_valid_user(user: User) -> User:
     return user
 
 
-def get_valid_user_dict(user: dict[str, Any]) -> dict[str, Any]:
-    """Returns valid user dict."""
-    if not user.get('username'):
-        raise ValueError(f"{user}: 'username' is required")
+def get_valid_user_dict(user_dict: UserDict) -> UserDict:
+    """Returns a valid user dict."""
+    _username: str = trim_str(user_dict.get('username', ''))
+    if not _username:
+        raise ValueError(f"{user_dict}: 'username' is required")
 
-    for k in user.keys():
-        validate_user_field(user.get('username'), k, user.get(k))
+    for k in user_dict.keys():
+        validate_user_field(_username, k, user_dict.get(k))
 
-    return user
+    return user_dict
 
 
 def validate_user_field(username: str, field: str, data: Any) -> None:
@@ -220,7 +220,7 @@ def users_to_str(users: list[User]) -> str:
     return users_str
 
 
-def user_dicts_to_str(user_dicts: list[dict[str, Any]]) -> str:
+def user_dicts_to_str(user_dicts: list[UserDict]) -> str:
     """Formats user dicts."""
     users_str_list = [
         '\n'.join(f"{k:>20}: {user.get(k)}" for k in ALLOWED_COLS if k in user)
@@ -230,7 +230,7 @@ def user_dicts_to_str(user_dicts: list[dict[str, Any]]) -> str:
     return users_str
 
 
-def user_updates_to_str(user: User, updates: dict[str, Any]) -> str:
+def user_updates_to_str(user: User, updates: UserDict) -> str:
     """Formats user dicts."""
     user_str = '\n'.join(
         f"{field:>20}: {getattr(user, field)}"

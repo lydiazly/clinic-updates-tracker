@@ -14,12 +14,13 @@ import random
 import re
 from time import sleep
 import traceback
+from typing import cast
 
 from clinictracker.selectors import (
     HomePageSelectors,
     DetailPageSelectors,
 )
-from clinictracker.config import RunConfig, TIMEOUT_PAGE, TIMEOUT_UL
+from clinictracker.config import Config, RunConfig, TIMEOUT_PAGE, TIMEOUT_UL
 from clinictracker.startup import QueryParams, MyLogger
 from clinictracker.browsers import get_browser
 from clinictracker.utils import (
@@ -324,7 +325,7 @@ def get_details(page: Page, url: str) -> ItemData:
 
 def run(
     query: QueryParams,
-    config: RunConfig,
+    config: Config,
     logger: Logger | MyLogger = getLogger(),
     check_date: bool = True,
 ) -> ListData | None:
@@ -356,27 +357,29 @@ def run(
             for msg in res.messages:
                 logger.info(msg)
 
-            # Print to STDOUT if selecting '--print' ------------------|
-            if getattr(config, 'to_stdout', False):
-                print_content(list_data.items, list_data.n_tot, query)
+            if hasattr(config, 'export'):
+                config = cast(RunConfig, config)
 
-            # Export to a file if not selecting '--no-o' --------------|
-            if getattr(config, 'export', False):
-                if len(list_data.items) > 0:
-                    content = construct_content(
-                        list_data.items, list_data.n_tot, query
-                    )
-                    # os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                    config.output_path.parent.mkdir(
-                        parents=True, exist_ok=True
-                    )
-                    with open(config.output_path, "w") as f:
-                        f.write(content)
-                    logger.info(f"Exported to '{str(config.output_path)}'")
+                # Print to STDOUT if selecting '--print' --------------|
+                if config.to_stdout:
+                    print_content(list_data.items, list_data.n_tot, query)
+
+                # Export to a file if not selecting '--no-o' ----------|
+                if config.export:
+                    if len(list_data.items) > 0:
+                        content = construct_content(
+                            list_data.items, list_data.n_tot, query
+                        )
+                        config.output_path.parent.mkdir(
+                            parents=True, exist_ok=True
+                        )
+                        with open(config.output_path, "w") as f:
+                            f.write(content)
+                        logger.info(f"Exported to '{str(config.output_path)}'")
+                    else:
+                        logger.info(NO_UPDATES_MSG)
                 else:
-                    logger.info(NO_UPDATES_MSG)
-            else:
-                logger.info(NO_EXPORT_MSG)
+                    logger.info(NO_EXPORT_MSG)
 
         except TimeoutError as e:
             print_error(e, logger, max_level=2)

@@ -11,10 +11,10 @@ from argparse import (
 import logging
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable
+from typing import Callable
 
 from clinictracker.config import TARGET_BASE_URL, TARGET_TZ, BROWSER_CHOICES
-from clinictracker.user.models import PERIOD_USER, MAX_ITEMS_USER
+from clinictracker.user.models import UserDict, PERIOD_USER, MAX_ITEMS_USER
 from clinictracker.user.config import CommandName, USERS_JSON_PATH, TABLE_NAMES
 from clinictracker.startup import MyLogger, setup_logger
 from clinictracker.startup import trim_str
@@ -48,15 +48,15 @@ USER_ARGS_HINT = (
 
 def user_parser_closure(
     command_name: CommandName,
-) -> Callable[[str], dict[str, Any]]:
+) -> Callable[[str], UserDict]:
     """Factory function that creates a parser for a specific command."""
 
-    def parse_user_args(user_string: str) -> dict[str, Any]:
+    def parse_user_args(user_string: str) -> UserDict:
         """Parses a user in format: 'username=str emails=str,... ...'
         User fields will be validated when creating `User` objects.
         """
         parts = user_string.split()
-        user_dict: dict[str, Any] = {}
+        user_dict: UserDict = {}
         for part in parts:
             if '=' in part:
                 key, value = [trim_str(s) for s in part.split('=', maxsplit=1)]
@@ -87,11 +87,16 @@ def user_parser_closure(
                     f"Syntax error: {part}\n" + USER_FORMAT
                 )
 
+        # Fill in 'username'
+        _username: str = trim_str(user_dict.get('username', ''))
+        user_dict['username'] = _username
+
+        # Set defaults
+        # (Could be set later but set here for logging)
         if command_name == CommandName.ADD:
             # If no email specified and username is an email, use it
-            username = user_dict.get('username')
-            if not user_dict.get('emails') and is_valid_email(username):
-                user_dict['emails'] = [username]
+            if not user_dict.get('emails') and is_valid_email(_username):
+                user_dict['emails'] = [_username]
             # Fill with defaults
             user_dict['period'] = user_dict.get('period', PERIOD_USER)
             user_dict['nmax'] = user_dict.get('nmax', MAX_ITEMS_USER)
@@ -131,7 +136,7 @@ def get_args_and_logger_for_service() -> (
         ),
     )
     # Database operations
-    subparsers: _SubParsersAction = parser.add_subparsers(
+    subparsers: _SubParsersAction[ArgumentParser] = parser.add_subparsers(
         dest='command',
         metavar='COMMAND',
         help=(

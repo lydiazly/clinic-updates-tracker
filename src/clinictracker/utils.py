@@ -216,11 +216,11 @@ def is_date_within(
             and target_date.tzinfo is not None
         ):
             tz_info = target_date.tzinfo
-            tzname = target_date.tzname()
+            tzname = target_date.tzname() or 'Unknown'
         # Otherwise, use the local time zone
         else:
             tz_info = ref_local.tzinfo  # <class 'datetime.timezone'>
-            tzname = ref_local.tzname()
+            tzname = ref_local.tzname() or 'Unknown'
             warnings.append("Applying local time zone to the target time.")
 
     # Parse target time -----------------------------------------------|

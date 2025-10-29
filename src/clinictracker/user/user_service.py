@@ -4,8 +4,10 @@
 from datetime import datetime, timedelta
 from logging import Logger, getLogger
 import traceback
-from typing import Any
+from typing import TypedDict, cast
 
+from clinictracker.models import ItemData, ListData
+from clinictracker.user.models import User, UserDict
 from clinictracker.user.config import (
     CommandName,
     ServiceConfig,
@@ -13,8 +15,6 @@ from clinictracker.user.config import (
     MAX_ITEMS_MIN,
     CLEANUP_BUFFER_DAYS,
 )
-from clinictracker.models import ItemData, ListData
-from clinictracker.user.models import User
 from clinictracker.startup import MyLogger, Color, QueryParams, get_full_url
 from clinictracker.user.helpers import (
     load_users_from_json,
@@ -41,6 +41,12 @@ class UserService:
     ABORT_MSG = "Operation cancelled."
     CAUTION_FLG = f"{Color.BOLD}{Color.YELLOW}**CAUTION**{Color.END} "
     USER_COUNT_MSG = "Total users in database: %d"
+    # Type alias
+    _CitiesDataType = dict[str, ListData]
+
+    class _ContentToSend(TypedDict):
+        body: str
+        hashes: list[str]
 
     def __init__(
         self,
@@ -52,8 +58,8 @@ class UserService:
         self.config: ServiceConfig = config
         self.logger: Logger | MyLogger = logger
         self.users: list[User] = []
-        self.data_all: dict[str, ListData] = {}
-        self.city_set: set = set()
+        self.cities_data: UserService._CitiesDataType = {}
+        self.city_set: set[str] = set()
         self.max_days_back: int = DAYS_BACK_MIN
         self.max_nmax: int = MAX_ITEMS_MIN
         self.tables_ready: bool = False
@@ -109,9 +115,10 @@ class UserService:
             self.logger.warning(DRYRUN_SEQ_MSG)
         self.db.insert_users(users_src, update=True)
 
+        users_db: list[User] | None
         if self.config.delete_users:
             # Retrieve all current users in database
-            users_db: list[User] = self.db.get_all_users()
+            users_db = self.db.get_all_users()
             self.logger.info(self.USER_COUNT_MSG % len(users_db))
             if not users_db:
                 return users_db
@@ -163,7 +170,7 @@ class UserService:
             self.logger.warning(DRYRUN_SEQ_MSG)
         self.db.insert_users(users)
 
-    def update_users(self, updates_list: list[dict[str, Any]]) -> None:
+    def update_users(self, updates_list: list[UserDict]) -> None:
         """Updates users in database from dicts."""
         self.logger.info(f"Updating {len(updates_list)} users in database...")
         for updates in updates_list:
@@ -253,7 +260,9 @@ class UserService:
                         users_db = None
                     else:
                         users_db = self.get_users(
-                            usernames=self.config.command.data
+                            usernames=cast(
+                                list[str] | None, self.config.command.data
+                            )
                         )
                         # Print users_db later
                         print_users = True
@@ -262,20 +271,26 @@ class UserService:
                         # Users in config.command.data are validated
                         _count = self.db.get_row_count('users')
                         self.logger.info(self.USER_COUNT_MSG % _count)
-                        self.add_users(users=self.config.command.data)
+                        self.add_users(
+                            users=cast(list[User], self.config.command.data)
+                        )
                 case CommandName.UPD:
                     if not self.config.load_users:
                         # Users in config.command.data are validated
                         _count = self.db.get_row_count('users')
                         self.logger.info(self.USER_COUNT_MSG % _count)
                         self.update_users(
-                            updates_list=self.config.command.data
+                            updates_list=cast(
+                                list[UserDict], self.config.command.data
+                            )
                         )
                 case CommandName.DEL:
                     if not self.config.load_users:
                         _count = self.db.get_row_count('users')
                         self.logger.info(self.USER_COUNT_MSG % _count)
-                        self.delete_users(usernames=self.config.command.data)
+                        self.delete_users(
+                            usernames=cast(list[str], self.config.command.data)
+                        )
                 case CommandName.RESET:
                     _count = self.db.get_row_count('users')
                     self.logger.info(self.USER_COUNT_MSG % _count)
@@ -284,7 +299,9 @@ class UserService:
                     if not self.config.load_users:
                         _count = self.db.get_row_count('users')
                         self.logger.info(self.USER_COUNT_MSG % _count)
-                        self.clear_tables(tables=self.config.command.data)
+                        self.clear_tables(
+                            tables=cast(list[str], self.config.command.data)
+                        )
                 case _:
                     raise ValueError(
                         f"Unknown command: {self.config.command.name}\n"
@@ -306,11 +323,11 @@ class UserService:
                 self.logger.debug("All users:\n" + users_to_str(users_db))
 
     def get_lists_for_all(self) -> None:
-        """Fetches data in all cities and sets `data_all`.
+        """Fetches data in all cities and sets `cities_data`.
         Calls `core.run(query, config, logger, check_date=False)`
         """
-        _list_data: ListData
-        _data_all: dict[str, ListData] = {}
+        _list_data: ListData | None
+        _cities_data: UserService._CitiesDataType = {}
         for city in self.city_set:
             _query = self.set_params_for_each(city)
             _list_data = run(
@@ -319,14 +336,19 @@ class UserService:
                 logger=self.logger,
                 check_date=False,
             )
-            _data_all[city] = _list_data
+
+            if _list_data is None:
+                self.logger.warning(f"Data not fetched from {city}.")
+                continue
+
             if len(_list_data.items) > 0:
+                _cities_data[city] = _list_data
                 self.logger.info(
                     f"Collected {_list_data.n_tot} items from: {city}"
                 )
             else:
                 self.logger.info(f"No updates from {city}.")
-        self.data_all = _data_all
+        self.cities_data = _cities_data
 
     def fetch_data_and_send(self) -> None:
         """Fetches full lists of data and send to users."""
@@ -337,11 +359,12 @@ class UserService:
         # Process each user
         body_to_send: str
         hashes_to_record: list[str]
+        _content_to_send: UserService._ContentToSend
         for user in self.users:
             self.logger.info(f"\nProcessing user {user.username}...")
-            _res = self.process_user(user)
-            body_to_send = _res.get('body')
-            hashes_to_record = _res.get('hashes')
+            _content_to_send = self.process_user(user)
+            body_to_send = _content_to_send.get('body', '')
+            hashes_to_record = _content_to_send.get('hashes', [])
             if not body_to_send or not hashes_to_record:
                 continue
 
@@ -364,12 +387,12 @@ class UserService:
                 self.db.record_sent_items(user, hashes_to_record, current_time)
                 self.db.update_last_sent_at(user, current_time)
 
-    def process_user(self, user: User) -> dict[str, str | list[str]]:
+    def process_user(self, user: User) -> _ContentToSend:
         """Filters data for a user and constructs the email body.
         Items are filtered by hash values instead of dates.
 
         Returns:
-            result: A dict with keys:
+            content_to_send: A dict with keys:
                 body (str): Email body to send to the user
                 hashes (list[str]): List of item hash values to be sent
         """
@@ -391,9 +414,9 @@ class UserService:
         for city in user.cities:
             self.logger.info(f"Filtering updates in {city} for {username}...")
             unsent_items = []
-            _n_tot = self.data_all[city].n_tot
-            _query = self.data_all[city].query
-            _items = self.data_all[city].items
+            _n_tot = self.cities_data[city].n_tot
+            _query = self.cities_data[city].query
+            _items = self.cities_data[city].items
             _hashes = [item.digest for item in _items]
 
             if not _items:

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from dotenv import load_dotenv
 import os
+from typing import TypedDict
 
 
 load_dotenv()
@@ -54,3 +55,12 @@ class User:
             f"{field:>20}: {getattr(self, field)}"
             for field in ['id'] + ALLOWED_COLS + ['last_sent_at']
         )
+
+
+class UserDict(TypedDict, total=False):
+    username: str
+    nickname: str | None
+    emails: list[str]
+    cities: list[str]
+    period: int
+    nmax: int

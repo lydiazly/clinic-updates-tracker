@@ -10,9 +10,10 @@ import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 from textwrap import dedent
-from typing import TypedDict
+from types import TracebackType
+from typing import TypedDict, Self, Literal, cast
 
-from clinictracker.user.models import User, ALLOWED_COLS
+from clinictracker.user.models import User, UserDict, ALLOWED_COLS
 from clinictracker.user.config import PG_PASSWORD_PATH
 from clinictracker.startup import MyLogger
 from clinictracker.user.helpers import get_valid_user, validate_user_field
@@ -44,6 +45,7 @@ class UserServiceDB:
     TABLE_CLEAR_MSG = "Removed all rows from: %s"
     USER_NOT_FOUND_MSG = "User not found: %s. Skipping..."
     USER_EXIST_MSG = "User already exists: %s. Skipping..."
+    SEQ_NOT_FOUND_MSG = "Sequence not found: users_id_seq"
 
     def __init__(
         self,
@@ -83,11 +85,16 @@ class UserServiceDB:
             'password': password,
         }
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Literal[False]:
         try:
             self.close()
         except Exception as e:
@@ -145,7 +152,7 @@ class UserServiceDB:
             self.logger.info(self.CLOSED_MSG)
 
     def create_users_table(self) -> bool:
-        """Creates 'users' table. Returns `True` if created.
+        """Creates "users" table. Returns `True` if created.
         - Columns: id, username, nickname, emails, cities, period, nmax,
                    last_sent_at, created_at, updated_at
         - Primary key: id
@@ -206,7 +213,7 @@ class UserServiceDB:
             return not self.dryrun
 
     def create_sent_items_table(self) -> bool:
-        """Creates 'sent_items' table for tracking sent items per user.
+        """Creates "sent_items" table for tracking sent items per user.
         Returns `True` if created.
         - Columns: user_id, item_hash, sent_at
         - Primary key: (user_id, item_hash)
@@ -250,7 +257,7 @@ class UserServiceDB:
             self.logger.info(self.TABLE_CREATE_MSG % 'sent_items')
             return not self.dryrun
 
-    def insert_users(self, users: list[User], update=False) -> None:
+    def insert_users(self, users: list[User], update: bool = False) -> None:
         """Inserts/Updates `User` objects into database and increment
         sequence only after inserting new rows.
         If `update=False`, insert only.
@@ -393,9 +400,7 @@ class UserServiceDB:
                     + ', '.join(inserted_usernames)
                 )
 
-    def update_user(
-        self, username: str, updates: dict[str, str | int | list[str]]
-    ) -> None:
+    def update_user(self, username: str, updates: UserDict) -> None:
         """Validates and updates user fields from a dict."""
         conn, cur = self._ensure_connected()
 
@@ -603,7 +608,7 @@ class UserServiceDB:
         else:
             row = cur.fetchone()
             if row is not None:
-                return row[0]
+                return cast(int, row[0])
             return 0
 
     def cleanup_old_sent_items(self, cutoff_date: datetime) -> None:
@@ -643,24 +648,27 @@ class UserServiceDB:
         )
         value_query = "SELECT last_value, is_called FROM users_id_seq;"
         try:
-            # Get the sequence name
+            # Ensure sequence "users_id_seq" exists and get the name
             # cur.execute(seq_query)
             # row = cur.fetchone()
             # if row is None or row[0] is None:
-            #     raise ValueError("No sequence for users.id")
+            #     raise ValueError(self.SEQ_NOT_FOUND_MSG)
             # seq_name = row[0].split('.')[-1]  # remove 'public.'
             # self.logger.debug(f"Sequence name: {seq_name}")
             # Get current value
             # cur.execute(sql.SQL(value_query).format(sql.Identifier(seq_name)))
             cur.execute(value_query)
-            last_value_old, is_called = cur.fetchone()
+            _res = cur.fetchone()
+            if _res is None:
+                raise RuntimeError(self.SEQ_NOT_FOUND_MSG)
+            last_value_old, is_called = _res
             # Reset to the max user id + 1 (is_called = false)
             # cur.execute(sql.SQL(reset_query).format(sql.Literal(seq_name)))
             cur.execute(reset_query)
             # Check the current value
             # cur.execute(sql.SQL(value_query).format(sql.Identifier(seq_name)))
             cur.execute(value_query)
-            last_value_new, is_called = cur.fetchone()
+            last_value_new, is_called = cur.fetchone()  # type: ignore[misc]
             if not self.dryrun:
                 conn.commit()
             else:
@@ -677,7 +685,10 @@ class UserServiceDB:
             self.logger.info(f"Reset. Next user id: {next_seq}")
 
     def truncate_table(
-        self, table_name: str, cascade=False, restart_identity=True
+        self,
+        table_name: str,
+        cascade: bool = False,
+        restart_identity: bool = True,
     ) -> None:
         """Truncate (remove all rows from) a table."""
         conn, cur = self._ensure_connected()

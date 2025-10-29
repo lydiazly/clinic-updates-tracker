@@ -94,7 +94,9 @@ class MyLogger:
         return getattr(self.logger, name)
 
 
-class CustomInfoFormatter(logging.Formatter):
+class LogFormatter(logging.Formatter):
+    """Info level logging formatter."""
+
     FMT = "[%(levelname)s] %(message)s"
     FORMATTERS = {
         logging.DEBUG: logging.Formatter(Color.GRAY + FMT + Color.END),
@@ -104,27 +106,28 @@ class CustomInfoFormatter(logging.Formatter):
         logging.CRITICAL: logging.Formatter(Color.RED_B + FMT + Color.END),
     }
 
-    def format(self, record):
-        formatter = self.FORMATTERS.get(record.levelno)
+    def format(self, record: logging.LogRecord) -> str:
+        formatter = self.FORMATTERS.get(
+            record.levelno, logging.Formatter(self.FMT)
+        )
         return formatter.format(record)
 
 
-class CustomDebugFormatter(logging.Formatter):
-    """Logging Formatter for --debug to add colors and count warning / errors"""
+class DebugLogFormatter(LogFormatter):
+    """Debug level logging formatter."""
 
-    FMT1 = "[%(asctime)s %(levelno)s] %(message)s"
-    FMT2 = "[%(asctime)s %(levelno)s] (%(levelname)s) %(message)s (%(filename)s:%(lineno)d)"
+    FMT = "[%(asctime)s %(levelno)s] %(message)s"
+    FMT_ERR = (
+        "[%(asctime)s %(levelno)s] (%(levelname)s) %(message)s "
+        "(%(filename)s:%(lineno)d)"
+    )
     FORMATTERS = {
-        logging.DEBUG: logging.Formatter(Color.GRAY + FMT1 + Color.END),
-        logging.INFO: logging.Formatter(FMT1),
-        logging.WARNING: logging.Formatter(Color.YELLOW + FMT2 + Color.END),
-        logging.ERROR: logging.Formatter(Color.RED + FMT2 + Color.END),
-        logging.CRITICAL: logging.Formatter(Color.RED_B + FMT2 + Color.END),
+        logging.DEBUG: logging.Formatter(Color.GRAY + FMT + Color.END),
+        logging.INFO: logging.Formatter(FMT),
+        logging.WARNING: logging.Formatter(Color.YELLOW + FMT_ERR + Color.END),
+        logging.ERROR: logging.Formatter(Color.RED + FMT_ERR + Color.END),
+        logging.CRITICAL: logging.Formatter(Color.RED_B + FMT_ERR + Color.END),
     }
-
-    def format(self, record):
-        formatter = self.FORMATTERS.get(record.levelno)
-        return formatter.format(record)
 
 
 def setup_logger(
@@ -139,7 +142,7 @@ def setup_logger(
         handler.setLevel(logging.INFO)
         # formatter = logging.Formatter("[%(levelname)s] %(message)s")
         # handler.setFormatter(formatter)
-        handler.setFormatter(CustomInfoFormatter())
+        handler.setFormatter(LogFormatter())
         logger.addHandler(handler)
         logger.propagate = False
         # Suppress urllib3 warnings
@@ -150,7 +153,7 @@ def setup_logger(
         # Level: DEBUG, use the root logger
         # Create handler with custom formatter
         handler = logging.StreamHandler(stream=sys.stderr)
-        handler.setFormatter(CustomDebugFormatter())
+        handler.setFormatter(DebugLogFormatter())
         logging.basicConfig(
             level=logging.DEBUG,
             handlers=[handler],

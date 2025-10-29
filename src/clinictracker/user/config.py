@@ -7,11 +7,11 @@ from dotenv import load_dotenv
 from enum import StrEnum  # python 3.11+
 import os
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 from clinictracker.config import Config
 from clinictracker.startup import trim_str
-from clinictracker.user.models import User
+from clinictracker.user.models import User, UserDict
 from clinictracker.user.helpers import (
     create_user_from_dict,
     get_valid_user_dict,
@@ -52,16 +52,19 @@ class CommandName(StrEnum):
     CLEAR = 'clear'
 
 
+CommandDataType = list[User] | list[UserDict] | list[str] | None
+
+
 class CommandRequest(NamedTuple):
     """A user data operation command and its payload.
 
     Attributes:
         name (CommandName): The command that needs to be executed with data
-        data (list[User] | list[dict] | list[str] | None): The payload
+        data (CommandDataType): The payload
     """
 
     name: CommandName
-    data: list[User] | list[dict[str, Any]] | list[str] | None
+    data: CommandDataType
 
 
 @dataclass(frozen=True)

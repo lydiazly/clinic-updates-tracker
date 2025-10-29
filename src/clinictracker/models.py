@@ -50,7 +50,7 @@ class ItemData:
         content: str = '|'.join([title.strip(), url.strip(), date.strip()])
         return hashlib.sha256(content.encode('utf-8')).hexdigest()
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         digest_value = self._generate_digest(self.title, self.url, self.date)
         object.__setattr__(self, 'digest', digest_value)
 
