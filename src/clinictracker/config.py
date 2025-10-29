@@ -19,10 +19,10 @@ TIMEOUT_UL = int(os.getenv('TIMEOUT_UL', 3000))  # for loading list
 # File to export
 OUTPUT_HTML_NAME = os.getenv('OUTPUT_HTML_NAME', 'content.html').strip()
 # OUTPUT_HTML_PATH: str = os.getenv(
-#     'OUTPUT_HTML_PATH', f'./output/{OUTPUT_HTML_NAME}'
+#     'OUTPUT_HTML_PATH', f'output/{OUTPUT_HTML_NAME}'
 # )
 OUTPUT_HTML_PATH: Path = Path(
-    os.getenv('OUTPUT_HTML_PATH', f'./output/{OUTPUT_HTML_NAME}').strip()
+    os.getenv('OUTPUT_HTML_PATH', f'output/{OUTPUT_HTML_NAME}').strip()
 )
 # Append a filename if needed
 if OUTPUT_HTML_PATH.is_dir():
@@ -40,10 +40,10 @@ BROWSER_CHOICES = ['chromium', 'firefox', 'webkit']
 
 # Users JSON file to import
 # USERS_JSON_PATH: str = os.getenv(
-#     'USERS_JSON_PATH', './data/users.json'
+#     'USERS_JSON_PATH', 'data/users.json'
 # )
 USERS_JSON_PATH: Path = Path(
-    os.getenv('USERS_JSON_PATH', './data/users.json').strip()
+    os.getenv('USERS_JSON_PATH', 'data/users.json').strip()
 )
 
 
@@ -81,11 +81,6 @@ class RunConfig(Config):
         to_stdout (bool): Print results as plain text to STDOUT
     """
 
-    debug: bool
-    test: bool
-    headed_mode: bool
-    browser_name: str
-    headless_shell: bool
     export: bool
     output_path: Path
     to_stdout: bool

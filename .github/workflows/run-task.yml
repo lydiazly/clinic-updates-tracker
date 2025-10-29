@@ -101,6 +101,7 @@ jobs:
               --days ${{ env.DAYS_BACK }} \
               --nmax ${{ env.MAX_ITEMS }} \
               --output "${{ env.OUTPUT_HTML_PATH }}" \
+              --debug \
               "${{ vars.CITY }}"
             if [ $? -eq 0 ]; then break; fi
             echo "> Waiting to retry ($i/${{ vars.RETRIES }})..."

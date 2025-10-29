@@ -117,7 +117,7 @@ def get_list(
     except TimeoutError:
         raise TimeoutError(TIMEOUT_ERR % ('title', TIMEOUT_PAGE / 1000))
     else:
-        logger.info(f"Page title: {title_locator.inner_text().strip()}")
+        logger.debug(f"Page title: {title_locator.inner_text().strip()}")
 
     # Wait for the list title to be loaded
     try:
@@ -125,7 +125,7 @@ def get_list(
     except TimeoutError:
         raise TimeoutError(TIMEOUT_ERR % ('list', TIMEOUT_PAGE / 1000))
     else:
-        logger.info(f"List title: {list_title_locator.inner_text().strip()}")
+        logger.debug(f"List title: {list_title_locator.inner_text().strip()}")
 
     n_tot: int = 0  # total number of updates on the page
     items: list[ItemData] = []
@@ -161,7 +161,7 @@ def get_list(
 
     # Get items
     logger.info(
-        "Checking updates "
+        f"Checking updates in {query.city} "
         + (f"in the past {query.days_back} days " if check_date else '')
         + f"(collecting {query.nmax}/{n_tot} items at most)..."
     )
@@ -182,7 +182,7 @@ def get_list(
             for warn in res.warnings:
                 logger.warning(warn)
             for msg in res.messages:
-                logger.info(msg)
+                logger.debug(msg)
 
         has_valid_date = False
         # If within the time range, append the item to the list
@@ -200,7 +200,7 @@ def get_list(
                 for warn in is_within_res.warnings:
                     logger.warning(warn)
                 for msg in is_within_res.messages:
-                    logger.info(msg)
+                    logger.debug(msg)
                 if is_within_res.data:
                     items.append(res.data)
                     count += 1
@@ -357,11 +357,11 @@ def run(
                 logger.info(msg)
 
             # Print to STDOUT if selecting '--print' ------------------|
-            if config.to_stdout:
+            if getattr(config, 'to_stdout', False):
                 print_content(list_data.items, list_data.n_tot, query)
 
             # Export to a file if not selecting '--no-o' --------------|
-            if config.export:
+            if getattr(config, 'export', False):
                 if len(list_data.items) > 0:
                     content = construct_content(
                         list_data.items, list_data.n_tot, query

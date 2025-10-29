@@ -42,6 +42,7 @@ for i in $(seq 1 ${RETRIES}); do
     --days ${DAYS_BACK} \
     --nmax ${MAX_ITEMS} \
     --output "${OUTPUT_HTML_PATH}" \
+    --debug \
     "${CITY}"
   if [ $? -eq 0 ]; then break; fi
   echo "> Waiting to retry ($i/${RETRIES})..."

@@ -40,9 +40,9 @@ class QueryParams(NamedTuple):
 
     url: str
     city: str
-    days_back: int
-    nmax: int
-    tz: str
+    days_back: int = DAYS_BACK
+    nmax: int = MAX_ITEMS
+    tz: str = ''
 
 
 def load_query(args: Namespace) -> QueryParams:
@@ -67,9 +67,13 @@ def load_query(args: Namespace) -> QueryParams:
 # ---------------------------------------------------------------------|
 # Logging
 class Color(StrEnum):
-    """Preset ANSI color escape codes: GRAY, YELLOW, RED, RED_B, END"""
+    """Preset ANSI color escape codes:
+    BOLD, GRAY, GREEN, YELLOW, RED, RED_B, END
+    """
 
+    BOLD = '\x1b[1m'
     GRAY = '\x1b[90m'
+    GREEN = '\x1b[32m'
     YELLOW = '\x1b[33m'
     RED = '\x1b[31m'
     RED_B = '\x1b[31;1m'
@@ -239,7 +243,7 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
         metavar='str',
         default=OUTPUT_HTML_PATH,
         help=(
-            "Path of output file (default to './output/content.html' "
+            "Path of output file (default to 'output/content.html' "
             "or from $OUTPUT_HTML_PATH)"
         ),
     )

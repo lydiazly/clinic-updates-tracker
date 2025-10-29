@@ -5,90 +5,44 @@ from argparse import (
     ArgumentParser,
     Namespace,
     RawTextHelpFormatter,
+    ArgumentTypeError,
     _SubParsersAction,
 )
 import logging
 from pathlib import Path
-from typing import Any, NamedTuple, Callable
+from textwrap import dedent
+from typing import Any, Callable
 
 from clinictracker.config import TARGET_BASE_URL, TARGET_TZ, BROWSER_CHOICES
-from clinictracker.user.models import User, PERIOD_USER, MAX_ITEMS_USER
-from clinictracker.user.config import (
-    CommandName,
-    ServiceConfig,
-    DAYS_BACK_MIN,
-    MAX_ITEMS_MIN,
-    USERS_JSON_PATH,
-    TABLE_NAMES,
-)
-from clinictracker.startup import (
-    QueryParams,
-    MyLogger,
-    setup_logger,
-    get_full_url,
-)
+from clinictracker.user.models import PERIOD_USER, MAX_ITEMS_USER
+from clinictracker.user.config import CommandName, USERS_JSON_PATH, TABLE_NAMES
+from clinictracker.startup import MyLogger, setup_logger
 from clinictracker.startup import trim_str
 from clinictracker.user.helpers import is_valid_email, user_dicts_to_str
 
 
 # ---------------------------------------------------------------------|
-# Query
-class QueryParamsForAll(NamedTuple):
-    """Query parameters for fetching full lists of all cities.
-
-    Attributes:
-        cities (set[str]): Set of cities
-        max_days_back (int): Maximum days to look back
-        max_nmax (int): Maximum items to collect in full list
-    """
-
-    cities: set
-    max_days_back: int
-    max_nmax: int
-
-
-def load_query_for_all(users: list[User]) -> QueryParamsForAll:
-    cities: list[str] = []
-    for user in users:
-        cities.extend(user.cities)
-
-    max_user_period = max(user.period for user in users)
-    max_user_nmax = max(user.nmax for user in users)
-
-    return QueryParamsForAll(
-        cities=set(cities),
-        max_days_back=max(DAYS_BACK_MIN, max_user_period + 1),
-        max_nmax=max(MAX_ITEMS_MIN, max_user_nmax),
-    )
-
-
-def load_query_for_each(
-    config: ServiceConfig, city: str, days_back: int, nmax: int
-) -> QueryParams:
-    query_dict = {'only_accepting': 'yes', 'list_town': city}
-    full_url = get_full_url(config.url, '?', query_dict)
-    return QueryParams(
-        url=full_url,
-        city=city,
-        days_back=days_back,
-        nmax=nmax,
-        tz=config.tz,
-    )
-
-
-# ---------------------------------------------------------------------|
 # CLI arguments
+USER_FORMAT = (
+    "Format:\n    -u "
+    '"username=str [nickname=str] emails=str[,...] cities=str[,...] '
+    '[period=int] [nmax=int]"'
+)
 USER_ARGS_HINT = (
-    "Format:\n  -u \"username=str emails=str,str,... ...\"\n"
-    "Fields:\n"
-    "  username: a unique string (case insensitive)\n"
-    "  nickname: default to null\n"
-    "  emails: recipients (if not given and username is a valid email, "
-    "set it as a recipient)\n"
-    "  cities: town/city list\n"
-    "  period: schedule period in days (default to 1 or from $PERIOD_USER)\n"
-    "  nmax: maximum number of items to collect "
-    "  (default to 10 or from $MAX_ITEMS_USER)\n"
+    f"{USER_FORMAT}\n"
+    + dedent(
+        """
+    Fields:
+        username: a unique string (case insensitive)
+        nickname: default to null
+        emails: recipients (if not given and username is a valid email,
+                set it as a recipient)
+        cities: town/city list
+        period: schedule period in days (default to 1 or from $PERIOD_USER)
+        nmax: maximum number of items to collect
+              (default to 10 or from $MAX_ITEMS_USER)
+    """
+    ).strip()
 )
 
 
@@ -118,10 +72,21 @@ def user_parser_closure(
                             trim_str(s) for s in value.split(',')
                         ]
                     case 'period' | 'nmax':
-                        if value.isdigit():
+                        if value.split('-', 1)[-1].isdigit():
                             user_dict[key] = int(value)
                         else:
-                            raise ValueError(f"'{key}' must be a number.")
+                            raise ArgumentTypeError(
+                                f"'{key}' must be a number."
+                            )
+                    case _:
+                        raise ArgumentTypeError(
+                            f"Unknown field: {key}\n" + USER_FORMAT
+                        )
+            else:
+                raise ArgumentTypeError(
+                    f"Syntax error: {part}\n" + USER_FORMAT
+                )
+
         if command_name == CommandName.ADD:
             # If no email specified and username is an email, use it
             username = user_dict.get('username')
@@ -289,7 +254,7 @@ def get_args_and_logger_for_service() -> (
         default=USERS_JSON_PATH,
         help=(
             "JSON file containing user data "
-            "(default to './data/users.json' or from $USERS_JSON_PATH)"
+            "(default to 'data/users.json' or from $USERS_JSON_PATH)"
         ),
     )
     parser.add_argument(
@@ -385,6 +350,14 @@ def get_args_and_logger_for_service() -> (
         help=(
             "Suppress INFO level outputs unless --debug is selected "
             "(default: print all)"
+        ),
+    )
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help=(
+            "Dry run for data management and exit before data fetching "
+            "(default: false)"
         ),
     )
 

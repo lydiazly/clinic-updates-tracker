@@ -38,14 +38,16 @@ def test_page(caplog):
         tz='',
     )
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.DEBUG):
         res = run(query, config)
         # Assert returns ListData
         assert isinstance(res, ListData)
         # Check the log records more specifically
         assert len(caplog.records) >= 5
-        assert full_url in caplog.records[0].message
-        assert f"{TITLE_PREFIX} {city}" in caplog.records[1].message
-        assert f"{LIST_TITLE_PREFIX} {city}" in caplog.records[2].message
-        assert EMPTY_CUE_PREFIX in caplog.records[3].message
+        assert "Using selector" in caplog.records[0].message
+        assert "Options: {'headless':" in caplog.records[1].message
+        assert full_url in caplog.records[2].message
+        assert f"{TITLE_PREFIX} {city}" in caplog.records[3].message
+        assert f"{LIST_TITLE_PREFIX} {city}" in caplog.records[4].message
+        assert EMPTY_CUE_PREFIX in caplog.records[5].message
         assert caplog.records[-1].message == CLOSED_MSG

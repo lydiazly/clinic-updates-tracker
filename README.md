@@ -66,7 +66,7 @@ options:
                         (default to 10 or from $MAX_ITEMS)
   -p, --print           Print results as plain text to STDOUT (default: false)
   -o str, --output str  Path of output file
-                        (default to './output/content.html' or from $OUTPUT_HTML_PATH)
+                        (default to 'output/content.html' or from $OUTPUT_HTML_PATH)
   --no-o                No export (default: export to a file)
   -H, --headed          Run in headed mode (default: headless)
   -b str, --browser str

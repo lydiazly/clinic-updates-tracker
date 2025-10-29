@@ -22,16 +22,19 @@ load_dotenv()
 
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").strip().lower() == "true"
 
+PG_PASSWORD_PATH = Path(os.getenv('PG_PASSWORD_PATH', '.pg_password').strip())
+
 # Minimum days to look back (before filtering by hash values)
 DAYS_BACK_MIN: int = 2
 # Minimum items to collect in full list (before filtering for each user)
-MAX_ITEMS_MIN: int = 10
+# MAX_ITEMS_MIN: int = 10
+MAX_ITEMS_MIN: int = 3  # TEST
 # Extra days to keep records beyond the maximum period among users
 CLEANUP_BUFFER_DAYS: int = 7
 
 # Source file containing a list of user data
 USERS_JSON_PATH: Path = Path(
-    os.getenv('USERS_JSON_PATH', './data/users.json').strip()
+    os.getenv('USERS_JSON_PATH', 'data/users.json').strip()
 )
 
 # Tables in database
@@ -83,6 +86,7 @@ class ServiceConfig(Config):
         save_users (bool): Save/Overwrite all user data to the JSON file
         crud_only (bool): Exit after CRUD operations on users
         send (bool): Send fetched data to users
+        dryrun (bool): Dry run for data management then exit
     """
 
     url: str
@@ -96,6 +100,7 @@ class ServiceConfig(Config):
     save_users: bool
     crud_only: bool
     send: bool
+    dryrun: bool
 
 
 def load_config_for_service(args: Namespace) -> ServiceConfig:
@@ -159,4 +164,5 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
         save_users=args.save,
         crud_only=args.crud_only,
         send=args.send,
+        dryrun=args.dry_run,
     )

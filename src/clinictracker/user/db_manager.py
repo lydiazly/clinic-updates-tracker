@@ -13,6 +13,7 @@ from textwrap import dedent
 from typing import TypedDict
 
 from clinictracker.user.models import User, ALLOWED_COLS
+from clinictracker.user.config import PG_PASSWORD_PATH
 from clinictracker.startup import MyLogger
 from clinictracker.user.helpers import get_valid_user, validate_user_field
 
@@ -50,9 +51,30 @@ class UserServiceDB:
         port: int = 5432,
         database: str = 'userservice',
         user: str = 'admin',
-        password: str = '',
+        password: str | None = None,
+        pg_password_path: Path = PG_PASSWORD_PATH,
+        dryrun: bool = False,
         logger: Logger | MyLogger = getLogger(),
     ) -> None:
+        self.conn: psycopg2.extensions.connection | None = None
+        self.cur: psycopg2.extensions.cursor | None = None
+        self.dryrun: bool = dryrun
+        self.logger: Logger | MyLogger = logger
+        # Initialize
+        if password is None:
+            logger.debug(
+                f"Loading password from {PG_PASSWORD_PATH}... "
+                "(set $PG_PASSWORD_PATH to load from another file)"
+            )
+            try:
+                password = pg_password_path.read_text().strip()
+            except Exception as e:
+                logger.debug(f"Unable to load password: {e}")
+                password = getpass("Enter your PostgreSQL password: ").strip()
+                logger.debug(f"Got password with {len(password)} characters.")
+            else:
+                logger.debug("Password loaded.")
+
         self.conn_params: ConnParams = {
             'host': host,
             'port': port,
@@ -60,9 +82,6 @@ class UserServiceDB:
             'user': user,
             'password': password,
         }
-        self.conn: psycopg2.extensions.connection | None = None
-        self.cur: psycopg2.extensions.cursor | None = None
-        self.logger: Logger | MyLogger = logger
 
     def __enter__(self):
         self.connect()
@@ -125,8 +144,8 @@ class UserServiceDB:
         else:
             self.logger.info(self.CLOSED_MSG)
 
-    def create_users_table(self) -> None:
-        """Creates 'users' table.
+    def create_users_table(self) -> bool:
+        """Creates 'users' table. Returns `True` if created.
         - Columns: id, username, nickname, emails, cities, period, nmax,
                    last_sent_at, created_at, updated_at
         - Primary key: id
@@ -141,7 +160,7 @@ class UserServiceDB:
         row = cur.fetchone()
         if row and row[0]:
             self.logger.info(self.TABLE_EXIST_MSG % 'users')
-            return
+            return True
 
         query = dedent(
             """
@@ -175,15 +194,20 @@ class UserServiceDB:
         )
         try:
             cur.execute(query)
-            conn.commit()
+            if not self.dryrun:
+                conn.commit()
+            else:
+                conn.rollback()
         except Exception as e:
             conn.rollback()
             raise RuntimeError(self.TABLE_CREATE_ERR % 'users') from e
         else:
             self.logger.info(self.TABLE_CREATE_MSG % 'users')
+            return not self.dryrun
 
-    def create_sent_items_table(self) -> None:
+    def create_sent_items_table(self) -> bool:
         """Creates 'sent_items' table for tracking sent items per user.
+        Returns `True` if created.
         - Columns: user_id, item_hash, sent_at
         - Primary key: (user_id, item_hash)
         - Foreign key: user_id references users(id)
@@ -198,7 +222,7 @@ class UserServiceDB:
         row = cur.fetchone()
         if row and row[0]:
             self.logger.info(self.TABLE_EXIST_MSG % 'sent_items')
-            return
+            return True
 
         query = dedent(
             """
@@ -215,12 +239,16 @@ class UserServiceDB:
         )
         try:
             cur.execute(query)
-            conn.commit()
+            if not self.dryrun:
+                conn.commit()
+            else:
+                conn.rollback()
         except Exception as e:
             conn.rollback()
             raise RuntimeError(self.TABLE_CREATE_ERR % 'sent_items') from e
         else:
             self.logger.info(self.TABLE_CREATE_MSG % 'sent_items')
+            return not self.dryrun
 
     def insert_users(self, users: list[User], update=False) -> None:
         """Inserts/Updates `User` objects into database and increment
@@ -273,9 +301,9 @@ class UserServiceDB:
             )
         ).format(tb=tmp_tb_sql, cols=cols_sql)
         # Bulk insert into temp table
-        insert_query = sql.SQL(
-            "INSERT INTO {tb} ({cols}) VALUES %s;"
-        ).format(tb=tmp_tb_sql, cols=cols_sql)
+        insert_query = sql.SQL("INSERT INTO {tb} ({cols}) VALUES %s;").format(
+            tb=tmp_tb_sql, cols=cols_sql
+        )
         # Update existing rows with selected columns and get updated usernames
         update_from_tmp_query = sql.SQL(
             dedent(
@@ -331,7 +359,10 @@ class UserServiceDB:
             cur.execute(insert_from_tmp_query)
             inserted_usernames = [row[0] for row in cur.fetchall()]
             insert_count = cur.rowcount
-            conn.commit()
+            if not self.dryrun:
+                conn.commit()
+            else:
+                conn.rollback()
         # except psycopg2.errors.UniqueViolation as e:
         #     conn.rollback()
         #     username = re.search(r'\(username\)=\(([^)]+)\)', str(e))
@@ -396,8 +427,12 @@ class UserServiceDB:
             cur.execute(query, values)
             if cur.rowcount == 0:
                 self.logger.warning(self.USER_NOT_FOUND_MSG % username)
+                conn.rollback()
                 return
-            conn.commit()
+            if not self.dryrun:
+                conn.commit()
+            else:
+                conn.rollback()
         except Exception as e:
             conn.rollback()
             raise RuntimeError(f"Unable to update user: {username}") from e
@@ -413,8 +448,12 @@ class UserServiceDB:
             cur.execute(query, (username,))
             if cur.rowcount == 0:
                 self.logger.warning(self.USER_NOT_FOUND_MSG % username)
+                conn.rollback()
                 return
-            conn.commit()
+            if not self.dryrun:
+                conn.commit()
+            else:
+                conn.rollback()
         except Exception as e:
             conn.rollback()
             raise RuntimeError(f"Unable to delete user: {username}") from e
@@ -516,7 +555,10 @@ class UserServiceDB:
         values = [(user.id, item_hash, sent_at) for item_hash in item_hashes]
         try:
             cur.executemany(query, values)
-            conn.commit()
+            if not self.dryrun:
+                conn.commit()
+            else:
+                conn.rollback()
         except Exception as e:
             conn.rollback()
             raise RuntimeError(
@@ -537,7 +579,10 @@ class UserServiceDB:
         query = "UPDATE users SET last_sent_at = %s WHERE id = %s;"
         try:
             cur.execute(query, (sent_at, user.id))
-            conn.commit()
+            if not self.dryrun:
+                conn.commit()
+            else:
+                conn.rollback()
         except Exception as e:
             conn.rollback()
             raise RuntimeError(
@@ -546,17 +591,15 @@ class UserServiceDB:
         else:
             self.logger.info(f"Updated last_sent_at for: {user.username}")
 
-    def count_all_sent_items(self) -> int:
-        """Get the number of all sent_items records."""
+    def get_row_count(self, tb: str) -> int:
+        """Get the row count of a table."""
         conn, cur = self._ensure_connected()
 
-        query = "SELECT COUNT(*) FROM sent_items;"
+        query = sql.SQL("SELECT COUNT(*) FROM {};").format(sql.Identifier(tb))
         try:
             cur.execute(query)
         except Exception as e:
-            raise RuntimeError(
-                "Unable to get the number of records in sent_items."
-            ) from e
+            raise RuntimeError(f"Unable to get the row count: {tb}") from e
         else:
             row = cur.fetchone()
             if row is not None:
@@ -570,7 +613,10 @@ class UserServiceDB:
         query = "DELETE FROM sent_items WHERE sent_at < %s;"
         try:
             cur.execute(query, (cutoff_date,))
-            conn.commit()
+            if not self.dryrun:
+                conn.commit()
+            else:
+                conn.rollback()
         except Exception as e:
             conn.rollback()
             raise RuntimeError(
@@ -615,7 +661,10 @@ class UserServiceDB:
             # cur.execute(sql.SQL(value_query).format(sql.Identifier(seq_name)))
             cur.execute(value_query)
             last_value_new, is_called = cur.fetchone()
-            conn.commit()
+            if not self.dryrun:
+                conn.commit()
+            else:
+                conn.rollback()
         except Exception as e:
             conn.rollback()
             raise RuntimeError("Unable to reset 'users_id_seq'.") from e
@@ -652,7 +701,10 @@ class UserServiceDB:
         )
         try:
             cur.execute(query)
-            conn.commit()
+            if not self.dryrun:
+                conn.commit()
+            else:
+                conn.rollback()
         except Exception as e:
             conn.rollback()
             raise RuntimeError("Unable to reset users_id_seq.") from e
@@ -660,11 +712,22 @@ class UserServiceDB:
             self.logger.info(f"Table cleared: {table_name} ")
 
 
-def initialize_db(logger: Logger | MyLogger = getLogger()) -> UserServiceDB:
-    """Initialize and connect to the database."""
-    try:
-        pg_password = Path('./.pg_password').read_text().strip()
-    except Exception:
-        pg_password = getpass("Enter your PostgreSQL password: ")
-    db = UserServiceDB(password=pg_password, logger=logger)
-    return db
+# def initialize_db(
+#     pg_password_path: Path = PG_PASSWORD_PATH,
+#     dryrun: bool = False,
+#     logger: Logger | MyLogger = getLogger(),
+# ) -> UserServiceDB:
+#     """Initialize and connect to the database."""
+#     logger.debug(
+#         f"Loading password from {PG_PASSWORD_PATH}... "
+#         "(set $PG_PASSWORD_PATH to load from another file)"
+#     )
+#     try:
+#         pg_password = pg_password_path.read_text().strip()
+#     except Exception as e:
+#         logger.debug(f"Unable to load password: {e}")
+#         pg_password = getpass("Enter your PostgreSQL password: ")
+#     else:
+#         logger.debug(f"Loaded password from: {str(pg_password_path)}")
+#     db = UserServiceDB(password=pg_password, dryrun=dryrun, logger=logger)
+#     return db
