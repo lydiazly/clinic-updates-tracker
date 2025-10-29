@@ -100,139 +100,6 @@ class UserService:
             tz=self.config.tz,
         )
 
-    def get_lists_for_all(self) -> None:
-        """Fetches data in all cities and sets `data_all`.
-        Calls `core.run(query, config, logger, check_date=False)`
-        """
-        _list_data: ListData
-        _data_all: dict[str, ListData] = {}
-        for city in self.city_set:
-            _query = self.set_params_for_each(city)
-            _list_data = run(
-                query=_query,
-                config=self.config,
-                logger=self.logger,
-                check_date=False,
-            )
-            _data_all[city] = _list_data
-            if len(_list_data.items) > 0:
-                self.logger.info(
-                    f"Collected {_list_data.n_tot} items from: {city}"
-                )
-            else:
-                self.logger.info(f"No updates from {city}.")
-        self.data_all = _data_all
-
-    def fetch_data_and_send(self) -> None:
-        """Fetches full lists of data and send to users."""
-        # Fetch data in all cities specified by users
-        self.logger.info("Collecting updates for all...")
-        self.get_lists_for_all()
-
-        # Process each user
-        body_to_send: str
-        hashes_to_record: list[str]
-        for user in self.users:
-            self.logger.info(f"Processing user {user.username}...")
-            _res = self.process_user(user)
-            body_to_send = _res.get('body')
-            hashes_to_record = _res.get('hashes')
-            if not body_to_send or not hashes_to_record:
-                continue
-
-            # Send email to user
-            current_time = datetime.now().astimezone()  # timezone-aware
-            es = EmailService(self.logger)
-
-            if not self.config.send:
-                es.preview(EmailParams(user, body_to_send))
-                continue
-
-            try:
-                es.send(EmailParams(user, body_to_send))
-            except Exception as e:
-                self.logger.error(
-                    f"Failed to send email to {user.username}:\n{e}"
-                )
-                continue
-            else:
-                self.db.record_sent_items(user, hashes_to_record, current_time)
-                self.db.update_last_sent_at(user, current_time)
-
-    def process_user(self, user: User) -> dict[str, str | list[str]]:
-        """Filters data for a user and constructs the email body.
-        Items are filtered by hash values instead of dates.
-
-        Returns:
-            result: A dict with keys:
-                body (str): Email body to send to the user
-                hashes (list[str]): List of item hash values to be sent
-        """
-        body_to_send: str = ''
-        hashes_to_record: list[str] = []
-        username: str = user.username
-        nmax: int = user.nmax
-
-        # Check if enough time has passed since last_sent_at
-        current_time = datetime.now().astimezone()  # timezone-aware
-        if not self.db.should_send_to_user(user, current_time):
-            self.logger.info(
-                f"Skipping {username}: Not enough time passed since last send."
-            )
-            return {'body': body_to_send, 'hashes': hashes_to_record}
-
-        unsent_items: list[ItemData]
-        email_body_list: list[str] = []
-        for city in user.cities:
-            self.logger.info(f"Filtering updates in {city} for {username}...")
-            unsent_items = []
-            _n_tot = self.data_all[city].n_tot
-            _query = self.data_all[city].query
-            _items = self.data_all[city].items
-            _hashes = [item.digest for item in _items]
-
-            if not _items:
-                self.logger.info("No updates found.")
-                continue
-
-            # Check which items in this city have already been sent
-            sent_hashes: set[str] = self.db.get_sent_item_hashes(
-                user.id, _hashes
-            )
-            self.logger.debug(
-                f"Found {len(sent_hashes)} updates of {city} "
-                f"have been sent to {username}."
-            )
-
-            # Get unsent items in this city and limit to nmax
-            for item in _items:
-                if item.digest not in sent_hashes:
-                    unsent_items.append(item)
-
-            items_to_send = unsent_items[:nmax]
-            hashes_to_record.extend([item.digest for item in items_to_send])
-
-            if items_to_send:
-                email_body_list.append(
-                    construct_content(items_to_send, _n_tot, _query, False)
-                )
-                self.logger.debug(
-                    f"About to send {len(items_to_send)} new updates of "
-                    f"{city} to {username} (at most {nmax} items)."
-                )
-            else:
-                self.logger.debug(
-                    f"No unsent updates in {city} for {username}."
-                )
-                continue
-
-        if email_body_list:
-            body_to_send = '\n'.join(email_body_list)
-        else:
-            self.logger.info(f"No updates for {username}.")
-
-        return {'body': body_to_send, 'hashes': hashes_to_record}
-
     def upsert_users(self, users_src: list[User]) -> list[User] | None:
         """Updates and inserts users into database from a list of objects."""
         self.logger.info(
@@ -437,6 +304,139 @@ class UserService:
                 self.logger.info("Users retrieved:\n" + users_to_str(users_db))
             else:
                 self.logger.debug("All users:\n" + users_to_str(users_db))
+
+    def get_lists_for_all(self) -> None:
+        """Fetches data in all cities and sets `data_all`.
+        Calls `core.run(query, config, logger, check_date=False)`
+        """
+        _list_data: ListData
+        _data_all: dict[str, ListData] = {}
+        for city in self.city_set:
+            _query = self.set_params_for_each(city)
+            _list_data = run(
+                query=_query,
+                config=self.config,
+                logger=self.logger,
+                check_date=False,
+            )
+            _data_all[city] = _list_data
+            if len(_list_data.items) > 0:
+                self.logger.info(
+                    f"Collected {_list_data.n_tot} items from: {city}"
+                )
+            else:
+                self.logger.info(f"No updates from {city}.")
+        self.data_all = _data_all
+
+    def fetch_data_and_send(self) -> None:
+        """Fetches full lists of data and send to users."""
+        # Fetch data in all cities specified by users
+        self.logger.info("Collecting updates for all...")
+        self.get_lists_for_all()
+
+        # Process each user
+        body_to_send: str
+        hashes_to_record: list[str]
+        for user in self.users:
+            self.logger.info(f"\nProcessing user {user.username}...")
+            _res = self.process_user(user)
+            body_to_send = _res.get('body')
+            hashes_to_record = _res.get('hashes')
+            if not body_to_send or not hashes_to_record:
+                continue
+
+            # Send email to user
+            current_time = datetime.now().astimezone()  # timezone-aware
+            es = EmailService(self.logger)
+
+            if not self.config.send:
+                es.preview(EmailParams(user, body_to_send))
+                continue
+
+            try:
+                es.send(EmailParams(user, body_to_send))
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to send email to {user.username}:\n{e}"
+                )
+                continue
+            else:
+                self.db.record_sent_items(user, hashes_to_record, current_time)
+                self.db.update_last_sent_at(user, current_time)
+
+    def process_user(self, user: User) -> dict[str, str | list[str]]:
+        """Filters data for a user and constructs the email body.
+        Items are filtered by hash values instead of dates.
+
+        Returns:
+            result: A dict with keys:
+                body (str): Email body to send to the user
+                hashes (list[str]): List of item hash values to be sent
+        """
+        body_to_send: str = ''
+        hashes_to_record: list[str] = []
+        username: str = user.username
+        nmax: int = user.nmax
+
+        # Check if enough time has passed since last_sent_at
+        current_time = datetime.now().astimezone()  # timezone-aware
+        if not self.db.should_send_to_user(user, current_time):
+            self.logger.info(
+                f"Skipping {username}: Not enough time passed since last send."
+            )
+            return {'body': body_to_send, 'hashes': hashes_to_record}
+
+        unsent_items: list[ItemData]
+        email_body_list: list[str] = []
+        for city in user.cities:
+            self.logger.info(f"Filtering updates in {city} for {username}...")
+            unsent_items = []
+            _n_tot = self.data_all[city].n_tot
+            _query = self.data_all[city].query
+            _items = self.data_all[city].items
+            _hashes = [item.digest for item in _items]
+
+            if not _items:
+                self.logger.info("No updates found.")
+                continue
+
+            # Check which items in this city have already been sent
+            sent_hashes: set[str] = self.db.get_sent_item_hashes(
+                user.id, _hashes
+            )
+            self.logger.debug(
+                f"Found {len(sent_hashes)} updates of {city} "
+                f"have been sent to {username}."
+            )
+
+            # Get unsent items in this city and limit to nmax
+            for item in _items:
+                if item.digest not in sent_hashes:
+                    unsent_items.append(item)
+
+            items_to_send = unsent_items[:nmax]
+            hashes_to_record.extend([item.digest for item in items_to_send])
+
+            if items_to_send:
+                email_body_list.append(
+                    construct_content(items_to_send, _n_tot, _query, False)
+                )
+                self.logger.debug(
+                    f"About to send {len(items_to_send)} new updates of "
+                    f"{city} to {username} (at most {nmax} items)."
+                )
+            else:
+                self.logger.debug(
+                    f"No unsent updates in {city} for {username}."
+                )
+                continue
+
+        if email_body_list:
+            body_to_send = '\n'.join(email_body_list)
+        else:
+            self.logger.info(f"No updates for {username}.")
+
+        return {'body': body_to_send, 'hashes': hashes_to_record}
 
 
 def run_service(
