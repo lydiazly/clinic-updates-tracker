@@ -23,8 +23,8 @@ from clinictracker.user.helpers import (
     users_to_str,
     user_updates_to_str,
 )
-from clinictracker.core import run, print_error, TEST_MSG
-from clinictracker.utils import construct_content
+from clinictracker.core import run, TEST_MSG
+from clinictracker.utils import print_error, construct_content
 from clinictracker.user.db_manager import UserServiceDB
 from clinictracker.user.email_service import EmailParams, EmailService
 
@@ -32,7 +32,7 @@ from clinictracker.user.email_service import EmailParams, EmailService
 DRYRUN_BEGIN_MSG = f"{Color.GREEN}*** DRY RUN BEGIN ***{Color.END}"
 DRYRUN_END_MSG = f"{Color.GREEN}*** DRY RUN END ***{Color.END}"
 DRYRUN_SEQ_MSG = "User id sequence increment keeps after dry run of insertion."
-CREATION_ONLY_MSG = "*** Creation only (data fetching skipped) ***"
+CREATE_ONLY_MSG = "*** Create only (data fetching skipped) ***"
 CRUD_ONLY_MSG = "*** CRUD only (data fetching skipped) ***"
 SKIP_CREATION_MSG = "'--skip-creation' selected. Table creation skipped."
 
@@ -68,15 +68,16 @@ class UserService:
             logger.info(SKIP_CREATION_MSG)
         else:
             _created = db.create_users_table()
-            self.tables_ready = db.create_sent_items_table() and _created
+            self.tables_ready = _created and db.create_sent_items_table()
 
-    def set_params_for_all(self) -> None:
+    def set_params_for_all(self) -> bool:
         """Sets `city_set`, `max_days_back`, and `max_nmax` for
         fetching full lists in all cities requested from users.
+        Returns `True` if succeed.
         """
         if not self.users:
             self.logger.info("No users. Nothing to do.")
-            return
+            return False
 
         _cities: list[str] = []
         for user in self.users:
@@ -93,6 +94,8 @@ class UserService:
             f"max_days_back={self.max_days_back}, max_nmax={self.max_nmax}"
         )
         self.logger.info(f"Cities to check: {', '.join(self.city_set)}")
+
+        return True
 
     def set_params_for_each(self, city: str) -> QueryParams:
         """Sets query parameters for fetching full list for each city."""
@@ -352,6 +355,11 @@ class UserService:
 
     def fetch_data_and_send(self) -> None:
         """Fetches full lists of data and send to users."""
+        # Set query parameters based on all users
+        _params_ready: bool = self.set_params_for_all()
+        if not _params_ready:
+            return
+
         # Fetch data in all cities specified by users
         self.logger.info("Collecting updates for all...")
         self.get_lists_for_all()
@@ -379,9 +387,7 @@ class UserService:
             try:
                 es.send(EmailParams(user, body_to_send))
             except Exception as e:
-                self.logger.error(
-                    f"Failed to send email to {user.username}:\n{e}"
-                )
+                self.logger.error(f"Failed to send to {user.username}:\n{e}")
                 continue
             else:
                 self.db.record_sent_items(user, hashes_to_record, current_time)
@@ -470,8 +476,8 @@ def run_service(
         logger.info(DRYRUN_BEGIN_MSG)
 
     # Initialize database
-    with UserServiceDB(dryrun=config.dryrun, logger=logger) as db:
-        try:
+    try:
+        with UserServiceDB(dryrun=config.dryrun, logger=logger) as db:
             if config.test:
                 logger.info(TEST_MSG)
                 return
@@ -479,8 +485,8 @@ def run_service(
             # Initialize & create tables ------------------------------|
             us = UserService(db, config, logger)
 
-            if config.creation_only:
-                logger.info(CREATION_ONLY_MSG)
+            if config.create_only:
+                logger.info(CREATE_ONLY_MSG)
                 return
 
             if not us.tables_ready:
@@ -489,22 +495,12 @@ def run_service(
             # Perform CRUD operations and retrieve all users ----------|
             us.crud_and_get_users()
 
-            if config.crud_only:
-                logger.info(CRUD_ONLY_MSG)
-                return
-
-            if config.dryrun:
-                return
-
             # Go fetch and send data ----------------------------------|
-            if config.command is None:
-                if not us.users:
-                    logger.info("No users. Nothing to do.")
-                    return
-
-                # Set query parameters based on all users
-                us.set_params_for_all()
-
+            if (
+                not config.dryrun
+                and not config.crud_only
+                and config.command is None
+            ):
                 # Prepare data and send to all users
                 us.fetch_data_and_send()
                 current_time = datetime.now().astimezone()  # timezone-aware
@@ -512,8 +508,7 @@ def run_service(
                 # Cleanup old records
                 _stale_days = us.max_days_back + CLEANUP_BUFFER_DAYS
                 logger.info(
-                    "Cleaning up sent_items records more than "
-                    f"{_stale_days} days old..."
+                    f"Removing sent_items more than {_stale_days} days old..."
                 )
                 cutoff_date = current_time - timedelta(days=_stale_days)
                 db.cleanup_old_sent_items(cutoff_date)
@@ -525,22 +520,29 @@ def run_service(
                 logger.info("Saving users to file...")
                 save_users_to_json(us.users, config.json_path, logger)
 
-        # Chained exceptions are handled here
-        except RuntimeError as e:
-            print_error(e, logger)
-            raise
+            if config.crud_only:
+                logger.info(CRUD_ONLY_MSG)
+                return
 
-        # Other unexpected exceptions
-        except Exception as e:
-            if config.debug:
-                traceback.print_exc()
-            else:
-                print_error(e, logger)
-            raise
-
-        else:
-            logger.info("Done!")
-
-        finally:
             if config.dryrun:
-                logger.info(DRYRUN_END_MSG)
+                return
+
+    # Chained exceptions are handled here
+    except RuntimeError as e:
+        print_error(e, logger)
+        raise
+
+    # Other unexpected exceptions
+    except Exception as e:
+        if config.debug:
+            traceback.print_exc()
+        else:
+            print_error(e, logger)
+        raise
+
+    else:
+        logger.info("Done!")
+
+    finally:
+        if config.dryrun:
+            logger.info(DRYRUN_END_MSG)

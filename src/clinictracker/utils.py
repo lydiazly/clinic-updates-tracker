@@ -5,14 +5,35 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag, PageElement
 from datetime import datetime, timedelta, timezone, date, tzinfo, time
 from dateutil.parser import parse, ParserError
+from logging import Logger
 import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from clinictracker.models import ItemData, Result
-from clinictracker.startup import QueryParams
+from clinictracker.startup import QueryParams, MyLogger
 
 
 TITLE_TEMPLATE = "%(city)s clinic updates in the past %(days_back)s days"
+
+
+def print_error(
+    exc: Exception | BaseException,
+    logger: Logger | MyLogger,
+    max_level: int = 5,
+) -> None:
+    """Prints error messages and causes."""
+    current_exc = exc
+    level = 1
+    while current_exc is not None and level <= max_level:
+        logger.error(f"{'  └─ ' if level > 1 else ''}{current_exc}")
+        if current_exc.__cause__ is not None:
+            current_exc = current_exc.__cause__
+            level += 1
+        elif current_exc.__context__ is not None:
+            current_exc = current_exc.__context__
+            level += 1
+        else:
+            return
 
 
 def preserve_tags(element: PageElement) -> str:

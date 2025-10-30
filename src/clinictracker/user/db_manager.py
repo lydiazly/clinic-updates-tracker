@@ -95,20 +95,9 @@ class UserServiceDB:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> Literal[False]:
-        try:
-            self.close()
-        except Exception as e:
-            # If there was already an exception in the with block, preserve it
-            if exc_type is not None:
-                # Log the error but don't raise it
-                # TODO: test
-                self.logger.error(f"Error during operations:\n{e}")
-                # Return None/False to let the original exception propagate
-                return False
-            else:
-                # No original exception, so raise the close error
-                raise
-        # Return None/False to propagate any exception from the with block
+        if exc_type is not None:
+            self.logger.error("Error during operations.")
+        self.close()
         return False
 
     def _ensure_connected(
@@ -130,24 +119,22 @@ class UserServiceDB:
 
     def close(self) -> None:
         """Closes database connection."""
-        errors = []
+        _errors = []
 
         if self.cur is not None:
             try:
                 self.cur.close()
             except Exception as e:
-                errors.append(f"(cursor) {type(e).__name__}: {e}")
+                _errors.append(f"(cursor) {type(e).__name__}: {e}")
         if self.conn is not None:
             try:
                 self.conn.close()
             except Exception as e:
-                errors.append(f"(connection) {type(e).__name__}: {e}")
+                _errors.append(f"(connection) {type(e).__name__}: {e}")
 
-        if errors:
-            errors_all = '\n'.join(errors)
-            raise RuntimeError(
-                f"Error closing database connection:\n{errors_all}"
-            )
+        if _errors:
+            _errors_all = '\n'.join(_errors)
+            raise RuntimeError(f"Error closing connection:\n{_errors_all}")
         else:
             self.logger.info(self.CLOSED_MSG)
 
@@ -180,9 +167,9 @@ class UserServiceDB:
                 cities VARCHAR(50)[] NOT NULL CHECK (array_length(cities, 1) >= 1),
                 period INTEGER DEFAULT 1 CHECK (period > 0),
                 nmax INTEGER DEFAULT 10 CHECK (nmax > 0),
-                last_sent_at TIMESTAMP,
-                created_at TIMESTAMP DEFAULT now(),
-                updated_at TIMESTAMP DEFAULT now()
+                last_sent_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now()
             );
             -- 2. Create a trigger function (once per database)
             CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -236,7 +223,7 @@ class UserServiceDB:
             CREATE TABLE IF NOT EXISTS sent_items (
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 item_hash VARCHAR(64) NOT NULL,
-                sent_at TIMESTAMP DEFAULT now(),
+                sent_at TIMESTAMPTZ DEFAULT now(),
                 PRIMARY KEY (user_id, item_hash)
             );
 

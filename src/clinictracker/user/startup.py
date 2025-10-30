@@ -243,7 +243,7 @@ def get_args_and_logger_for_service() -> (
         help="Skip creating tables (default: false)",
     )
     parser.add_argument(
-        '--creation-only',
+        '--create-only',
         action='store_true',
         help=(
             "Exit after creating tables without any further operation "

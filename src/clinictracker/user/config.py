@@ -30,7 +30,8 @@ DAYS_BACK_MIN: int = 2
 # MAX_ITEMS_MIN: int = 10
 MAX_ITEMS_MIN: int = 3  # TEST
 # Extra days to keep records beyond the maximum period among users
-CLEANUP_BUFFER_DAYS: int = 7
+# CLEANUP_BUFFER_DAYS: int = 7
+CLEANUP_BUFFER_DAYS: int = 1  # TEST
 
 # Source file containing a list of user data
 USERS_JSON_PATH: Path = Path(
@@ -81,7 +82,7 @@ class ServiceConfig(Config):
         tz (str): TZ identifier (IANA Time Zones) of the target website
         command (CommandRequest | None): (name, data)
         skip_creation (bool): Skip creating tables
-        creation_only (bool): Exit after creating tables
+        create_only (bool): Exit after creating tables
         json_path (Path): JSON file containing user data
         load_users (bool): Update user data from the JSON file
         delete_users (bool): If load_users, delete users that are not in
@@ -96,7 +97,7 @@ class ServiceConfig(Config):
     tz: str
     command: CommandRequest | None
     skip_creation: bool
-    creation_only: bool
+    create_only: bool
     json_path: Path
     load_users: bool
     delete_users: bool
@@ -160,7 +161,7 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
         tz=trim_str(args.tz),
         command=command_request,
         skip_creation=args.skip_creation,
-        creation_only=args.creation_only,
+        create_only=args.create_only,
         json_path=args.file,
         load_users=args.load,
         delete_users=args.delete if args.load and args.file else False,
