@@ -58,6 +58,7 @@ class UserService:
         self.config: ServiceConfig = config
         self.logger: Logger | MyLogger = logger
         self.users: list[User] = []
+        self.selected_users: list[User] = []
         self.cities_data: UserService._CitiesDataType = {}
         self.city_set: set[str] = set()
         self.max_days_back: int = DAYS_BACK_MIN
@@ -70,21 +71,53 @@ class UserService:
             _created = db.create_users_table()
             self.tables_ready = _created and db.create_sent_items_table()
 
+    def select_users(self) -> None:
+        """Selects users to serve. Sets `selected_users`."""
+        usernames: list[str] | None = self.config.usernames
+
+        if self.config.force_send:
+            if usernames is None:
+                self.selected_users = self.users
+            else:
+                self.selected_users = [
+                    u for u in self.users if u.username in usernames
+                ]
+        else:
+            # Check if enough time has passed since last_sent_at
+            current_time = datetime.now().astimezone()  # timezone-aware
+            _users: list[User] = []
+            for user in self.users:
+                if usernames is None or user.username in usernames:
+                    if self.db.should_send_to_user(user, current_time):
+                        _users.append(user)
+                    else:
+                        self.logger.info(
+                            f"Skipping {user.username}: Not enough time "
+                            "passed since last send"
+                        )
+            self.selected_users = _users
+        self.logger.debug(
+            f"Specified users: {(', '.join(usernames) if usernames else 'all')}"
+        )
+        self.logger.debug(
+            f"Users to serve: {', '.join(u.username for u in self.selected_users)}"
+        )
+
     def set_params_for_all(self) -> bool:
         """Sets `city_set`, `max_days_back`, and `max_nmax` for
-        fetching full lists in all cities requested from users.
+        fetching full lists in all cities requested from selected users.
         Returns `True` if succeed.
         """
-        if not self.users:
-            self.logger.info("No users. Nothing to do.")
+        if not self.selected_users:
+            self.logger.info("No users to serve. Nothing to do.")
             return False
 
         _cities: list[str] = []
-        for user in self.users:
+        for user in self.selected_users:
             _cities.extend(user.cities)
 
-        max_user_period = max(user.period for user in self.users)
-        max_user_nmax = max(user.nmax for user in self.users)
+        max_user_period = max(user.period for user in self.selected_users)
+        max_user_nmax = max(user.nmax for user in self.selected_users)
 
         self.city_set = set(_cities)
         self.max_days_back = max(DAYS_BACK_MIN, max_user_period + 1)
@@ -175,7 +208,6 @@ class UserService:
 
     def update_users(self, updates_list: list[UserDict]) -> None:
         """Updates users in database from dicts."""
-        self.logger.info(f"Updating {len(updates_list)} users in database...")
         for updates in updates_list:
             _username = updates.pop('username')
             _user_db = self.db.get_user_by_username(_username)
@@ -325,73 +357,79 @@ class UserService:
             else:
                 self.logger.debug("All users:\n" + users_to_str(users_db))
 
-    def get_lists_for_all(self) -> None:
+    async def get_lists_for_all(self) -> None:
         """Fetches data in all cities and sets `cities_data`.
         Calls `core.run(query, config, logger, check_date=False)`
         """
+        _cities: list[str] = list(self.city_set)
         _list_data: ListData | None
         _cities_data: UserService._CitiesDataType = {}
-        for city in self.city_set:
-            _query = self.set_params_for_each(city)
-            _list_data = run(
-                query=_query,
-                config=self.config,
-                logger=self.logger,
-                check_date=False,
-            )
+        _queries: list[QueryParams] = [self.set_params_for_each(city) for city in _cities]
+        _data_all: list[ListData] | None = await run(
+            queries=_queries,
+            config=self.config,
+            logger=self.logger,
+            check_date=False,
+        )
+        if _data_all is None:
+            self.logger.warning("Data not fetched.")
+            return
 
-            if _list_data is None:
-                self.logger.warning(f"Data not fetched from {city}.")
-                continue
-
-            if len(_list_data.items) > 0:
-                _cities_data[city] = _list_data
-                self.logger.info(
-                    f"Collected {_list_data.n_tot} items from: {city}"
-                )
+        for i, city in enumerate(_cities):
+            if len(_data_all[i].items) > 0:
+                _cities_data[city] = _data_all[i]
             else:
                 self.logger.info(f"No updates from {city}.")
         self.cities_data = _cities_data
 
-    def fetch_data_and_send(self) -> None:
-        """Fetches full lists of data and send to users."""
+    async def fetch_data_and_send(self, es: EmailService) -> None:
+        """Fetches full lists of data and send to selected users."""
+        # Determine the users to serve
+        self.select_users()
+
         # Set query parameters based on all users
         _params_ready: bool = self.set_params_for_all()
         if not _params_ready:
             return
 
-        # Fetch data in all cities specified by users
+        # Fetch data in all cities specified by selected users
         self.logger.info("Collecting updates for all...")
-        self.get_lists_for_all()
+        await self.get_lists_for_all()
 
         # Process each user
         body_to_send: str
         hashes_to_record: list[str]
         _content_to_send: UserService._ContentToSend
-        for user in self.users:
-            self.logger.info(f"\nProcessing user {user.username}...")
+        success: bool = True
+        for user in self.selected_users:
+            self.logger.info(f"Processing user {user.username}...")
             _content_to_send = self.process_user(user)
             body_to_send = _content_to_send.get('body', '')
             hashes_to_record = _content_to_send.get('hashes', [])
             if not body_to_send or not hashes_to_record:
                 continue
 
-            # Send email to user
-            current_time = datetime.now().astimezone()  # timezone-aware
-            es = EmailService(self.logger)
-
+            # Print email content for user
             if not self.config.send:
                 es.preview(EmailParams(user, body_to_send))
                 continue
 
+            # Send email to user
+            current_time = datetime.now().astimezone()  # timezone-aware
             try:
                 es.send(EmailParams(user, body_to_send))
             except Exception as e:
-                self.logger.error(f"Failed to send to {user.username}:\n{e}")
+                print_error(e, self.logger)
+                success = False
                 continue
             else:
                 self.db.record_sent_items(user, hashes_to_record, current_time)
                 self.db.update_last_sent_at(user, current_time)
+        
+        if success:
+            self.logger.info("All emails sent successfully.")
+        else:
+            raise RuntimeError("Error during email sending.")
 
     def process_user(self, user: User) -> _ContentToSend:
         """Filters data for a user and constructs the email body.
@@ -406,14 +444,6 @@ class UserService:
         hashes_to_record: list[str] = []
         username: str = user.username
         nmax: int = user.nmax
-
-        # Check if enough time has passed since last_sent_at
-        current_time = datetime.now().astimezone()  # timezone-aware
-        if not self.db.should_send_to_user(user, current_time):
-            self.logger.info(
-                f"Skipping {username}: Not enough time passed since last send."
-            )
-            return {'body': body_to_send, 'hashes': hashes_to_record}
 
         unsent_items: list[ItemData]
         email_body_list: list[str] = []
@@ -430,13 +460,17 @@ class UserService:
                 continue
 
             # Check which items in this city have already been sent
-            sent_hashes: set[str] = self.db.get_sent_item_hashes(
-                user.id, _hashes
-            )
-            self.logger.debug(
-                f"Found {len(sent_hashes)} updates of {city} "
-                f"have been sent to {username}."
-            )
+            sent_hashes: set[str] = set()
+            if not self.config.force_send:
+                sent_hashes = self.db.get_sent_item_hashes(user.id, _hashes)
+                self.logger.debug(
+                    f"Found {len(sent_hashes)} updates of {city} "
+                    f"have been sent to {username}."
+                )
+            else:
+                self.logger.debug(
+                    "'--force-send' selected. Skipping sent items checking..."
+                )
 
             # Get unsent items in this city and limit to nmax
             for item in _items:
@@ -468,7 +502,7 @@ class UserService:
         return {'body': body_to_send, 'hashes': hashes_to_record}
 
 
-def run_service(
+async def run_service(
     config: ServiceConfig, logger: Logger | MyLogger = getLogger()
 ) -> None:
     """Manages user data in the database and process daily updates."""
@@ -501,8 +535,11 @@ def run_service(
                 and not config.crud_only
                 and config.command is None
             ):
+                # Initialize email service
+                es = EmailService(logger)
+
                 # Prepare data and send to all users
-                us.fetch_data_and_send()
+                await us.fetch_data_and_send(es)
                 current_time = datetime.now().astimezone()  # timezone-aware
 
                 # Cleanup old records

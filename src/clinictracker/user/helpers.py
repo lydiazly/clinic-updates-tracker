@@ -115,7 +115,7 @@ def save_users_to_json(
     # Convert each object to dict, filtering out None values
     data: list[UserDict] = [
         cast(
-            UserDict, {k: v for k, v in asdict(user).items() if v is not None}
+            UserDict, {k: User.print_value(v) for k, v in asdict(user).items() if v is not None}
         )
         for user in users
     ]
@@ -124,11 +124,11 @@ def save_users_to_json(
     s = json.dumps(data, indent=2, ensure_ascii=False)
 
     # Format JSON with compact lists
-    def replace_func(match: re.Match[str]) -> str:
+    def _replace_func(match: re.Match[str]) -> str:
         # Split on any whitespace (\n \r \t \f \s) and discard empty strings
         return ' '.join(match.group().split())
 
-    compact_json = re.sub(r"(?<=\[)[^\[\]\{]+(?=\])", replace_func, s)
+    compact_json = re.sub(r"(?<=\[)[^\[\]\{]+(?=\])", _replace_func, s)
 
     # If file exists and non-empty, create backup
     if json_path.is_file() and json_path.stat().st_size > 0:
@@ -223,7 +223,11 @@ def users_to_str(users: list[User]) -> str:
 def user_dicts_to_str(user_dicts: list[UserDict]) -> str:
     """Formats user dicts."""
     users_str_list = [
-        '\n'.join(f"{k:>20}: {user.get(k)}" for k in ALLOWED_COLS if k in user)
+        '\n'.join(
+            f"{k:>20}: {User.print_value(user.get(k))}"
+            for k in ALLOWED_COLS
+            if k in user
+        )
         for user in user_dicts
     ]
     users_str = (f"\n{HR}\n".join(['', *users_str_list, ''])).strip()
@@ -233,7 +237,7 @@ def user_dicts_to_str(user_dicts: list[UserDict]) -> str:
 def user_updates_to_str(user: User, updates: UserDict) -> str:
     """Formats user dicts."""
     user_str = '\n'.join(
-        f"{field:>20}: {getattr(user, field)}"
+        f"{field:>20}: {User.print_value(getattr(user, field))}"
         + (
             f"{Color.YELLOW}  ->  {updates.get(field)}{Color.END}"
             if field in updates

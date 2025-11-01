@@ -307,6 +307,22 @@ def get_args_and_logger_for_service() -> (
             "(default: print content to STDOUT without sending)"
         ),
     )
+    parser.add_argument(
+        '--force-send',
+        action='store_true',
+        help=(
+            "Force sending regardless of whether already sent or not\n"
+            "(if not --send, preview only) (default: false)"
+        ),
+    )
+    parser.add_argument(
+        '-u',
+        '--usernames',
+        nargs='+',
+        type=str.lower,
+        metavar='str',
+        help="List of usernames. If specified, only send to these users",
+    )
     # Browser args
     parser.add_argument(
         '-H',

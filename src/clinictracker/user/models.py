@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from dotenv import load_dotenv
 import os
-from typing import TypedDict
+from typing import Any, TypedDict
 
 
 load_dotenv()
@@ -52,9 +52,17 @@ class User:
 
     def __str__(self) -> str:
         return '\n'.join(
-            f"{field:>20}: {getattr(self, field)}"
+            # f"{field:>20}: {getattr(self, field)}"
+            f"{field:>20}: {self.print_value(getattr(self, field))}"
             for field in ['id'] + ALLOWED_COLS + ['last_sent_at']
         )
+
+    @staticmethod
+    def print_value(value: Any) -> Any:
+        if isinstance(value, datetime):
+            return value.astimezone().strftime('%Y-%m-%d %H:%M:%S (%Z)')
+        else:
+            return value
 
 
 class UserDict(TypedDict, total=False):

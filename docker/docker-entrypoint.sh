@@ -101,7 +101,7 @@ if [ "${SEND_EMAILS}" = 'true' ] \
       echo "✓ Successfully obtained Gmail access token."
       echo -e "Token: ${access_token}\n"
 
-      sender="Lydia Zhang <${GMAIL_SENDER}>"
+      sender="${GMAIL_SENDER}"
       recipients="${emails}"
       repo="clinic-updates-tracker"
       is_test="${TEST_MODE}"

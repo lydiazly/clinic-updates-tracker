@@ -3,6 +3,7 @@
 # pytest tests/test_url.py -s
 from datetime import datetime
 from dateutil.parser import parse, ParserError
+import logging
 import pytest
 from time import time
 
@@ -44,8 +45,8 @@ def test_parse_datetime(datetime_str, expected_datetime):
 )
 def test_date_within(target_date, days_back, ref_datetime, tz):
     """Tests dates within the time range."""
-    res = is_date_within(target_date, days_back, ref_datetime, tz)
-    assert res.data
+    is_within = is_date_within(target_date, days_back, ref_datetime, tz)
+    assert is_within
     # print('\n' + res.messages[0])
 
 
@@ -62,12 +63,13 @@ def test_date_within(target_date, days_back, ref_datetime, tz):
 )
 def test_date_not_within(target_date, days_back, ref_datetime, tz):
     """Tests dates not within the time range."""
-    res = is_date_within(target_date, days_back, ref_datetime, tz)
-    assert not res.data
+    is_within = is_date_within(target_date, days_back, ref_datetime, tz)
+    assert not is_within
     # print('\n' + res.messages[0])
 
 
-tz_warning = "Applying local time zone to the target time."
+USE_LOCAL_TZ_MSG = "Applying local time zone to the target time."
+TZ_NOT_FOUND_MSG = "Time zone not found: %s"
 
 
 @pytest.mark.parametrize(
@@ -77,32 +79,33 @@ tz_warning = "Applying local time zone to the target time."
             "September 1, 2025",
             parse("2025-09-02T13:00"),
             'nowhere',
-            f"Time zone not found: nowhere\n{tz_warning}",
+            '\n'.join([TZ_NOT_FOUND_MSG % 'nowhere', USE_LOCAL_TZ_MSG]),
         ),
-        ("September 1, 2025", parse("2025-09-02T13:00"), '', tz_warning),
+        ("September 1, 2025", parse("2025-09-02T13:00"), '', USE_LOCAL_TZ_MSG),
     ],
 )
-def test_warnings(target_date, ref_datetime, tz, warning):
+def test_warnings(caplog, target_date, ref_datetime, tz, warning):
     """Tests warnings."""
-    res = is_date_within(target_date, 1, ref_datetime, tz)
-    assert res.data
-    assert warning == '\n'.join(res.warnings)
-    # print('\n' + '\n'.join(res.warnings))
+    with caplog.at_level(logging.INFO):
+        is_within = is_date_within(target_date, 1, ref_datetime, tz)
+        assert is_within
+        assert all(r.levelno == logging.WARNING for r in caplog.records)
+        assert '\n'.join(r.message for r in caplog.records) == warning
+        # print('\n' + '\n'.join(r.message for r in caplog.records))
+
+
+DATE_ERR = r"^\(is_date_within\) Error parsing date:"
+NO_DATE_ERR = r"^\(is_date_within\) Target date is missing.$"
+INVALID_DATE_ERR = r"Target date must be a string, datetime, or date object.$"
 
 
 @pytest.mark.parametrize(
     "invalid_date, error_msg",
     [
-        ("", r"^\(is_date_within\) Target date is missing.$"),
-        (None, r"^\(is_date_within\) Target date is missing.$"),
-        (
-            time(),
-            (
-                r"^\(is_date_within\) Error parsing date:\n"
-                r"Target date must be a string, datetime, or date object.$"
-            ),
-        ),
-        ("not a date", r"^\(is_date_within\) Error parsing date:"),
+        ("", NO_DATE_ERR),
+        (None, NO_DATE_ERR),
+        (time(), '\n'.join([DATE_ERR, INVALID_DATE_ERR])),
+        ("not a date", DATE_ERR),
     ],
 )
 def test_date_invalid(invalid_date, error_msg):

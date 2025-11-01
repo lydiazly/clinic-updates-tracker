@@ -5,11 +5,11 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag, PageElement
 from datetime import datetime, timedelta, timezone, date, tzinfo, time
 from dateutil.parser import parse, ParserError
-from logging import Logger
+from logging import Logger, getLogger
 import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from clinictracker.models import ItemData, Result
+from clinictracker.models import ItemData
 from clinictracker.startup import QueryParams, MyLogger
 
 
@@ -155,7 +155,8 @@ def is_date_within(
     days_back: int,
     ref_datetime: datetime | None = None,
     tz: str = '',
-) -> Result[bool]:
+    logger: Logger | MyLogger = getLogger(),
+) -> bool:
     """Checks if a given date is within the past n days.
     1-hour buffer is considered.
 
@@ -168,10 +169,7 @@ def is_date_within(
         tz (str): time zone of the target_date, default to local time zone
 
     Returns:
-        Result: A namedtuple with fields:
-            data (bool): Is within the past n days or not
-            messages (list[str])
-            warnings (list[str])
+        is_within (bool): Is within the past n days or not
 
     Raises:
         ValueError: If the date string is empty or unable to be parsed
@@ -217,8 +215,6 @@ def is_date_within(
         ref_str_all = f"{ref_local_str} ({ref_utc_str})"
 
     # Verify TZ info --------------------------------------------------|
-    messages: list[str] = []
-    warnings: list[str] = []
     tz_info: ZoneInfo | tzinfo | None = None
     tzname: str
     # Use provided TZ identifier/name for target time
@@ -228,7 +224,7 @@ def is_date_within(
             tzname = tz_info.key  # or str(tz_info)
         except ZoneInfoNotFoundError:
             # Set to the local time zone later
-            warnings.append(f"Time zone not found: {tz}")
+            logger.warning(f"Time zone not found: {tz}")
 
     if tz_info is None:
         # If the object includes tzinfo, use it
@@ -242,7 +238,7 @@ def is_date_within(
         else:
             tz_info = ref_local.tzinfo  # <class 'datetime.timezone'>
             tzname = ref_local.tzname() or 'Unknown'
-            warnings.append("Applying local time zone to the target time.")
+            logger.warning("Applying local time zone to the target time.")
 
     # Parse target time -----------------------------------------------|
     target_parsed: datetime  # timezone-aware
@@ -289,18 +285,14 @@ def is_date_within(
     days_diff_str = f"{days_diff:.3g}"
     _days = 'day' if days_diff_str == '1' else 'days'
     if is_within:
-        messages.append(
+        logger.debug(
             f"{target_str_all} is within {days_back} {_days} before "
             f"{ref_str_all}. Collecting..."
         )
     else:
-        messages.append(
+        logger.debug(
             f"{target_str_all} is {days_diff_str} {_days} earlier than "
             f"{ref_str_all}. Returning..."
         )
 
-    return Result(
-        data=is_within,
-        messages=messages,
-        warnings=warnings,
-    )
+    return is_within

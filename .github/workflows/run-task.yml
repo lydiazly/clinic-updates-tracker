@@ -158,7 +158,7 @@ jobs:
           fi
           echo "✓ Successfully obtained Gmail access token."
 
-          sender="Lydia Zhang <${{ secrets.GMAIL_SENDER }}>"
+          sender="${{ secrets.GMAIL_SENDER }}"
           recipients="${{ steps.parse_emails.outputs.emails }}"
           repo="${{ github.repository }}"
           is_test="${{ env.TEST_MODE }}"

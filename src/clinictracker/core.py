@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 # core.py
 """Main functions to fetch updates in a specified town/city."""
+import asyncio
 from logging import Logger, getLogger
-from playwright.sync_api import (
-    sync_playwright,
+from playwright.async_api import (
+    async_playwright,
     Browser,
     BrowserContext,
     Page,
@@ -12,14 +13,15 @@ from playwright.sync_api import (
 )
 import random
 import re
-from time import sleep
+
+# from time import sleep
 import traceback
 from types import TracebackType
 from typing import Self, Literal
 
 from clinictracker.selectors import HomePageSelectors, DetailPageSelectors
 from clinictracker.config import Config, RunConfig, TIMEOUT_PAGE, TIMEOUT_UL
-from clinictracker.models import T, Result, ItemData, ListData
+from clinictracker.models import ItemData, ListData
 from clinictracker.startup import QueryParams, MyLogger
 from clinictracker.browsers import get_browser
 from clinictracker.utils import (
@@ -33,76 +35,70 @@ from clinictracker.utils import (
 
 TIMEOUT_ERR = "Timeout loading %s after %gs."
 TEST_MSG = "*** Test only (no operation) ***"
-CLOSED_MSG = "Browser closed."
+BROWSER_CLOSED_MSG = "Browser closed."
 NO_UPDATES_MSG = "No updates. No file exported."
 NO_EXPORT_MSG = "'--no-o' selected. No file exported."
 
 
-class PageContext:
-
+class PageManager:
     def __init__(
         self,
         browser: Browser,
+        context: BrowserContext,
         query: QueryParams,
         config: Config,
         check_date: bool = True,
         logger: Logger | MyLogger = getLogger(),
     ) -> None:
         self.browser: Browser = browser
+        self.context: BrowserContext = context
         self.query: QueryParams = query
         self.config: Config = config
         self.check_date: bool = check_date
         self.logger: Logger | MyLogger = logger
-        # Initialize context
-        self.context: BrowserContext = browser.new_context()  # incognito
-        self.context.set_default_timeout(TIMEOUT_PAGE)
-        self.page = self.context.new_page()
+        self.page: Page | None = None
 
-    def __enter__(self) -> Self:
+    async def __aenter__(self) -> Self:
+        self.page = await self.open_page()
         return self
 
-    def __exit__(
+    async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> Literal[False]:
-        if exc_type is not None:
-            self.logger.error("Error during browsing.")
-        self.close()
+        await self.close()
         return False
 
-    def close(self) -> None:
-        """Gracefully closes everything."""
-        self.context.close()
-        self.browser.close()
-        self.logger.info(CLOSED_MSG)
+    async def open_page(self) -> Page:
+        return await self.context.new_page()
+
+    async def close(self) -> None:
+        """Gracefully closes page."""
+        if self.page and not self.page.is_closed():
+            try:
+                await asyncio.wait_for(self.page.close(), timeout=2)
+            except asyncio.TimeoutError:
+                self.logger.debug("Page closing timeout.")
+            except Exception:
+                pass
 
     @staticmethod
-    def navigate_to_page(page: Page, url: str) -> None:
+    async def goto_page(page: Page, url: str) -> None:
         """Navigates to a page."""
         try:
-            page.goto(url)
-            page.wait_for_load_state("networkidle")
+            await page.goto(url, wait_until='domcontentloaded')
         except TimeoutError:
             raise TimeoutError(TIMEOUT_ERR % (url, TIMEOUT_PAGE / 1000))
         except Exception as e:
             raise RuntimeError(f"Unable to load {url}.") from e
 
-    def print_messages(self, res: Result[T]) -> None:
-        for warn in res.warnings:
-            self.logger.warning(warn)
-        for msg in res.messages:
-            self.logger.info(msg)
-
-    def get_list(self) -> Result[ListData]:
+    async def get_list(self) -> ListData:
         """Navigates to the page and collects the list items.
 
         Returns:
-            Result: A namedtuple with fields:
-                data (ListData): (items, n_tot, query)
-                messages (list[str])
-                warnings (list[str])
+            data (ListData): (items, n_tot, query)
         """
         url = self.query.url
         city = self.query.city
@@ -110,154 +106,149 @@ class PageContext:
         nmax = self.query.nmax
         tz = self.query.tz
 
-        self.navigate_to_page(self.page, url)
-        self.logger.info(f"Page loaded: {url} (tz: {tz or 'local'})")
+        if not self.page:
+            self.page = await self.open_page()
+
+        await self.goto_page(self.page, url)
+        self.logger.info(f"Page loaded: {self.page.url} (tz: {tz or 'local'})")
+        # await asyncio.sleep(30)
+        # return
 
         # Find the <strong>Updates regarding...</strong> element,
         # then navigate to following sibling <ul>
-        container_locator = self.page.locator(HomePageSelectors.CONTAINER)
-        title_locator = container_locator.locator(HomePageSelectors.TITLE)
+        container_locator = self.page.locator(
+            HomePageSelectors.CONTAINER
+        ).describe("Container")
+        title_locator = container_locator.locator(
+            HomePageSelectors.TITLE
+        ).describe("Page title")
         list_title_locator = container_locator.locator(
             HomePageSelectors.LIST_TITLE
+        ).describe("List title")
+        # list_locator = container_locator.locator(HomePageSelectors.LIST).first
+        list_locator = container_locator.get_by_role('list').first.describe(
+            "List"
         )
-        list_locator = container_locator.locator(
-            HomePageSelectors.LIST
-        ).locator(
-            "nth=0"
-        )  # .first
-        empty_cue_locator = container_locator.locator(
-            HomePageSelectors.EMPTY_CUE
+        # items_locator = list_locator.locator(HomePageSelectors.ITEM)
+        items_locator = list_locator.get_by_role('listitem').describe(
+            "List items"
         )
+        empty_sign_locator = container_locator.locator(
+            HomePageSelectors.EMPTY_SIGN
+        ).describe("No updates sign")
 
         # Wait for the title to be loaded
         try:
-            title_locator.wait_for(state="visible")
+            self.logger.debug(
+                f"Page title: {(await title_locator.inner_text()).strip()}"
+            )
         except TimeoutError:
             raise TimeoutError(TIMEOUT_ERR % ('title', TIMEOUT_PAGE / 1000))
-        else:
-            self.logger.debug(
-                f"Page title: {title_locator.inner_text().strip()}"
-            )
 
         # Wait for the list title to be loaded
         try:
-            list_title_locator.wait_for(state="visible")
+            self.logger.debug(
+                f"List title: {(await list_title_locator.inner_text()).strip()}"
+            )
         except TimeoutError:
             raise TimeoutError(TIMEOUT_ERR % ('list', TIMEOUT_PAGE / 1000))
-        else:
-            self.logger.debug(
-                f"List title: {list_title_locator.inner_text().strip()}"
-            )
 
         n_tot: int = 0  # total number of updates on the page
         items: list[ItemData] = []
-        messages: list[str] = []
-        warnings: list[str] = []
 
-        # Wait for the list to be loaded
+        # Wait for the list items to be loaded
         try:
-            list_locator.wait_for(state="visible", timeout=TIMEOUT_UL)
-            items_locator = list_locator.locator(HomePageSelectors.ITEM)
             # If at least one <li> is loaded
-            items_locator.locator("nth=0").wait_for(
+            await items_locator.first.wait_for(
                 state="visible", timeout=TIMEOUT_UL
             )
         except TimeoutError:
             # First, look for "There is no recent news/alerts for this town."
             try:
-                empty_cue_locator.wait_for(state="visible", timeout=TIMEOUT_UL)
-                messages.append(empty_cue_locator.inner_text().strip())
-                return Result(
-                    data=ListData(items=items, n_tot=n_tot, query=self.query),
-                    messages=messages,
-                    warnings=warnings,
+                self.logger.info(
+                    (
+                        await empty_sign_locator.inner_text(timeout=TIMEOUT_UL)
+                    ).strip()
                 )
+                return ListData(items=items, n_tot=n_tot, query=self.query)
             # Now timeout
             except TimeoutError:
-                _timeout = TIMEOUT_PAGE + TIMEOUT_UL
+                _timeout = 2 * TIMEOUT_UL
                 raise TimeoutError(TIMEOUT_ERR % ('updates', _timeout / 1000))
         else:
-            n_tot = items_locator.count()
-            self.logger.info(f"List with {n_tot} items loaded.")
+            n_tot = await items_locator.count()
+            self.logger.info(f"{n_tot} items loaded.")
 
         # Get items
         self.logger.info(
             f"Checking updates in {city} "
-            + (f"in the past {days_back} days" if self.check_date else '')
-            + f" (collecting {nmax}/{n_tot} items at most)..."
+            + (f"in the past {days_back} days " if self.check_date else '')
+            + f"(collecting {nmax}/{n_tot} items)..."
         )
         count = 0
-        _res: Result[ItemData]
-        for item_locator in items_locator.all():
+        _item_data: ItemData
+        for item_locator in await items_locator.all():
             if count >= nmax:
                 break
 
             # Parse each item
             try:
-                _res = self.parse_item(item_locator)
+                _item_data = await self.parse_item(item_locator)
             except Exception as e:
                 raise RuntimeError(
                     f"(get_list) Unable to parse item {count + 1}."
                 ) from e
-            else:
-                self.print_messages(_res)
 
             has_valid_date = False
             # If within the time range, append the item to the list
             if self.check_date:
-                _is_within_res: Result[bool]
                 try:
-                    _is_within_res = is_date_within(
-                        _res.data.date, days_back, tz=tz
+                    _is_within: bool = is_date_within(
+                        _item_data.date, days_back, tz=tz
                     )
                 except Exception as e:
                     # If errors occur, warn and collect it later
                     self.logger.warning(f"{type(e).__name__}: {e}")
                 else:
                     has_valid_date = True
-                    self.print_messages(_is_within_res)
-                    if _is_within_res.data:
-                        items.append(_res.data)
+                    if _is_within:
+                        items.append(_item_data)
                         count += 1
                     else:
                         break
-            elif _res.data.date.strip():
+            elif _item_data.date.strip():
                 has_valid_date = True
 
             # If no valid date found, still append
             if not has_valid_date:
                 self.logger.warning("Date unknown. Still collecting...")
-                items.append(_res.data)
+                items.append(_item_data)
                 count += 1
 
             # If not checking the dates, append
             elif not self.check_date:
-                items.append(_res.data)
+                items.append(_item_data)
                 count += 1
 
             # Pause for a random interval
-            sleep(random.uniform(1, 3))
+            await asyncio.sleep(random.uniform(1, 3))
 
-        return Result(
-            data=ListData(items=items, n_tot=n_tot, query=self.query),
-            messages=[f"{len(items)} updates collected."],
-            warnings=[],
-        )
+        self.logger.info(f"✓ Collected {len(items)} updates from: {city}")
+        return ListData(items=items, n_tot=n_tot, query=self.query)
 
-    def parse_item(self, item_locator: Locator) -> Result[ItemData]:
+    async def parse_item(self, item_locator: Locator) -> ItemData:
         """Parses the page (and detail page) and retrieves the content this item.
 
         Returns:
-            Result: A namedtuple with fields:
-                data (ItemData): (title, url, date, content, digest)
-                messages (list[str])
-                warnings (list[str])
+            data (ItemData): (title, url, date, content, digest)
         """
         # Get title and link of the item from the current page
         try:
-            link_locator = item_locator.get_by_role("link")
-            title = link_locator.inner_text().strip() or "No Title"
-            url = link_locator.get_attribute("href") or ''
+            link_locator = item_locator.get_by_role('link').describe(
+                "Detail link"
+            )
+            title = (await link_locator.inner_text()).strip()
+            url = (await link_locator.get_attribute('href')) or ''
         except Exception as e:
             raise RuntimeError(
                 "(parse_item) Unable to get the item link."
@@ -265,28 +256,20 @@ class PageContext:
 
         # Get post date by searching for '(Posted {date})'
         date_pattern = r"\(\s*[Pp]osted\s+([^\)]*)\s*\)"
-        match = re.search(date_pattern, item_locator.inner_text())
+        match = re.search(date_pattern, await item_locator.inner_text())
         date = '' if match is None else match.group(1).strip()
 
         # Get title, date, and content from the detail page in a new tab
-        messages: list[str] = []
-        warnings: list[str] = []
         detail_data: ItemData
         try:
-            detail_data = self.get_details(url)
+            detail_data = await self.get_details(url)
         except Exception as e:
             # If failed, set the content to empty and go on
-            warnings.append(
+            self.logger.warning(
                 f"Problems encountered when getting details:\n{e}\n"
                 "Empty content will be returned."
             )
-            return Result(
-                data=ItemData(title=title, url=url, date=date),
-                messages=messages,
-                warnings=warnings,
-            )
-        else:
-            messages.append(f"Detail page parsed in a new tab: {url}")
+            return ItemData(title=title, url=url, date=date)
 
         # Update title and date
         if detail_data.title and detail_data.title != title:
@@ -294,15 +277,11 @@ class PageContext:
         if detail_data.date and detail_data.date != date:
             date = detail_data.date
 
-        return Result(
-            data=ItemData(
-                title=title, url=url, date=date, content=detail_data.content
-            ),
-            messages=messages,
-            warnings=warnings,
+        return ItemData(
+            title=title, url=url, date=date, content=detail_data.content
         )
 
-    def get_details(self, url: str) -> ItemData:
+    async def get_details(self, url: str) -> ItemData:
         """Retrieves content on detail page.
 
         Returns:
@@ -316,37 +295,71 @@ class PageContext:
         if not url.strip():
             raise ValueError("(get_details) No link to the detail page.")
 
-        # Get the current context to create a new page (tab)
-        context = self.page.context
         # Create a new page (tab)
-        new_page = context.new_page()
+        new_page = await self.open_page()
 
         try:
-            self.navigate_to_page(new_page, url)
-        except Exception:  # handle in upper level
+            await self.goto_page(new_page, url)
+            self.logger.debug(f"Detail page loaded in new tab: {new_page.url}")
+            title_locator = new_page.locator(
+                DetailPageSelectors.TITLE
+            ).describe("Detail title")
+            title = (await title_locator.inner_text()).strip()
+            date_locator = (
+                new_page.locator(DetailPageSelectors.DATE_PARENT)
+                .get_by_role('time')
+                .describe("Detail date")
+            )
+            date = (await date_locator.inner_text()).strip()
+            content_locator = new_page.locator(
+                DetailPageSelectors.CONTENT
+            ).describe("Detail content")
+            content = clear_content(await content_locator.inner_html())
+        except Exception:  # propagate to upper level
             raise
-        else:
-            title_locator = new_page.locator(DetailPageSelectors.TITLE)
-            title = title_locator.inner_text().strip()
-            date_locator = new_page.locator(DetailPageSelectors.DATE)
-            date = date_locator.inner_text().strip()
-            content_locator = new_page.locator(DetailPageSelectors.CONTENT)
-            content = clear_content(content_locator.inner_html())
         finally:
-            new_page.close()
+            if new_page:
+                await new_page.close()
 
         return ItemData(title=title, url=url, date=date, content=content)
 
 
-def run(
-    query: QueryParams,
+async def close_everything(
+    browser: Browser,
+    context: BrowserContext,
+    logger: Logger | MyLogger = getLogger(),
+) -> None:
+    """Gracefully closes everything."""
+    if context:
+        try:
+            await asyncio.wait_for(context.close(), timeout=2)
+        except asyncio.TimeoutError:
+            logger.debug("Context closing timeout.")
+        except Exception:
+            pass
+    if browser:
+        try:
+            await asyncio.wait_for(browser.close(), timeout=2)
+        except asyncio.TimeoutError:
+            logger.debug("Browser closing timeout.")
+        except Exception:
+            pass
+    logger.info(BROWSER_CLOSED_MSG)
+
+
+async def run(
+    queries: list[QueryParams],
     config: Config,
     logger: Logger | MyLogger = getLogger(),
     check_date: bool = True,
-) -> ListData | None:
+) -> list[ListData] | None:
     """Main function to run the application."""
-    with sync_playwright() as p:
-        browser = get_browser(p, config, logger)
+    data_all: list[ListData] = []
+    browser: Browser | None = None
+
+    # Let playwright close browser automatically
+    async with async_playwright() as p:
+        browser = await get_browser(p, config, logger)
         if browser is None:
             logger.error(
                 f"{config.browser_name} not launched: unknown error occurred."
@@ -354,40 +367,52 @@ def run(
             raise RuntimeError
 
         try:
-            with PageContext(
-                browser, query, config, check_date, logger
-            ) as context:
-                if config.test:
-                    logger.info(TEST_MSG)
-                    return None
+            context = await browser.new_context()  # incognito
+            context.set_default_timeout(TIMEOUT_PAGE)
 
-                # Go to the landing page and get data -----------------|
-                _res = context.get_list()
-                list_data = _res.data
-                context.print_messages(_res)
+            _list_data: ListData
+            for i, query in enumerate(queries):
+                async with PageManager(
+                    browser, context, query, config, check_date, logger
+                ) as pm:
 
-                if isinstance(config, RunConfig):
-                    # Print to STDOUT if selecting '--print' ----------|
-                    if config.to_stdout:
-                        print_content(list_data.items, list_data.n_tot, query)
-                    # Export to a file if not selecting '--no-o' ------|
-                    if config.export:
-                        if len(list_data.items) > 0:
-                            content = construct_content(
-                                list_data.items, list_data.n_tot, query
+                    if config.test:
+                        logger.info(TEST_MSG)
+                        return None
+
+                    # Go to the landing page and get data -------------|
+                    _list_data = await pm.get_list()
+                    data_all.append(_list_data)
+
+                    if isinstance(config, RunConfig):
+                        # Print to STDOUT if selecting '--print' ------|
+                        if config.to_stdout:
+                            print_content(
+                                _list_data.items, _list_data.n_tot, query
                             )
-                            config.output_path.parent.mkdir(
-                                parents=True, exist_ok=True
-                            )
-                            with open(config.output_path, "w") as f:
-                                f.write(content)
-                            logger.info(
-                                f"Exported to '{str(config.output_path)}'"
-                            )
+
+                        # Export to a file if not selecting '--no-o' --|
+                        if config.export:
+                            if len(_list_data.items) > 0:
+                                content = construct_content(
+                                    _list_data.items, _list_data.n_tot, query
+                                )
+                                outpath = config.output_path
+                                outpath.parent.mkdir(
+                                    parents=True, exist_ok=True
+                                )
+                                if len(queries) > 1:
+                                    outpath = (
+                                        outpath.parent
+                                        / f"{outpath.stem}_{i}{outpath.suffix}"
+                                    )
+                                with open(outpath, "w") as f:
+                                    f.write(content)
+                                logger.info(f"Exported to '{str(outpath)}'")
+                            else:
+                                logger.info(NO_UPDATES_MSG)
                         else:
-                            logger.info(NO_UPDATES_MSG)
-                    else:
-                        logger.info(NO_EXPORT_MSG)
+                            logger.info(NO_EXPORT_MSG)
 
         except TimeoutError as e:
             print_error(e, logger, max_level=2)
@@ -408,4 +433,8 @@ def run(
 
         else:
             logger.info("Done!")
-            return list_data
+            return data_all
+
+        # Cleanup
+        finally:
+            await close_everything(browser, context, logger)

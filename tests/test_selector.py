@@ -40,23 +40,25 @@ def test_selectors_home(page: Page):
     # print("List title on landing page: " + title.inner_text())
 
     # list = container.locator(HomePageSelectors.LIST).first
-    list = container.locator(HomePageSelectors.LIST).locator('nth=0')
+    # list = container.locator(HomePageSelectors.LIST).locator('nth=0')
+    list = container.get_by_role('list').first
     expect(list, "List not found on landing page").to_be_visible(
         timeout=TIMEOUT
     )
 
-    items = list.locator(HomePageSelectors.ITEM)
+    # items = list.locator(HomePageSelectors.ITEM)
+    items = list.get_by_role('listitem')
     expect(items.first, "Item not found on landing page").to_be_visible(
         timeout=TIMEOUT
     )
     assert items.count() == 2
     # print(f"{items.count()} items on landing page:")
     for item in items.all():
-        assert "https://" in item.get_by_role("link").get_attribute("href")
+        assert "https://" in item.get_by_role('link').get_attribute('href')
     #     print(item.get_by_role("link").inner_text())
     #     print(item.get_by_role("link").get_attribute("href"))
 
-    text = container.locator(HomePageSelectors.EMPTY_CUE)
+    text = container.locator(HomePageSelectors.EMPTY_SIGN)
     expect(text, "Text not found on landing page").to_be_visible(
         timeout=TIMEOUT
     )
@@ -77,7 +79,8 @@ def test_selectors_detail(page: Page):
     assert title.inner_text() == "Detail title"
     # print("\nTitle on detail page: " + title.inner_text())
 
-    date = page.locator(DetailPageSelectors.DATE)
+    # date = page.locator(DetailPageSelectors.DATE)
+    date = page.locator(DetailPageSelectors.DATE_PARENT).get_by_role('time')
     expect(date, "Date not found on detail page").to_be_visible(
         timeout=TIMEOUT
     )

@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 # browsers.py
 """Installs and launches browsers."""
+import asyncio
 from logging import Logger, getLogger
 import os
-from playwright.sync_api import Playwright, Browser
+# from playwright.sync_api import Playwright, Browser
+from playwright.async_api import Playwright, Browser
 import subprocess
 import sys
 
@@ -11,7 +13,7 @@ from clinictracker.config import Config
 from clinictracker.startup import MyLogger
 
 
-def get_browser(
+async def get_browser(
     p: Playwright,
     config: Config,
     logger: Logger | MyLogger = getLogger(),
@@ -38,8 +40,8 @@ def get_browser(
     browser: Browser | None = None
     # Launch
     try:
-        browser = getattr(p, config.browser_name).launch(**kwargs)
-        # browser = p.chromium.launch(**kwargs)
+        browser = await getattr(p, config.browser_name).launch(**kwargs)
+        # browser = await p.chromium.launch(**kwargs)
 
     # If browser not found, install
     except Exception:
@@ -65,7 +67,10 @@ def get_browser(
             f"Installing system dependencies for {config.browser_name}..."
         )
         try:
-            subprocess.run(deps_cmd, text=True, check=True, env=env)
+            # subprocess.run(deps_cmd, text=True, check=True, env=env)
+            await asyncio.to_thread(
+                subprocess.run, deps_cmd, text=True, check=True, env=env
+            )
         except subprocess.CalledProcessError as e:
             logger.error(
                 f"Unable to install dependencies for {config.browser_name}:"
@@ -81,7 +86,10 @@ def get_browser(
         # Install browser
         logger.info(f"Installing {config.browser_name}...")
         try:
-            subprocess.run(cmd, text=True, check=True, env=env)
+            # subprocess.run(cmd, text=True, check=True, env=env)
+            await asyncio.to_thread(
+                subprocess.run, cmd, text=True, check=True, env=env
+            )
         except subprocess.CalledProcessError as e:
             logger.error(f"Error installing '{config.browser_name}': {e}")
             raise RuntimeError
@@ -90,7 +98,7 @@ def get_browser(
 
         # Launch
         try:
-            browser = getattr(p, config.browser_name).launch(**kwargs)
+            browser = await getattr(p, config.browser_name).launch(**kwargs)
         except Exception as e:
             logger.error(
                 f"{config.browser_name} not launched:\n"

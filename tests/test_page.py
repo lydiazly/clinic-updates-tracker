@@ -2,19 +2,21 @@
 # tests/test_page.py
 import logging
 import platform
+import pytest
 
 from clinictracker.models import ListData
 from clinictracker.config import RunConfig, TARGET_BASE_URL, OUTPUT_HTML_PATH
 from clinictracker.startup import QueryParams, get_full_url
-from clinictracker.core import run, CLOSED_MSG
+from clinictracker.core import run, BROWSER_CLOSED_MSG
 from clinictracker.selectors import (
     LIST_TITLE_PREFIX,
     TITLE_PREFIX,
-    EMPTY_CUE_PREFIX,
+    EMPTY_SIGN_PREFIX,
 )
 
 
-def test_page(caplog):
+@pytest.mark.asyncio
+async def test_page(caplog):
     """Tests loading result page (chromium new headless mode)."""
     city = 'Dummy'
     headless_shell = platform.system() == 'Linux'
@@ -39,15 +41,16 @@ def test_page(caplog):
     )
 
     with caplog.at_level(logging.DEBUG):
-        res = run(query, config)
+        res_all = await run([query], config)
         # Assert returns ListData
-        assert isinstance(res, ListData)
+        for res in res_all:
+            assert isinstance(res, ListData)
         # Check the log records more specifically
-        assert len(caplog.records) >= 5
-        assert "Using selector" in caplog.records[0].message
-        assert "Options: {'headless':" in caplog.records[1].message
-        assert full_url in caplog.records[2].message
-        assert f"{TITLE_PREFIX} {city}" in caplog.records[3].message
-        assert f"{LIST_TITLE_PREFIX} {city}" in caplog.records[4].message
-        assert EMPTY_CUE_PREFIX in caplog.records[5].message
-        assert caplog.records[-1].message == CLOSED_MSG
+        assert len(caplog.records) >= 6
+        # assert "Using selector" in caplog.records[0].message
+        assert "Options: {'headless':" in caplog.records[0].message
+        assert full_url in caplog.records[1].message
+        assert f"{TITLE_PREFIX} {city}" in caplog.records[2].message
+        assert f"{LIST_TITLE_PREFIX} {city}" in caplog.records[3].message
+        assert EMPTY_SIGN_PREFIX in caplog.records[4].message
+        assert caplog.records[-1].message == BROWSER_CLOSED_MSG

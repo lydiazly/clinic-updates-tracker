@@ -20,7 +20,7 @@ from clinictracker.user.helpers import (
 
 load_dotenv()
 
-DEBUG_MODE = os.getenv("DEBUG_MODE", "false").strip().lower() == "true"
+DEBUG_MODE = os.getenv('DEBUG_MODE', 'false').strip().lower() == 'true'
 
 PG_PASSWORD_PATH = Path(os.getenv('PG_PASSWORD_PATH', '.pg_password').strip())
 
@@ -90,6 +90,8 @@ class ServiceConfig(Config):
         save_users (bool): Save/Overwrite all user data to the JSON file
         crud_only (bool): Exit after CRUD operations on users
         send (bool): Send fetched data to users
+        force_send (bool): Force sending
+        usernames (list[str]): Only send to these users
         dryrun (bool): Dry run for data management then exit
     """
 
@@ -104,12 +106,15 @@ class ServiceConfig(Config):
     save_users: bool
     crud_only: bool
     send: bool
+    force_send: bool
+    usernames: list[str] | None
     dryrun: bool
 
 
 def load_config_for_service(args: Namespace) -> ServiceConfig:
     """Loads configuration from args and environment for user service."""
     command_request: CommandRequest | None = None
+    usernames: list[str] | None = None
     if args.command is not None:
         command_name = CommandName(args.command)
         match command_name:
@@ -151,6 +156,10 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
                 )
             case _:
                 command_request = CommandRequest(name=command_name, data=None)
+    else:
+        if args.usernames is not None:
+            usernames = [trim_str(u).lower() for u in args.usernames]
+
     return ServiceConfig(
         debug=args.debug or DEBUG_MODE,
         test=args.test,
@@ -167,6 +176,8 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
         delete_users=args.delete if args.load and args.file else False,
         save_users=args.save,
         crud_only=args.crud_only,
-        send=args.send,
+        send=args.command is None and args.send,
+        force_send=args.command is None and args.force_send,
+        usernames=usernames,
         dryrun=args.dry_run,
     )

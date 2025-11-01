@@ -10,7 +10,7 @@ from pathlib import Path
 
 load_dotenv()
 
-DEBUG_MODE = os.getenv("DEBUG_MODE", "false").strip().lower() == "true"
+DEBUG_MODE = os.getenv('DEBUG_MODE', 'false').strip().lower() == 'true'
 
 # Timeout in milliseconds
 TIMEOUT_PAGE = int(os.getenv('TIMEOUT_PAGE', 30000))  # for loading page

@@ -3,7 +3,7 @@
 """Data models and structures."""
 from dataclasses import dataclass, field
 import hashlib
-from typing import TypeVar, Generic, NamedTuple
+from typing import TypeVar, NamedTuple
 
 from clinictracker.startup import QueryParams
 
@@ -11,18 +11,18 @@ from clinictracker.startup import QueryParams
 T = TypeVar('T')
 
 
-class Result(NamedTuple, Generic[T]):
-    """For passing result data and messages.
+# class Result(NamedTuple, Generic[T]):
+#     """For passing result data and messages.
 
-    Attributes:
-        data (T): Any data
-        messages (list[str]): Each message will be printed by logger.info()
-        warnings (list[str]): Each warning will be printed by logger.warning()
-    """
+#     Attributes:
+#         data (T): Any data
+#         messages (list[str]): Each message will be printed by logger.info()
+#         warnings (list[str]): Each warning will be printed by logger.warning()
+#     """
 
-    data: T
-    messages: list[str]
-    warnings: list[str]
+#     data: T
+#     messages: list[str]
+#     warnings: list[str]
 
 
 @dataclass(frozen=True)

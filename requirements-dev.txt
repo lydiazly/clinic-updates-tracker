@@ -1,8 +1,10 @@
 beautifulsoup4>=4.14.2
 pytest-playwright>=0.7.1
+pytest-asyncio
 python-dateutil
 python-dotenv
 psycopg2-binary>=2.9.10
 mypy
 types-psycopg2
 types-python-dateutil
+types-requests

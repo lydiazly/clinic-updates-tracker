@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # user/db_manager.py
 """PostSQL database manager."""
+import asyncio
 from dataclasses import fields
 from datetime import datetime
 from getpass import getpass
@@ -95,9 +96,13 @@ class UserServiceDB:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> Literal[False]:
-        if exc_type is not None:
+        if exc_type is not None and exc_type is not asyncio.CancelledError:
             self.logger.error("Error during operations.")
-        self.close()
+        try:
+            self.close()
+        except Exception as e:
+            self.logger.error(f"Error during disconnection: {e}")
+            raise
         return False
 
     def _ensure_connected(
@@ -557,7 +562,7 @@ class UserServiceDB:
                 f"Unable to insert sent hashes for: {user.username}"
             ) from e
         else:
-            self.logger.info(f"Recorded {cur.rowcount} items")
+            self.logger.info(f"Recorded {cur.rowcount} new items.")
 
     def update_last_sent_at(
         self, user: User, sent_at: datetime | None = None

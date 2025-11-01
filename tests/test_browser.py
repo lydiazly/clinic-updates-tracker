@@ -2,13 +2,19 @@
 # tests/test_browser.py
 import logging
 import platform
+import pytest
 
 from clinictracker.config import Config, TARGET_BASE_URL
 from clinictracker.startup import QueryParams, get_full_url
-from clinictracker.core import run, TEST_MSG, CLOSED_MSG
+from clinictracker.core import (
+    run,
+    TEST_MSG,
+    BROWSER_CLOSED_MSG,
+)
 
 
-def test_chromium(caplog):
+@pytest.mark.asyncio
+async def test_chromium(caplog):
     """Tests launching chromium (new headless mode)."""
     headless_shell = platform.system() == 'Linux'
     config = Config(
@@ -29,10 +35,10 @@ def test_chromium(caplog):
     )
 
     with caplog.at_level(logging.INFO):
-        res = run(query, config)
+        res = await run(query, config)
         # Assert returns None
         assert res is None
         # Check the log records more specifically
-        assert len(caplog.records) == 2
-        assert caplog.records[0].message == TEST_MSG
-        assert caplog.records[-1].message == CLOSED_MSG
+        assert len(caplog.records) >= 2
+        assert caplog.records[-2].message == TEST_MSG
+        assert caplog.records[-1].message == BROWSER_CLOSED_MSG
