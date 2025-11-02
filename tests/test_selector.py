@@ -3,10 +3,7 @@
 # pytest tests/test_selector.py --browser-channel chromium -s
 import os
 from playwright.sync_api import Page, expect
-from clinictracker.selectors import (
-    HomePageSelectors,
-    DetailPageSelectors,
-)
+from clinictracker.selectors import HomePageSelectors, DetailPageSelectors
 from clinictracker.utils import clear_content, html_to_plain
 
 

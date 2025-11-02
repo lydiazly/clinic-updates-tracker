@@ -4,7 +4,7 @@
 from argparse import Namespace
 from dataclasses import dataclass
 from dotenv import load_dotenv
-from enum import StrEnum  # python 3.11+
+from enum import StrEnum, auto  # python 3.11+
 import os
 from pathlib import Path
 from typing import NamedTuple
@@ -20,40 +20,57 @@ from clinictracker.user.helpers import (
 
 load_dotenv()
 
-DEBUG_MODE = os.getenv('DEBUG_MODE', 'false').strip().lower() == 'true'
+DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'false').strip().lower() == 'true'
+SEND_EMAILS: bool = os.getenv('SEND_EMAILS', 'false').strip().lower() == 'true'
 
-PG_PASSWORD_PATH = Path(os.getenv('PG_PASSWORD_PATH', '.pg_password').strip())
+PGSERVICE_PATH: Path = Path(
+    os.getenv('PGSERVICEFILE', 'config/pg_service.conf').strip()
+)
+
+PGPASSFILE: str = os.getenv('PGPASSFILE', '').strip()
+PGPASS_PATH: Path = (
+    Path(PGPASSFILE) if PGPASSFILE else (Path.home() / '.pgpass')
+)
 
 # Minimum days to look back (before filtering by hash values)
-DAYS_BACK_MIN: int = 2
+DAYS_BACK_MIN: int = int(os.getenv('DAYS_BACK_MIN', 2))  # default: 2 days
 # Minimum items to collect in full list (before filtering for each user)
-# MAX_ITEMS_MIN: int = 10
-MAX_ITEMS_MIN: int = 3  # TEST
+MAX_ITEMS_MIN: int = int(os.getenv('MAX_ITEMS_MIN', 10))  # default: 10 items
 # Extra days to keep records beyond the maximum period among users
-# CLEANUP_BUFFER_DAYS: int = 7
-CLEANUP_BUFFER_DAYS: int = 1  # TEST
+CLEANUP_BUFFER_DAYS: int = int(os.getenv('CLEANUP_BUFFER_DAYS', 7))
 
 # Source file containing a list of user data
 USERS_JSON_PATH: Path = Path(
     os.getenv('USERS_JSON_PATH', 'data/users.json').strip()
 )
 
+
+
+class ServiceName(StrEnum):
+    DEV = auto()
+    PROD = auto()
+
+
+class TableName(StrEnum):
+    SENT = 'sent_items'
+    USERS = auto()
+
 # Tables in database
-TABLE_NAMES = ['sent_items', 'users']
+TABLE_NAMES: list[str] = [name for name in TableName]
 
 
 class CommandName(StrEnum):
     """User data operation commands: LIST, ADD, UPD, DEL, RESET, CLEAR"""
 
-    LIST = 'list'
-    ADD = 'add'
+    LIST = auto()
+    ADD = auto()
     UPD = 'update'
     DEL = 'delete'
-    RESET = 'reset'
-    CLEAR = 'clear'
+    RESET = auto()
+    CLEAR = auto()
 
 
-CommandDataType = list[User] | list[UserDict] | list[str] | None
+CommandDataType = list[User] | list[UserDict] | list[str] | list[TableName] | None
 
 
 class CommandRequest(NamedTuple):
@@ -114,7 +131,17 @@ class ServiceConfig(Config):
 def load_config_for_service(args: Namespace) -> ServiceConfig:
     """Loads configuration from args and environment for user service."""
     command_request: CommandRequest | None = None
-    usernames: list[str] | None = None
+    _usernames: list[str] | None = None
+    _tables: list[TableName] = [name for name in TableName]
+    if args.usernames is not None:
+        _usernames = list(
+            dict.fromkeys([trim_str(u).lower() for u in args.usernames])
+        )  # no duplicates
+    if hasattr(args, 'tables') and args.tables is not None:
+        _tables = list(
+            dict.fromkeys([TableName(trim_str(t).lower()) for t in args.tables])
+        )  # no duplicates
+
     if args.command is not None:
         command_name = CommandName(args.command)
         match command_name:
@@ -131,34 +158,15 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
             case CommandName.LIST | CommandName.DEL:
                 command_request = CommandRequest(
                     name=command_name,
-                    data=(
-                        list(
-                            dict.fromkeys(
-                                [trim_str(u).lower() for u in args.usernames]
-                            )
-                        )
-                        if args.usernames is not None
-                        else None
-                    ),  # list[str] | None
+                    data=_usernames,  # list[str] | None
                 )
             case CommandName.CLEAR:
                 command_request = CommandRequest(
                     name=command_name,
-                    data=(
-                        list(
-                            dict.fromkeys(
-                                [trim_str(t).lower() for t in args.tables]
-                            )
-                        )
-                        if args.tables is not None
-                        else TABLE_NAMES
-                    ),  # list[str]
+                    data=_tables,  # list[TableName]
                 )
             case _:
                 command_request = CommandRequest(name=command_name, data=None)
-    else:
-        if args.usernames is not None:
-            usernames = [trim_str(u).lower() for u in args.usernames]
 
     return ServiceConfig(
         debug=args.debug or DEBUG_MODE,
@@ -176,8 +184,8 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
         delete_users=args.delete if args.load and args.file else False,
         save_users=args.save,
         crud_only=args.crud_only,
-        send=args.command is None and args.send,
+        send=args.command is None and (args.send or SEND_EMAILS),
         force_send=args.command is None and args.force_send,
-        usernames=usernames,
+        usernames=_usernames,
         dryrun=args.dry_run,
     )

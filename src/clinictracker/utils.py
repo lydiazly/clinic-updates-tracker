@@ -183,7 +183,7 @@ def is_date_within(
         ref_datetime = datetime.now().astimezone()  # timezone-aware
 
     # date_fmt = '%B %d, %Y'
-    # datet_utc_fmt = '%Y-%m-%d (UTC)'
+    # date_utc_fmt = '%Y-%m-%d (UTC)'
     datetime_fmt = '%Y-%m-%d %H:%M:%S'
     datetime_utc_fmt = '%Y-%m-%dT%H:%M:%SZ'
 

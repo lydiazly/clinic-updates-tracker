@@ -14,7 +14,6 @@ from playwright.async_api import (
 import random
 import re
 
-# from time import sleep
 import traceback
 from types import TracebackType
 from typing import Self, Literal

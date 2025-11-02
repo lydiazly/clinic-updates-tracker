@@ -7,45 +7,32 @@ from clinictracker.config import TARGET_BASE_URL
 from clinictracker.startup import get_full_url
 
 
+BASE_URL = "https://base_url"
+
+
 @pytest.mark.parametrize(
-    "full_url, full_url_expected",
+    "sub, sub_url_expected",
     [
-        [
-            get_full_url("https://base_url", '?', {'arg1': 'val1'}),
-            "https://base_url?arg1=val1",
-        ],
-        [
-            get_full_url(
-                "https://base_url", '?', {'arg1': 'val1', 'arg2': 'val2'}
-            ),
-            "https://base_url?arg1=val1&arg2=val2",
-        ],
-        [
-            get_full_url("https://base_url", '/', "sub_path"),
-            "https://base_url/sub_path",
-        ],
-        [
-            get_full_url("https://base_url", '?', "sub_path"),
-            "https://base_url/sub_path",
-        ],
+        ({'arg1': 'val1'}, "?arg1=val1"),
+        ({'arg1': 'val1', 'arg2': 'val2'}, "?arg1=val1&arg2=val2"),
+        ("sub_path", "/sub_path"),
+        ("sub_path", "/sub_path"),
     ],
 )
-def test_get_full_url(full_url, full_url_expected):
+def test_get_full_url(sub, sub_url_expected):
     """Tests startup.get_full_url()."""
-    assert full_url == full_url_expected
+    assert get_full_url(BASE_URL, sub) == BASE_URL + sub_url_expected
 
 
 @pytest.mark.parametrize(
-    "url, text_expected",
-    [
-        [
-            get_full_url(TARGET_BASE_URL, '?', {'list_town': 'some_city'}),
-            "Updates regarding some_city",
-        ],
-    ],
+    "query, text_expected",
+    [({'list_town': 'Dummy'}, "Updates regarding %s")],
 )
-def test_url(page: Page, url, text_expected):
+def test_url(page: Page, query, text_expected):
     """Tests TARGET_BASE_URL."""
-    page.goto(url)
+    city: str = query.get('list_town', '')
+    page.goto(get_full_url(TARGET_BASE_URL, query))
     # Expects an element to match the text
-    expect(page.locator(f'strong:has-text("{text_expected}")')).to_be_visible()
+    expect(
+        page.locator(f'strong:has-text("{text_expected % city}")')
+    ).to_be_visible()

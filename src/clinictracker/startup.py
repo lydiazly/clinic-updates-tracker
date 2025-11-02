@@ -53,7 +53,7 @@ def load_query(args: Namespace) -> QueryParams:
     query_dict = ({'only_accepting': 'yes'} if not args.all else {}) | {
         'list_town': args.city
     }
-    full_url = get_full_url(trim_str(args.url), '?', query_dict)
+    full_url = get_full_url(trim_str(args.url), query_dict)
     query = QueryParams(
         url=full_url,
         city=trim_str(args.city),
@@ -335,16 +335,15 @@ def validate_args(args: Namespace) -> None:
         raise ValueError("Value of -n/--nmax must be positive.")
 
 
-def get_full_url(
-    base_url: str, delim: str = '?', sub: dict[str, str] | str = {}
-) -> str:
+def get_full_url(base_url: str, sub: dict[str, str] | str = {}) -> str:
     """Appends `sub` (a query dict or a subdirectory string) to the base URL:
     `{base_url}?arg1=val1&...` or `{base_url}/...`"""
+    full_url: str = base_url.strip().lower()
     # Query
-    if delim == '?' and isinstance(sub, dict):
-        full_url = f"{base_url}?{urlencode(sub)}"
+    if isinstance(sub, dict):
+        full_url = f"{full_url}?{urlencode(sub)}"
         # will encode special characters as well
     # Subdirectory
-    else:
-        full_url = f"{base_url.rstrip('/')}/{str(sub)}"
+    elif isinstance(sub, str):
+        full_url = f"{full_url.rstrip('/')}/{sub.strip()}"
     return full_url

@@ -210,7 +210,8 @@ class EmailService:
                 )
             else:
                 raise RuntimeError(
-                    f"✗ Failed to send email:\n{json.dumps(response_json, indent=2)}"
+                    "✗ Failed to send email:\n"
+                    + json.dumps(response_json, indent=2)
                 )
 
         except Exception as e:

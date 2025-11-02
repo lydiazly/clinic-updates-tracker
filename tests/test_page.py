@@ -31,7 +31,7 @@ async def test_page(caplog):
         to_stdout=False,
     )
     query_dict = {'only_accepting': 'yes', 'list_town': city}
-    full_url = get_full_url(TARGET_BASE_URL, '?', query_dict)
+    full_url = get_full_url(TARGET_BASE_URL, query_dict)
     query = QueryParams(
         url=full_url,
         city=city,
@@ -47,7 +47,6 @@ async def test_page(caplog):
             assert isinstance(res, ListData)
         # Check the log records more specifically
         assert len(caplog.records) >= 6
-        # assert "Using selector" in caplog.records[0].message
         assert "Options: {'headless':" in caplog.records[0].message
         assert full_url in caplog.records[1].message
         assert f"{TITLE_PREFIX} {city}" in caplog.records[2].message

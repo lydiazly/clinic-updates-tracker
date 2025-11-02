@@ -4,28 +4,24 @@
 import asyncio
 from dataclasses import fields
 from datetime import datetime
-from getpass import getpass
 from logging import Logger, getLogger
-from pathlib import Path
+import os
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 from textwrap import dedent
 from types import TracebackType
-from typing import TypedDict, Self, Literal, cast
+from typing import Self, Literal, cast
 
 from clinictracker.user.models import User, UserDict, ALLOWED_COLS
-from clinictracker.user.config import PG_PASSWORD_PATH
+from clinictracker.user.config import (
+    PGSERVICE_PATH,
+    PGPASS_PATH,
+    ServiceName,
+    TableName,
+)
 from clinictracker.startup import MyLogger
 from clinictracker.user.helpers import get_valid_user, validate_user_field
-
-
-class ConnParams(TypedDict):
-    host: str
-    port: int
-    database: str
-    user: str
-    password: str
 
 
 class UserServiceDB:
@@ -50,43 +46,18 @@ class UserServiceDB:
 
     def __init__(
         self,
-        host: str = 'localhost',
-        port: int = 5432,
-        database: str = 'userservice',
-        user: str = 'admin',
-        password: str | None = None,
-        pg_password_path: Path = PG_PASSWORD_PATH,
+        service_name: ServiceName = ServiceName.DEV,
         dryrun: bool = False,
         logger: Logger | MyLogger = getLogger(),
     ) -> None:
-        self.conn: psycopg2.extensions.connection | None = None
-        self.cur: psycopg2.extensions.cursor | None = None
+        self.service_name: ServiceName = service_name
         self.dryrun: bool = dryrun
         self.logger: Logger | MyLogger = logger
-        # Initialize
-        if password is None:
-            logger.debug(
-                f"Loading password from {PG_PASSWORD_PATH}... "
-                "(set $PG_PASSWORD_PATH to load from another file)"
-            )
-            try:
-                password = pg_password_path.read_text().strip()
-            except Exception as e:
-                logger.debug(f"Unable to load password: {e}")
-                password = getpass("Enter your PostgreSQL password: ").strip()
-                logger.debug(f"Got password with {len(password)} characters.")
-            else:
-                logger.debug("Password loaded.")
-
-        self.conn_params: ConnParams = {
-            'host': host,
-            'port': port,
-            'database': database,
-            'user': user,
-            'password': password,
-        }
+        self.conn: psycopg2.extensions.connection | None = None
+        self.cur: psycopg2.extensions.cursor | None = None
 
     def __enter__(self) -> Self:
+        self._check_service_and_password_file()
         self.connect()
         return self
 
@@ -112,10 +83,33 @@ class UserServiceDB:
             raise RuntimeError("Not connected. Call connect() first.")
         return self.conn, self.cur
 
+    def _check_service_and_password_file(self) -> None:
+        """Sets environment variables `PGSERVICEFILE` and `PGPASSFILE`."""
+        if not PGSERVICE_PATH.is_file():
+            raise RuntimeError(
+                f"Service file not found: {str(PGSERVICE_PATH)}. "
+                "Set $PGSERVICEFILE to the service file path."
+            )
+        if not PGPASS_PATH.is_file():
+            raise RuntimeError(
+                f"Password file not found: {str(PGPASS_PATH)}. "
+                "Set $PGPASSFILE to the password file path."
+            )
+        # Tell libpq where to find the service and password file
+        os.environ['PGSERVICEFILE'] = str(PGSERVICE_PATH.resolve())
+        os.environ['PGPASSFILE'] = str(PGPASS_PATH.resolve())
+        # Check file permissions (should be 0600)
+        if (_perm := oct(PGPASS_PATH.stat().st_mode)[-3:]) != '600':
+            raise RuntimeError(
+                f"File '{str(PGPASS_PATH)}' has incorrect permissions: {_perm}"
+                " (should be 0600)"
+            )
+
     def connect(self) -> None:
         """Establishes database connection."""
         try:
-            self.conn = psycopg2.connect(**self.conn_params)
+            # libpq will automatically read $PGSERVICEFILE and $PGPASSFILE
+            self.conn = psycopg2.connect(service=self.service_name)
             self.cur = self.conn.cursor()
         except Exception as e:
             raise RuntimeError("Error connecting to database.") from e
@@ -152,13 +146,13 @@ class UserServiceDB:
         conn, cur = self._ensure_connected()
 
         try:
-            cur.execute(self.CHECK_TABLE_QUERY, ('users',))
+            cur.execute(self.CHECK_TABLE_QUERY, (TableName.USERS,))
         except Exception as e:
-            raise RuntimeError(self.TABLE_CHECK_ERR % 'users') from e
+            raise RuntimeError(self.TABLE_CHECK_ERR % TableName.USERS) from e
 
         row = cur.fetchone()
         if row and row[0]:
-            self.logger.info(self.TABLE_EXIST_MSG % 'users')
+            self.logger.info(self.TABLE_EXIST_MSG % TableName.USERS)
             return True
 
         query = dedent(
@@ -199,9 +193,9 @@ class UserServiceDB:
                 conn.rollback()
         except Exception as e:
             conn.rollback()
-            raise RuntimeError(self.TABLE_CREATE_ERR % 'users') from e
+            raise RuntimeError(self.TABLE_CREATE_ERR % TableName.USERS) from e
         else:
-            self.logger.info(self.TABLE_CREATE_MSG % 'users')
+            self.logger.info(self.TABLE_CREATE_MSG % TableName.USERS)
             return not self.dryrun
 
     def create_sent_items_table(self) -> bool:
@@ -214,13 +208,13 @@ class UserServiceDB:
         conn, cur = self._ensure_connected()
 
         try:
-            cur.execute(self.CHECK_TABLE_QUERY, ('sent_items',))
+            cur.execute(self.CHECK_TABLE_QUERY, (TableName.SENT,))
         except Exception as e:
-            raise RuntimeError(self.TABLE_CHECK_ERR % 'sent_items') from e
+            raise RuntimeError(self.TABLE_CHECK_ERR % TableName.SENT) from e
 
         row = cur.fetchone()
         if row and row[0]:
-            self.logger.info(self.TABLE_EXIST_MSG % 'sent_items')
+            self.logger.info(self.TABLE_EXIST_MSG % TableName.SENT)
             return True
 
         query = dedent(
@@ -244,9 +238,9 @@ class UserServiceDB:
                 conn.rollback()
         except Exception as e:
             conn.rollback()
-            raise RuntimeError(self.TABLE_CREATE_ERR % 'sent_items') from e
+            raise RuntimeError(self.TABLE_CREATE_ERR % TableName.SENT) from e
         else:
-            self.logger.info(self.TABLE_CREATE_MSG % 'sent_items')
+            self.logger.info(self.TABLE_CREATE_MSG % TableName.SENT)
             return not self.dryrun
 
     def insert_users(self, users: list[User], update: bool = False) -> None:
@@ -588,7 +582,7 @@ class UserServiceDB:
         else:
             self.logger.info(f"Updated last_sent_at for: {user.username}")
 
-    def get_row_count(self, tb: str) -> int:
+    def get_row_count(self, tb: TableName) -> int:
         """Get the row count of a table."""
         conn, cur = self._ensure_connected()
 
@@ -628,7 +622,7 @@ class UserServiceDB:
         """Reset sequence 'users_id_seq' to continue from max user id."""
         conn, cur = self._ensure_connected()
 
-        # seq_query = "SELECT pg_get_serial_sequence('users', 'id');"
+        # seq_query = "SELECT pg_get_serial_sequence(TableName.USERS, 'id');"
         reset_query = dedent(
             """
             SELECT setval(

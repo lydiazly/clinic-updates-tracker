@@ -6,11 +6,7 @@ import pytest
 
 from clinictracker.config import Config, TARGET_BASE_URL
 from clinictracker.startup import QueryParams, get_full_url
-from clinictracker.core import (
-    run,
-    TEST_MSG,
-    BROWSER_CLOSED_MSG,
-)
+from clinictracker.core import run, TEST_MSG, BROWSER_CLOSED_MSG
 
 
 @pytest.mark.asyncio
@@ -25,7 +21,7 @@ async def test_chromium(caplog):
         headless_shell=headless_shell,
     )
     query_dict = {'only_accepting': 'yes', 'list_town': 'Dummy'}
-    full_url = get_full_url(TARGET_BASE_URL, '?', query_dict)
+    full_url = get_full_url(TARGET_BASE_URL, query_dict)
     query = QueryParams(
         url=full_url,
         city='Dummy',
