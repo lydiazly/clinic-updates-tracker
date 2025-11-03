@@ -1,0 +1,118 @@
+# This workflow will install Python dependencies and run a script
+# [Actions secrets] GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN,
+#                   GMAIL_SENDER, PGPASS
+# [Actions variables] TARGET_BASE_URL, TARGET_TZ,
+#                     MAX_ITEMS_MIN, CLEANUP_BUFFER_DAYS, RETRIES
+
+name: Run user service
+
+on:
+  schedule:
+    - cron: '0 19 * * *'  # 19:00 UTC every day
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Test mode (--ignore-hash)'
+        required: false
+        type: boolean
+        default: false
+      debug_mode:
+        description: 'Debug mode (print variables only)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  user-service:
+
+    runs-on: ubuntu-latest
+
+    env:
+      TEST_MODE: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
+      IGNORE_HASH: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
+      MAX_ITEMS_MIN: ${{ github.event.inputs.test_mode == 'true' && '1' || vars.MAX_ITEMS_MIN }}
+
+    steps:
+      - name: Debug variables
+        if: github.event.inputs.debug_mode == 'true'
+        run: |
+          echo "*** Debug Mode ***"
+          echo "github.event.inputs.test_mode: '${{ github.event.inputs.test_mode }}'"
+          echo "                env.TEST_MODE: '${{ env.TEST_MODE }}'"
+          echo "           vars.MAX_ITEMS_MIN: '${{ vars.MAX_ITEMS_MIN }}'"
+          echo "            env.MAX_ITEMS_MIN: '${{ env.MAX_ITEMS_MIN }}'"
+          echo "         vars.TARGET_BASE_URL: '${{ vars.TARGET_BASE_URL }}'"
+          echo "               vars.TARGET_TZ: '${{ vars.TARGET_TZ }}'"
+          echo "                 vars.RETRIES: '${{ vars.RETRIES }}'"
+          echo "Debugging complete. Exiting workflow."
+          exit 1
+
+      - name: Configure man-db to speed up
+        run: |
+          echo "set man-db/auto-update false" | sudo debconf-communicate && sudo dpkg-reconfigure man-db
+
+      - name: Update
+        run: |
+          sudo apt-get update
+
+      - name: Checkout repository
+        uses: actions/checkout@v4  # default: fetch-depth=1
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Add ~/.local/bin to PATH
+        run: |
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          python3 --version
+          python3 -m pip install --no-cache-dir --upgrade --user pip
+          python3 -m pip install --no-cache-dir --user -r requirements.txt
+
+      - name: Install chromium headless shell
+        run: |
+          python3 -m playwright install --with-deps --only-shell chromium
+
+      - name: Install clinictracker
+        run: |
+          python3 -m pip install --no-cache-dir --user .
+
+      - name: Run script
+        shell: bash
+        env:
+          SECRETS_PATH: ".secrets"
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
+          PGPASS: ${{ secrets.PGPASS }}
+          PGSERVICEFILE: "./config/pg_service.conf"
+          PGPASSFILE: "./.pgpass"
+          PGSERVICE: prod
+        run: |
+          echo "GMAIL_CLIENT_ID=${GMAIL_CLIENT_ID}" > "${SECRETS_PATH}"
+          echo "GMAIL_CLIENT_SECRET=${GMAIL_CLIENT_SECRET}" >> "${SECRETS_PATH}"
+          echo "GMAIL_REFRESH_TOKEN=${GMAIL_REFRESH_TOKEN}" >> "${SECRETS_PATH}"
+          echo "GMAIL_SENDER=${GMAIL_SENDER}" >> "${SECRETS_PATH}"
+          echo "${PGPASS}" > "${PGPASSFILE}"
+          chmod 600 "${PGPASSFILE}"
+          args=(
+            --debug
+            --headless-shell
+            --url "${{ vars.TARGET_BASE_URL }}"
+            --tz "${{ vars.TARGET_TZ }}"
+            --retries ${{ vars.RETRIES }}
+            --send
+          )
+          if [ "${{ env.IGNORE_HASH }}" = 'true' ]; then
+            args+=(--ignore-hash)
+          fi
+
+          clinictracker-user "${args[@]}"

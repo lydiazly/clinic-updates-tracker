@@ -255,7 +255,9 @@ def user_updates_to_str(user: User, updates: UserDict) -> str:
     return user_str
 
 
-def ensure_pgpass_match(service_name: str, service_file: Path, pgpass_path: Path) -> None:
+def ensure_pgpass_match(
+    service_name: str, service_file: Path, pgpass_path: Path
+) -> None:
     """Checks if pgpass file has an entry matching the service parameters."""
     # Read service parameters
     _svc_config = configparser.ConfigParser()
@@ -284,14 +286,19 @@ def ensure_pgpass_match(service_name: str, service_file: Path, pgpass_path: Path
             _pg_host, _pg_port, _pg_db, _pg_user, _ = _parts
 
             # Check if this entry matches (with wildcard support)
-            if not (
+            if (
                 _pg_host in [_svc_host, '*']
                 and _pg_port in [_svc_port, '*']
                 and _pg_db in [_svc_db, '*']
                 and _pg_user in [_svc_user, '*']
             ):
-                raise RuntimeError(
-                    "No matching entry found for service "
-                    f"'{service_name}'\nLooking for: "
-                    f"{_svc_host}:{_svc_port}:{_svc_db}:{_svc_user}"
-                )
+                return
+            else:
+                continue
+
+    # No matches found
+    raise RuntimeError(
+        "No matching entry found for service "
+        f"'{service_name}'\nLooking for: "
+        f"{_svc_host}:{_svc_port}:{_svc_db}:{_svc_user}"
+    )

@@ -25,7 +25,7 @@ if [ ! -s "${PGPASSFILE}" ]; then
   exit 1
 fi
 
-sed -E -i 's/^localhost:/db:/' "${PGPASSFILE}"
+# sed -E -i 's/^localhost:/db:/' "${PGPASSFILE}"
 
 if [ "${PGSERVICE}" = 'dev-local' ]; then
   export PGSERVICE=dev
