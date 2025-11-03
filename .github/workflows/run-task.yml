@@ -105,7 +105,7 @@ jobs:
             "${{ vars.CITY }}"
           )
 
-          for i in $(seq 0 ${{ vars.RETRIES + 1 }}); do
+          for i in $(seq 0 ${{ vars.RETRIES }}); do
             clinictracker "${args[@]}"
             if [ $? -eq 0 ]; then break; fi
             if [ $i -eq ${{ vars.RETRIES }} ]; then exit 1; fi

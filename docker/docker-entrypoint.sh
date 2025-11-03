@@ -53,7 +53,7 @@ args=(
 echo -e "\n=== Step: Run script and save to OUTPUT_HTML_PATH ===\n"
 date
 set +e
-for i in $(seq 0 $((RETRIES+1))); do
+for i in $(seq 0 ${RETRIES}); do
   clinictracker "${args[@]}" "$@"
   if [ $? -eq 0 ]; then break; fi
   if [ $? -eq 130 ]; then exit 130; fi
