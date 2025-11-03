@@ -298,7 +298,7 @@ def get_args_and_logger_for_service() -> (
             "(no effect if COMMAND is specified) (default: false)"
         ),
     )
-    # Sending service args
+    # Other service args
     parser.add_argument(
         '--send',
         action='store_true',
@@ -308,12 +308,9 @@ def get_args_and_logger_for_service() -> (
         ),
     )
     parser.add_argument(
-        '--force-send',
+        '--ignore-hash',
         action='store_true',
-        help=(
-            "Force sending regardless of whether already sent or not\n"
-            "(if not --send, preview only) (default: false)"
-        ),
+        help=("Don't filter out items that are already sent (default: false)"),
     )
     parser.add_argument(
         '-u',
@@ -322,6 +319,16 @@ def get_args_and_logger_for_service() -> (
         type=str.lower,
         metavar='str',
         help="List of usernames. If specified, only send to these users",
+    )
+    parser.add_argument(
+        '--retries',
+        type=int,
+        metavar='int',
+        default=0,
+        help=(
+            "Maximum retries if timeout, excluding the initial attempt "
+            "(default: 0)"
+        ),
     )
     # Browser args
     parser.add_argument(
@@ -422,3 +429,6 @@ def validate_args_for_service(args: Namespace) -> None:
 
     if (args.load or args.save) and not args.file:
         raise ValueError("A file path must be specified by -f/--file.")
+
+    if args.retries < 0:
+        raise ValueError("Value of --retries must be non-negative.")

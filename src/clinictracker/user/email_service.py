@@ -11,6 +11,7 @@ from textwrap import dedent
 
 from clinictracker.startup import MyLogger
 from clinictracker.user.models import User
+from clinictracker.user.config import SECRETS_PATH
 from clinictracker.utils import html_to_plain
 
 
@@ -64,7 +65,7 @@ class EmailService:
         self.test: bool = (
             os.getenv('TEST_MODE', 'false').strip().lower() == 'true'
         )
-        self.__secrets: dict[str, str | None] = dotenv_values(".secrets")
+        self.__secrets: dict[str, str | None] = dotenv_values(SECRETS_PATH)
         self.sender: str = self.__secrets.get('GMAIL_SENDER') or ''
         if not self.sender:
             raise RuntimeError("✗ Sender is missing.")
@@ -108,7 +109,6 @@ class EmailService:
     def send(self, email_params: EmailParams) -> None:
         """Sends content to this user via Gmail API."""
         _user: User = email_params.user
-        _body: str = email_params.body
         self.logger.debug(
             f"Recipients of {_user.username}: {', '.join(_user.emails)}"
         )

@@ -65,7 +65,7 @@ COPY . .
 RUN <<EOF
 useradd -lMU -u ${UID} ${USERNAME}
 chown -R ${USERNAME}:${USERNAME} /app
-chmod +x ./docker/docker-entrypoint.sh
+chmod +x ./docker/docker-entrypoint*.sh
 EOF
 
 
@@ -79,6 +79,16 @@ RUN python3 -m playwright install --with-deps --only-shell chromium \
 USER ${USERNAME}
 
 ENTRYPOINT ["/app/docker/docker-entrypoint.sh"]
+
+
+# User service
+FROM run AS user
+
+ENV USERS_JSON_PATH_RO=/app/data.ro/users.json \
+    PGSERVICEFILE=/app/config/pg_service.conf \
+    PGPASSFILE=/app/.pgpass
+
+ENTRYPOINT ["/app/docker/docker-entrypoint-user.sh"]
 
 
 # Test environment

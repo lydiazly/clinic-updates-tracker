@@ -1,5 +1,6 @@
 data/
 output/
+.pgpass
 .pg_password
 .secrets
 .env.*

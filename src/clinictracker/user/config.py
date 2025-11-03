@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import NamedTuple
 
-from clinictracker.config import Config
+from clinictracker.config import Config, APP_ENV
 from clinictracker.startup import trim_str
 from clinictracker.user.models import User, UserDict
 from clinictracker.user.helpers import (
@@ -23,14 +23,21 @@ load_dotenv()
 DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'false').strip().lower() == 'true'
 SEND_EMAILS: bool = os.getenv('SEND_EMAILS', 'false').strip().lower() == 'true'
 
-PGSERVICE_PATH: Path = Path(
-    os.getenv('PGSERVICEFILE', 'config/pg_service.conf').strip()
+PGSERVICEFILE: str = os.getenv('PGSERVICEFILE', '').strip()
+PGSERVICE_PATH: Path = (
+    Path(PGSERVICEFILE).expanduser()
+    if PGSERVICEFILE
+    else (Path.home() / 'pg_service.conf')
 )
 
 PGPASSFILE: str = os.getenv('PGPASSFILE', '').strip()
 PGPASS_PATH: Path = (
-    Path(PGPASSFILE) if PGPASSFILE else (Path.home() / '.pgpass')
+    Path(PGPASSFILE).expanduser() if PGPASSFILE else (Path.home() / '.pgpass')
 )
+
+PGSERVICE: str = os.getenv('PGSERVICE', APP_ENV).strip() or 'dev-local'
+
+SECRETS_PATH: Path = Path(os.getenv('SECRETS_PATH', '.secrets').strip())
 
 # Minimum days to look back (before filtering by hash values)
 DAYS_BACK_MIN: int = int(os.getenv('DAYS_BACK_MIN', 2))  # default: 2 days
@@ -45,15 +52,16 @@ USERS_JSON_PATH: Path = Path(
 )
 
 
-
 class ServiceName(StrEnum):
     DEV = auto()
+    DEV_LOCAL = 'dev-local'
     PROD = auto()
 
 
 class TableName(StrEnum):
     SENT = 'sent_items'
     USERS = auto()
+
 
 # Tables in database
 TABLE_NAMES: list[str] = [name for name in TableName]
@@ -70,7 +78,9 @@ class CommandName(StrEnum):
     CLEAR = auto()
 
 
-CommandDataType = list[User] | list[UserDict] | list[str] | list[TableName] | None
+CommandDataType = (
+    list[User] | list[UserDict] | list[str] | list[TableName] | None
+)
 
 
 class CommandRequest(NamedTuple):
@@ -107,8 +117,9 @@ class ServiceConfig(Config):
         save_users (bool): Save/Overwrite all user data to the JSON file
         crud_only (bool): Exit after CRUD operations on users
         send (bool): Send fetched data to users
-        force_send (bool): Force sending
+        ignore_hash (bool): Don't filter out items that are already sent
         usernames (list[str]): Only send to these users
+        retries (int): Maximum retries if timeout
         dryrun (bool): Dry run for data management then exit
     """
 
@@ -123,8 +134,9 @@ class ServiceConfig(Config):
     save_users: bool
     crud_only: bool
     send: bool
-    force_send: bool
+    ignore_hash: bool
     usernames: list[str] | None
+    retries: int
     dryrun: bool
 
 
@@ -139,7 +151,9 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
         )  # no duplicates
     if hasattr(args, 'tables') and args.tables is not None:
         _tables = list(
-            dict.fromkeys([TableName(trim_str(t).lower()) for t in args.tables])
+            dict.fromkeys(
+                [TableName(trim_str(t).lower()) for t in args.tables]
+            )
         )  # no duplicates
 
     if args.command is not None:
@@ -185,7 +199,8 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
         save_users=args.save,
         crud_only=args.crud_only,
         send=args.command is None and (args.send or SEND_EMAILS),
-        force_send=args.command is None and args.force_send,
+        ignore_hash=args.command is None and args.ignore_hash,
         usernames=_usernames,
+        retries=args.retries,
         dryrun=args.dry_run,
     )

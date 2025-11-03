@@ -2,10 +2,12 @@
 *
 
 # Allow specific files and directories
+!config/*
 !docker/*.sh
-!src/clinictracker/*.py
+!src/clinictracker/**/*.py
 !tests/*.py
 !tests/*.html
 !pyproject.toml
 !README.md
 !requirements.txt
+!.pgpass

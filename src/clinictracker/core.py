@@ -110,8 +110,6 @@ class PageManager:
 
         await self.goto_page(self.page, url)
         self.logger.info(f"Page loaded: {self.page.url} (tz: {tz or 'local'})")
-        # await asyncio.sleep(30)
-        # return
 
         # Find the <strong>Updates regarding...</strong> element,
         # then navigate to following sibling <ul>

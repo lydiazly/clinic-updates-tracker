@@ -1,22 +1,24 @@
 # -*- coding: utf-8 -*-
 # user/user_service.py
 """User service."""
+import asyncio
 from datetime import datetime, timedelta
 from logging import Logger, getLogger
+from playwright.async_api import TimeoutError
 import traceback
 from typing import TypedDict, cast
 
 from clinictracker.models import ItemData, ListData
-from clinictracker.config import APP_ENV
 from clinictracker.user.models import User, UserDict
 from clinictracker.user.config import (
     CommandName,
     ServiceConfig,
+    ServiceName,
+    TableName,
     DAYS_BACK_MIN,
     MAX_ITEMS_MIN,
     CLEANUP_BUFFER_DAYS,
-    ServiceName,
-    TableName,
+    PGSERVICE,
 )
 from clinictracker.startup import MyLogger, Color, QueryParams, get_full_url
 from clinictracker.user.helpers import (
@@ -78,7 +80,7 @@ class UserService:
         """Selects users to serve. Sets `selected_users`."""
         usernames: list[str] | None = self.config.usernames
 
-        if self.config.force_send:
+        if self.config.ignore_hash:
             if usernames is None:
                 self.selected_users = self.users
             else:
@@ -369,12 +371,28 @@ class UserService:
         _queries: list[QueryParams] = [
             self.set_params_for_each(city) for city in _cities
         ]
-        _data_all: list[ListData] | None = await run(
-            queries=_queries,
-            config=self.config,
-            logger=self.logger,
-            check_date=False,
-        )
+
+        _data_all: list[ListData] | None = None
+        for i in range(0, self.config.retries + 1):
+            try:
+                _data_all = await run(
+                    queries=_queries,
+                    config=self.config,
+                    logger=self.logger,
+                    check_date=False,
+                )
+            except TimeoutError:
+                if i == self.config.retries:
+                    raise
+                self.logger.info(
+                    f"Waiting to retry ({i + 1}/{self.config.retries})..."
+                )
+                await asyncio.sleep(5)
+            except Exception:
+                raise
+            else:
+                break
+
         if _data_all is None:
             self.logger.warning("Data not fetched.")
             return
@@ -387,7 +405,7 @@ class UserService:
         self.cities_data = _cities_data
         self.logger.info("Updates from all cities are ready.")
 
-    async def fetch_data_and_send(self, es: EmailService) -> None:
+    async def fetch_data_and_send(self, es: EmailService) -> bool:
         """Fetches full lists of data and send to selected users."""
         # Determine the users to serve
         self.select_users()
@@ -395,11 +413,14 @@ class UserService:
         # Set query parameters based on all users
         _params_ready: bool = self.set_params_for_all()
         if not _params_ready:
-            return
+            return False
 
         # Fetch data in all cities specified by selected users
         self.logger.info("Collecting updates for all...")
         await self.get_lists_for_all()
+
+        if not self.cities_data:
+            return False
 
         # Process each user
         body_to_send: str
@@ -432,7 +453,11 @@ class UserService:
                 self.db.update_last_sent_at(user, current_time)
 
         if success:
-            self.logger.info("✓ All emails sent successfully.")
+            if self.config.send:
+                self.logger.info("✓ All emails sent successfully.")
+                return True
+            else:
+                return False
         else:
             raise RuntimeError("Error during email sending.")
 
@@ -453,19 +478,19 @@ class UserService:
         _email_body_list: list[str] = []
         _unsent_items: list[ItemData]
         for city in user.cities:
+            if city not in self.cities_data or not (
+                _items := self.cities_data[city].items
+            ):
+                continue
+
+            # Check which items in this city have already been sent
             self.logger.info(f"Filtering updates in {city} for {username}...")
             _unsent_items = []
             _n_tot = self.cities_data[city].n_tot
             _query = self.cities_data[city].query
-            _items = self.cities_data[city].items
             _hashes = [item.digest for item in _items]
-
-            if not _items:
-                continue
-
-            # Check which items in this city have already been sent
             _sent_hashes: set[str] = set()
-            if not self.config.force_send:
+            if not self.config.ignore_hash:
                 _sent_hashes = self.db.get_sent_item_hashes(user.id, _hashes)
                 self.logger.debug(
                     f"Found {len(_sent_hashes)} updates of {city} "
@@ -473,7 +498,7 @@ class UserService:
                 )
             else:
                 self.logger.debug(
-                    "'--force-send' selected. Skipping sent items checking..."
+                    "'--ignore-hash' selected. Skipping sent items checking..."
                 )
 
             # Get unsent items in this city and limit to nmax
@@ -516,7 +541,7 @@ async def run_service(
     try:
         # Initialize database -----------------------------------------|
         with UserServiceDB(
-            service_name=ServiceName(APP_ENV),
+            service_name=ServiceName(PGSERVICE),
             dryrun=config.dryrun,
             logger=logger,
         ) as db:
@@ -548,18 +573,19 @@ async def run_service(
                 es = EmailService(logger)
 
                 # Prepare data and send to all users
-                await us.fetch_data_and_send(es)
+                is_sent: bool = await us.fetch_data_and_send(es)
 
-                # Cleanup old records
-                _stale_days = us.max_days_back + CLEANUP_BUFFER_DAYS
-                logger.info(
-                    f"Removing sent_items more than {_stale_days} days old..."
-                )
-                current_time = datetime.now().astimezone()  # timezone-aware
-                cutoff_date = current_time - timedelta(days=_stale_days)
-                db.cleanup_old_sent_items(cutoff_date)
-                _count = db.get_row_count(TableName.SENT)
-                logger.info(f"Current sent records: {_count}")
+                if is_sent:
+                    # Cleanup old records
+                    _stale_days = us.max_days_back + CLEANUP_BUFFER_DAYS
+                    logger.info(
+                        f"Removing records more than {_stale_days} days old..."
+                    )
+                    current_time = datetime.now().astimezone()
+                    cutoff_date = current_time - timedelta(days=_stale_days)
+                    db.cleanup_old_sent_items(cutoff_date)
+                    _count = db.get_row_count(TableName.SENT)
+                    logger.info(f"Current sent records: {_count}")
 
             # Save User objects to JSON -------------------------------|
             if config.save_users:
@@ -572,6 +598,9 @@ async def run_service(
 
             if config.dryrun:
                 return
+
+    except TimeoutError:
+        raise
 
     # Chained exceptions are handled here
     except RuntimeError as e:

@@ -19,10 +19,12 @@ python3 -V
 # [Debian-based (Linux 6.10.14-linuxkit), python3.12, multi-stage]
 tag='test-py'
 tag='run-py'
+tag='user-py'
 docker build --target builder -t clinic-test:builder-py -f docker/Dockerfile-multi-py .  # 340MB
 docker build --target base -t clinic-test:base-py -f docker/Dockerfile-multi-py .  # 334MB
 docker build --target test -t clinic-test:test-py -f docker/Dockerfile-multi-py .  # 334MB run:✓
-docker build --target run -t clinic-test:run-py -f docker/Dockerfile-multi-py .  # 969MB run:✓
+docker build --target run -t clinic-test:run-py -f docker/Dockerfile-multi-py .  # 970MB run:✓
+docker build --target user -t clinic-test:user-py -f docker/Dockerfile-multi-py .  # 970MB run:✓
 
 # Run
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
@@ -43,11 +45,23 @@ docker run -it --name clinic-test --env-file .env --env-file .secrets \
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
   --entrypoint pytest --rm clinic-test:$tag  # ✓
 
+tag='user-py'
+docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
+  --network clinictracker_default -v "$(pwd)"/data:/app/data:ro \
+  --rm clinic-test:$tag list  # ✓
+docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
+  --network clinictracker_default -v "$(pwd)"/data:/app/data:ro \
+  --rm clinic-test:$tag --ignore-hash  # ✓
+docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
+  --network clinictracker_default -v "$(pwd)"/data:/app/data:ro \
+  --rm clinic-test:$tag --ignore-hash --send  # ✓
+
 #----------------------------------------------------------------------|
 # Compose
 
 # Build
 docker compose build run-task
+docker compose build user
 
 # Run (keep running if -e KEEP_ALIVE=true)
 # Already set -it in test-mode
@@ -57,6 +71,8 @@ docker compose run --name clinic-test -e DAYS_BACK=1 --rm test-mode ./docker/doc
 docker compose run --name clinic-test -e DAYS_BACK=1 \
   --entrypoint /app/docker/docker-entrypoint.sh --rm test-mode # ✓
 docker compose run --name clinic-test -e SEND_EMAILS=true --rm run-task  # ✓
+docker compose run --name clinic-test --rm user  # ✓
+docker compose run --name clinic-test --rm user list  # ✓
 
 # Create & start container
 docker compose up -d test-mode  # ✓
@@ -105,7 +121,7 @@ postgresql://admin@localhost:5432/userservice
 docker compose down -v db
 
 # Test
-python src/clinictracker/db_manager.py
+clinictracker-user --debug list
 
 #----------------------------------------------------------------------|
 # Exit and clean up

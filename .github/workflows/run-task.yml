@@ -94,17 +94,22 @@ jobs:
       - name: Run script and save to OUTPUT_HTML_PATH
         shell: bash
         run: |
-          for i in $(seq 1 ${{ vars.RETRIES }}); do
-            clinictracker --headless-shell \
-              --url "${{ vars.TARGET_BASE_URL }}" \
-              --tz "${{ vars.TARGET_TZ }}" \
-              --days ${{ env.DAYS_BACK }} \
-              --nmax ${{ env.MAX_ITEMS }} \
-              --output "${{ env.OUTPUT_HTML_PATH }}" \
-              --debug \
-              "${{ vars.CITY }}"
+          args=(
+            --debug
+            --headless-shell
+            --url "${{ vars.TARGET_BASE_URL }}"
+            --tz "${{ vars.TARGET_TZ }}"
+            --days ${{ env.DAYS_BACK }}
+            --nmax ${{ env.MAX_ITEMS }}
+            --output "${{ env.OUTPUT_HTML_PATH }}"
+            "${{ vars.CITY }}"
+          )
+
+          for i in $(seq 0 ${{ vars.RETRIES + 1 }}); do
+            clinictracker "${args[@]}"
             if [ $? -eq 0 ]; then break; fi
-            echo "> Waiting to retry ($i/${{ vars.RETRIES }})..."
+            if [ $i -eq ${{ vars.RETRIES }} ]; then exit 1; fi
+            echo "> Waiting to retry ($((i+1))/${{ vars.RETRIES }})..."
             sleep 5
           done
           echo "✓ Script completed successfully."

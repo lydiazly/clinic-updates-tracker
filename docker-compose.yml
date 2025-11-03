@@ -17,9 +17,35 @@ services:
       - TEST_MODE=false
       - KEEP_ALIVE=false
       - SEND_EMAILS=false
-      - SECRETS_FILE=/run/secrets/gmail_api
+      - SECRETS_PATH=/run/secrets/gmail_api
     volumes:
       - ./output:/app/output
+
+  user:
+    image: clinic-test:user-py
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-multi-py
+      target: user
+    container_name: clinic-user
+    secrets:
+      - gmail_api
+    env_file:
+      - ./.env.test  # test
+    environment:
+      - TEST_MODE=false
+      - KEEP_ALIVE=false
+      - SEND_EMAILS=false
+      - SECRETS_PATH=/run/secrets/gmail_api
+      - IGNORE_HASH=true
+      - PGSERVICE=dev
+    volumes:
+      - ./output:/app/output
+      - ./data:/app/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
 
   test-mode:  # install browser and change user, but turn on test mode
     image: clinic-test:run-py
@@ -37,7 +63,7 @@ services:
       - TEST_MODE=true
       - KEEP_ALIVE=false
       - SEND_EMAILS=false
-      - SECRETS_FILE=/run/secrets/gmail_api
+      - SECRETS_PATH=/run/secrets/gmail_api
     volumes:
       - ./output:/app/output
     entrypoint: /bin/bash  # Override the ENTRYPOINT
@@ -51,9 +77,9 @@ services:
     secrets:
       - pg_password
     environment:
-      POSTGRES_DB: userservice
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+      - POSTGRES_DB=userservice
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD_FILE=/run/secrets/pg_password
     ports:
       - "5432:5432"
     volumes:

@@ -6,6 +6,7 @@ from dataclasses import fields
 from datetime import datetime
 from logging import Logger, getLogger
 import os
+from pathlib import Path
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import execute_values
@@ -17,11 +18,16 @@ from clinictracker.user.models import User, UserDict, ALLOWED_COLS
 from clinictracker.user.config import (
     PGSERVICE_PATH,
     PGPASS_PATH,
+    PGSERVICE,
     ServiceName,
     TableName,
 )
 from clinictracker.startup import MyLogger
-from clinictracker.user.helpers import get_valid_user, validate_user_field
+from clinictracker.user.helpers import (
+    get_valid_user,
+    validate_user_field,
+    ensure_pgpass_match,
+)
 
 
 class UserServiceDB:
@@ -46,7 +52,7 @@ class UserServiceDB:
 
     def __init__(
         self,
-        service_name: ServiceName = ServiceName.DEV,
+        service_name: ServiceName = ServiceName(PGSERVICE),
         dryrun: bool = False,
         logger: Logger | MyLogger = getLogger(),
     ) -> None:
@@ -57,7 +63,7 @@ class UserServiceDB:
         self.cur: psycopg2.extensions.cursor | None = None
 
     def __enter__(self) -> Self:
-        self._check_service_and_password_file()
+        self._check_service_and_password()
         self.connect()
         return self
 
@@ -83,7 +89,7 @@ class UserServiceDB:
             raise RuntimeError("Not connected. Call connect() first.")
         return self.conn, self.cur
 
-    def _check_service_and_password_file(self) -> None:
+    def _check_service_and_password(self) -> None:
         """Sets environment variables `PGSERVICEFILE` and `PGPASSFILE`."""
         if not PGSERVICE_PATH.is_file():
             raise RuntimeError(
@@ -98,12 +104,21 @@ class UserServiceDB:
         # Tell libpq where to find the service and password file
         os.environ['PGSERVICEFILE'] = str(PGSERVICE_PATH.resolve())
         os.environ['PGPASSFILE'] = str(PGPASS_PATH.resolve())
+        # To verify, load again from environment variables
+        service_path: Path = Path(os.getenv('PGSERVICEFILE', 'void'))
+        pgpass_path: Path = Path(os.getenv('PGPASSFILE', 'void'))
+        _perm = oct(pgpass_path.stat().st_mode)[-3:]
+        self.logger.debug(f"PGSERVICEFILE: {str(service_path)}")
+        self.logger.debug(f"PGPASSFILE: {str(pgpass_path)} (perm: {_perm})")
+
         # Check file permissions (should be 0600)
-        if (_perm := oct(PGPASS_PATH.stat().st_mode)[-3:]) != '600':
+        if _perm != '600':
             raise RuntimeError(
-                f"File '{str(PGPASS_PATH)}' has incorrect permissions: {_perm}"
-                " (should be 0600)"
+                "Password file has incorrect permissions. Should be 0600."
             )
+
+        # Ensure service matching an entry in pgpass
+        ensure_pgpass_match(self.service_name.value, service_path, pgpass_path)
 
     def connect(self) -> None:
         """Establishes database connection."""

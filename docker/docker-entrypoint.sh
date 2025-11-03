@@ -6,11 +6,11 @@ export KEEP_ALIVE=${KEEP_ALIVE:-false}
 export SEND_EMAILS=${SEND_EMAILS:-false}
 export DAYS_BACK=${DAYS_BACK:-90}
 export MAX_ITEMS=${MAX_ITEMS:-10}
-export RETRIES=${RETRIES:-3}
 export OUTPUT_HTML_PATH="./output/content_docker.html"
+export RETRIES=${RETRIES:-3}
 
-if [ -n "${SECRETS_FILE}" ] && [ -s "${SECRETS_FILE}" ]; then
-  source "${SECRETS_FILE}"
+if [ -n "${SECRETS_PATH}" ] && [ -s "${SECRETS_PATH}" ]; then
+  source "${SECRETS_PATH}"
 fi
 
 echo -e "=== Environment Variables & Secrets ===\n"
@@ -25,27 +25,40 @@ echo " TARGET_BASE_URL: ${TARGET_BASE_URL}"
 echo "       TARGET_TZ: ${TARGET_TZ}"
 echo "            CITY: ${CITY}"
 echo "OUTPUT_HTML_PATH: ${OUTPUT_HTML_PATH}"
-echo "    SECRETS_FILE: ${SECRETS_FILE:-none}"
+echo "    SECRETS_PATH: ${SECRETS_PATH:-none}"
 echo ""
 echo "    GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:0:13}***"
 echo "GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:0:7}***"
 echo "GMAIL_REFRESH_TOKEN: ${GMAIL_REFRESH_TOKEN:0:32}***"
 echo "       GMAIL_SENDER: ${GMAIL_SENDER}"
 
+# Run pytest
+if [ "$1" = 'pytest' ]; then
+  shift
+  exec pytest "$@"
+fi
+
+# Run script
+args=(
+  --debug
+  --headless-shell
+  --url "${TARGET_BASE_URL}"
+  --tz "${TARGET_TZ}"
+  --days ${DAYS_BACK}
+  --nmax ${MAX_ITEMS}
+  --output "${OUTPUT_HTML_PATH}"
+  "${CITY}"
+)
+
 echo -e "\n=== Step: Run script and save to OUTPUT_HTML_PATH ===\n"
 date
 set +e
-for i in $(seq 1 ${RETRIES}); do
-  clinictracker --headless-shell \
-    --url "${TARGET_BASE_URL}" \
-    --tz "${TARGET_TZ}" \
-    --days ${DAYS_BACK} \
-    --nmax ${MAX_ITEMS} \
-    --output "${OUTPUT_HTML_PATH}" \
-    --debug \
-    "${CITY}"
+for i in $(seq 0 $((RETRIES+1))); do
+  clinictracker "${args[@]}" "$@"
   if [ $? -eq 0 ]; then break; fi
-  echo "> Waiting to retry ($i/${RETRIES})..."
+  if [ $? -eq 130 ]; then exit 130; fi
+  if [ $i -eq ${RETRIES} ]; then exit 1; fi
+  echo "> Waiting to retry ($((i+1))/${RETRIES})..."
   sleep 5
 done
 set -e

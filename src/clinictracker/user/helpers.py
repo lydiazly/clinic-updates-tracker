@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # user/helpers.py
 """User data helper functions."""
+import configparser
 from dataclasses import asdict
 from datetime import datetime
 import json
@@ -115,7 +116,12 @@ def save_users_to_json(
     # Convert each object to dict, filtering out None values
     data: list[UserDict] = [
         cast(
-            UserDict, {k: User.print_value(v) for k, v in asdict(user).items() if v is not None}
+            UserDict,
+            {
+                k: User.print_value(v)
+                for k, v in asdict(user).items()
+                if v is not None
+            },
         )
         for user in users
     ]
@@ -247,3 +253,45 @@ def user_updates_to_str(user: User, updates: UserDict) -> str:
     )
     user_str = f"{HR}\n{user_str}\n{HR}"
     return user_str
+
+
+def ensure_pgpass_match(service_name: str, service_file: Path, pgpass_path: Path) -> None:
+    """Checks if pgpass file has an entry matching the service parameters."""
+    # Read service parameters
+    _svc_config = configparser.ConfigParser()
+    _svc_config.read(service_file)
+    if service_name not in _svc_config:
+        raise RuntimeError(
+            f"Service '{service_name}' not found in service file."
+        )
+    _service = _svc_config[service_name]
+    _svc_host = _service.get('host', 'localhost')
+    _svc_port = _service.get('port', '5432')
+    _svc_db = _service.get('dbname', '*')
+    _svc_user = _service.get('user', '*')
+
+    # Search for matching entry in pgpass
+    with open(pgpass_path, 'r') as f:
+        for i, line in enumerate(f, 1):
+            line = line.strip()
+
+            # Skip comments and empty lines
+            if not line or line.startswith('#'):
+                continue
+            _parts = line.split(':')
+            if len(_parts) != 5:
+                continue
+            _pg_host, _pg_port, _pg_db, _pg_user, _ = _parts
+
+            # Check if this entry matches (with wildcard support)
+            if not (
+                _pg_host in [_svc_host, '*']
+                and _pg_port in [_svc_port, '*']
+                and _pg_db in [_svc_db, '*']
+                and _pg_user in [_svc_user, '*']
+            ):
+                raise RuntimeError(
+                    "No matching entry found for service "
+                    f"'{service_name}'\nLooking for: "
+                    f"{_svc_host}:{_svc_port}:{_svc_db}:{_svc_user}"
+                )
