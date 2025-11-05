@@ -87,8 +87,8 @@ jobs:
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
           GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
           PGPASS: ${{ secrets.PGPASS }}
-          PGSERVICEFILE: "./config/pg_service.conf"
-          PGPASSFILE: "./.pgpass"
+          PGSERVICEFILE: "config/pg_service.conf"
+          PGPASSFILE: ".pgpass"
           PGSERVICE: prod
         run: |
           echo "GMAIL_CLIENT_ID=${GMAIL_CLIENT_ID}" > "${SECRETS_PATH}"
@@ -110,3 +110,7 @@ jobs:
           fi
 
           uv run clinictracker-user "${args[@]}"
+
+      - name: Cleanup temporary files
+        if: always()
+        run: rm -f .secrets .pgpass
