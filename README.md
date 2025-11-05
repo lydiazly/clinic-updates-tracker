@@ -25,14 +25,14 @@ Install this module:
 
 ```sh
 # Install from GitHub
-python3 -m pip install git+https://github.com/lydiazly/clinic-updates-tracker.git
+python -m pip install git+https://github.com/lydiazly/clinic-updates-tracker.git
 # Installs: clinictracker
 ```
 
 To uninstall:
 
 ```sh
-python3 -m pip uninstall clinictracker
+python -m pip uninstall clinictracker
 ```
 
 ## Usage

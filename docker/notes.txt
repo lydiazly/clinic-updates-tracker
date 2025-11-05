@@ -17,25 +17,25 @@ python3 -V
 # Build
 
 # [Debian-based (Linux 6.10.14-linuxkit), python3.12, multi-stage]
-tag='test-py'
-tag='run-py'
-tag='user-py'
-docker build --target builder -t clinic-test:builder-py -f docker/Dockerfile-multi-py .  # 340MB
-docker build --target base -t clinic-test:base-py -f docker/Dockerfile-multi-py .  # 334MB
-docker build --target test -t clinic-test:test-py -f docker/Dockerfile-multi-py .  # 334MB run:✓
-docker build --target run -t clinic-test:run-py -f docker/Dockerfile-multi-py .  # 970MB run:✓
-docker build --target user -t clinic-test:user-py -f docker/Dockerfile-multi-py .  # 970MB run:✓
+tag='test'
+tag='run'
+tag='user'
+docker build --target builder -t clinic-test:builder -f docker/Dockerfile .  # 351MB
+docker build --target base -t clinic-test:base -f docker/Dockerfile .  # 314MB
+docker build --target test -t clinic-test:test -f docker/Dockerfile .  # 314MB run:✓
+docker build --target run -t clinic-test:run -f docker/Dockerfile .  # 949MB run:✓
+docker build --target user -t clinic-test:user -f docker/Dockerfile .  # 949MB run:✓
 
 # Run
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
   -e TEST_MODE=false -e SEND_EMAILS=false --rm clinic-test:$tag
 
 # Other tests
-tag='test-py'
+tag='test'
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
   -u runner --rm clinic-test:$tag  # ✓
 
-tag='run-py'
+tag='run'
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
   -v "$(pwd)"/output:/app/output \
   -e TEST_MODE=true -e DAYS_BACK=3 -e SEND_EMAILS=true --rm clinic-test:$tag  # ✓
@@ -45,16 +45,15 @@ docker run -it --name clinic-test --env-file .env --env-file .secrets \
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
   --entrypoint pytest --rm clinic-test:$tag  # ✓
 
-tag='user-py'
+tag='user'
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
-  --network clinictracker_default -v "$(pwd)"/data:/app/data:ro \
-  --rm clinic-test:$tag list  # ✓
+  --network clinictracker_default --rm clinic-test:$tag list  # if db is running ✓
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
-  --network clinictracker_default -v "$(pwd)"/data:/app/data:ro \
-  --rm clinic-test:$tag --ignore-hash  # ✓
+  -e PGSERVICE=prod --rm clinic-test:$tag list  # ✓
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
-  --network clinictracker_default -v "$(pwd)"/data:/app/data:ro \
-  --rm clinic-test:$tag --ignore-hash --send  # ✓
+  -e PGSERVICE=prod --rm clinic-test:$tag --ignore-hash  # ✓
+docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
+  -e PGSERVICE=prod --rm clinic-test:$tag --ignore-hash --send  # ✓
 
 #----------------------------------------------------------------------|
 # Compose
@@ -62,6 +61,13 @@ docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
 # Build
 docker compose build run-task
 docker compose build user
+
+# Database in docker
+# use ./.pg_password as secrets
+docker compose up -d db
+
+# Stop and remove
+docker compose down -v db
 
 # Run (keep running if -e KEEP_ALIVE=true)
 # Already set -it in test-mode
@@ -71,8 +77,11 @@ docker compose run --name clinic-test -e DAYS_BACK=1 --rm test-mode ./docker/doc
 docker compose run --name clinic-test -e DAYS_BACK=1 \
   --entrypoint /app/docker/docker-entrypoint.sh --rm test-mode # ✓
 docker compose run --name clinic-test -e SEND_EMAILS=true --rm run-task  # ✓
-docker compose run --name clinic-test --rm user  # ✓
-docker compose run --name clinic-test --rm user list  # ✓
+# Use db
+docker compose run --name clinic-test --rm user-dev  # ✓
+docker compose run --name clinic-test --rm user-dev list  # ✓
+# Use external database
+docker compose run --name clinic-test -e IGNORE_HASH=true --rm user list  # ✓
 
 # Create & start container
 docker compose up -d test-mode  # ✓
@@ -81,8 +90,9 @@ docker compose up --build -d test-mode
 # Force rebuild without cache
 docker compose build --no-cache test-mode
 docker compose up -d test-mode
-# Stop & remove
-docker compose down test-mode
+
+# Stop & remove containers and networks
+docker compose down
 
 # View and follow logs (running)
 # docker compose logs -f test-mode
@@ -106,9 +116,6 @@ clinictracker -h
 
 #----------------------------------------------------------------------|
 # Database
-# use ./.pg_password as secrets
-docker compose up -d db
-
 psql -h localhost -p 5432 -U admin -d userservice  # use ~/.pgpass
 # or use ./.env.pg
 source .env.pg
@@ -116,9 +123,6 @@ psql
 
 # Connection string
 postgresql://admin@localhost:5432/userservice
-
-# Stop and remove
-docker compose down -v db
 
 # Test
 clinictracker-user --debug list

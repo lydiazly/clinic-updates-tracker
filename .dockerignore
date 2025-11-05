@@ -8,6 +8,5 @@
 !tests/*.py
 !tests/*.html
 !pyproject.toml
-!README.md
-!requirements.txt
 !.pgpass
+!uv.lock

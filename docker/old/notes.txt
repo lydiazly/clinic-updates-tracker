@@ -19,19 +19,19 @@ python3 -V
 
 # [Ubuntu 24.04, python3.11]
 tag='ubuntu24.04-py3.11'
-docker build -t clinic-test:$tag -f docker/Dockerfile-py3.11 .  # ~1.56GB run:✓
+docker build -t clinic-test:$tag -f docker/old/Dockerfile-py3.11 .  # ~1.56GB run:✓
 
 # [Ubuntu 24.04, python3.12]
 tag='ubuntu24.04'
-docker build -t clinic-test:$tag -f docker/Dockerfile-py3.12 .  # ~1.37GB run:✓
+docker build -t clinic-test:$tag -f docker/old/Dockerfile-py3.12 .  # ~1.37GB run:✓
 
 # [Ubuntu 24.04, python3.12, multi-stage]
 tag='test'
 tag='run'
-docker build --target builder -t clinic-test:builder -f docker/Dockerfile-multi .  # 350MB
-docker build --target base -t clinic-test:base -f docker/Dockerfile-multi .  # 341MB
-docker build --target test -t clinic-test:test -f docker/Dockerfile-multi .  # 341MB run:✓
-docker build --target run -t clinic-test:run -f docker/Dockerfile-multi .  # 1.02GB run:✓
+docker build --target builder -t clinic-test:builder -f docker/old/Dockerfile-multi .  # 350MB
+docker build --target base -t clinic-test:base -f docker/old/Dockerfile-multi .  # 341MB
+docker build --target test -t clinic-test:test -f docker/old/Dockerfile-multi .  # 341MB run:✓
+docker build --target run -t clinic-test:run -f docker/old/Dockerfile-multi .  # 1.02GB run:✓
 
 # Run
 docker run -it --name clinic-test --env-file .env --env-file .secrets \

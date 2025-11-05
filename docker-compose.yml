@@ -2,11 +2,11 @@ name: clinictracker
 
 services:
   run-task:
-    image: clinic-test:run-py
+    image: clinic-test:run
     pull_policy: build
     build:
       context: .
-      dockerfile: docker/Dockerfile-multi-py
+      dockerfile: docker/Dockerfile
       target: run
     container_name: clinic-run
     secrets:
@@ -22,11 +22,11 @@ services:
       - ./output:/app/output
 
   user:
-    image: clinic-test:user-py
+    image: clinic-test:user
     pull_policy: build
     build:
       context: .
-      dockerfile: docker/Dockerfile-multi-py
+      dockerfile: docker/Dockerfile
       target: user
     container_name: clinic-user
     secrets:
@@ -35,7 +35,28 @@ services:
       - ./.env.test  # test
     environment:
       - TEST_MODE=false
-      - KEEP_ALIVE=false
+      - SEND_EMAILS=false
+      - SECRETS_PATH=/run/secrets/gmail_api
+      - IGNORE_HASH=false
+      - PGSERVICE=prod
+    volumes:
+      - ./output:/app/output
+      - ./data:/app/data:ro
+
+  user-dev:
+    image: clinic-test:user
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: user
+    container_name: clinic-user
+    secrets:
+      - gmail_api
+    env_file:
+      - ./.env.test  # test
+    environment:
+      - TEST_MODE=true
       - SEND_EMAILS=false
       - SECRETS_PATH=/run/secrets/gmail_api
       - IGNORE_HASH=true
@@ -48,11 +69,11 @@ services:
         condition: service_healthy
 
   test-mode:  # install browser and change user, but turn on test mode
-    image: clinic-test:run-py
+    image: clinic-test:run
     pull_policy: build
     build:
       context: .
-      dockerfile: docker/Dockerfile-multi-py
+      dockerfile: docker/Dockerfile
       target: run
     container_name: clinic-test
     secrets:
