@@ -59,7 +59,7 @@ class User:
         )
 
     @staticmethod
-    def print_value(value: Any) -> Any:
+    def print_value(value: Any) -> Any:  # noqa: ANN401
         if isinstance(value, datetime):
             return value.astimezone().strftime('%Y-%m-%d %H:%M:%S (%Z)')
         else:

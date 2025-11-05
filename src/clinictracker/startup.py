@@ -67,6 +67,8 @@ def load_query(args: Namespace) -> QueryParams:
 
 # ---------------------------------------------------------------------|
 # Logging
+default_logger: logging.Logger = logging.getLogger()
+
 class Color(StrEnum):
     """Preset ANSI color escape codes:
     BOLD, GRAY, GREEN, YELLOW, RED, RED_B, END
@@ -82,7 +84,7 @@ class Color(StrEnum):
 
 
 class MyLogger:
-    def __init__(self, logger: logging.Logger, is_quiet: bool = False):
+    def __init__(self, logger: logging.Logger, is_quiet: bool = False) -> None:
         self.logger = logger
         self.is_quiet = is_quiet
 
@@ -91,7 +93,7 @@ class MyLogger:
             self.logger.info(msg)
 
     # Delegate everything else
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
         return getattr(self.logger, name)
 
 
@@ -159,8 +161,7 @@ def setup_logger(
             level=logging.DEBUG,
             handlers=[handler],
         )
-        logger = logging.getLogger()
-        return logger
+        return default_logger
 
 
 # ---------------------------------------------------------------------|
@@ -336,7 +337,7 @@ def validate_args(args: Namespace) -> None:
         raise ValueError("Value of -n/--nmax must be positive.")
 
 
-def get_full_url(base_url: str, sub: dict[str, str] | str = {}) -> str:
+def get_full_url(base_url: str, sub: dict[str, str] | str = '') -> str:
     """Appends `sub` (a query dict or a subdirectory string) to the base URL:
     `{base_url}?arg1=val1&...` or `{base_url}/...`"""
     full_url: str = base_url.strip().lower()

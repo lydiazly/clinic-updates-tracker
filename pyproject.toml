@@ -35,8 +35,6 @@ dev = [
     "types-psycopg2",
     "types-python-dateutil",
     "types-requests",
-]
-test = [
     "pytest",
     "pytest-asyncio",
 ]
@@ -55,7 +53,35 @@ testpaths = ["tests"]
 
 [tool.ruff]
 include = ["*.py"]
-line-length = 79
+line-length = 88
+exclude = [
+    ".eggs",
+    ".git",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "W", "ANN", "C901", "Q"]
+# select = ["E", "F", "I", "B", "W", "ANN", "Q"]
+ignore = ["I001", "Q000", "Q001"]
+exclude = ["generated"]
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.lint.extend-per-file-ignores]
+"__init__.py" = ["E402", "F401"]
+"tests/*.py" = ["ANN"]
 
 [tool.ruff.format]
 quote-style = "preserve"

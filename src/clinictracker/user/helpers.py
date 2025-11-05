@@ -75,9 +75,9 @@ def load_users_from_json(
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
     except FileNotFoundError:
-        raise FileNotFoundError(f"{str(json_path)}: file not found")
+        raise FileNotFoundError(f"{str(json_path)}: file not found") from None
     except Exception as e:
-        raise RuntimeError(f"Failed to load file '{str(json_path)}': {e}")
+        raise RuntimeError(f"Failed to load file: '{str(json_path)}'") from e
 
     # Validate the data
     if (
@@ -175,7 +175,7 @@ def get_valid_user_dict(user_dict: UserDict) -> UserDict:
     return user_dict
 
 
-def validate_user_field(username: str, field: str, data: Any) -> None:
+def validate_user_field(username: str, field: str, data: Any) -> None:  # noqa
     """Validates a specified field of a user."""
     ERR_TEMPLATE = username + ": %s"
     match field:
@@ -275,7 +275,7 @@ def ensure_pgpass_match(
 
     # Search for matching entry in pgpass
     with open(pgpass_path, 'r') as f:
-        for i, line in enumerate(f, 1):
+        for line in f:
             line = line.strip()
 
             # Skip comments and empty lines

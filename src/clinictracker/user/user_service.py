@@ -4,7 +4,7 @@
 
 import asyncio
 from datetime import datetime, timedelta
-from logging import Logger, getLogger
+from logging import Logger
 from playwright.async_api import TimeoutError
 import traceback
 from typing import TypedDict, cast
@@ -13,6 +13,7 @@ from clinictracker.models import ItemData, ListData
 from clinictracker.user.models import User, UserDict
 from clinictracker.user.config import (
     CommandName,
+    CommandRequest,
     ServiceConfig,
     ServiceName,
     TableName,
@@ -21,7 +22,13 @@ from clinictracker.user.config import (
     CLEANUP_BUFFER_DAYS,
     PGSERVICE,
 )
-from clinictracker.startup import MyLogger, Color, QueryParams, get_full_url
+from clinictracker.startup import (
+    MyLogger,
+    Color,
+    QueryParams,
+    default_logger,
+    get_full_url,
+)
 from clinictracker.user.helpers import (
     load_users_from_json,
     save_users_to_json,
@@ -58,7 +65,7 @@ class UserService:
         self,
         db: UserServiceDB,
         config: ServiceConfig,
-        logger: Logger | MyLogger = getLogger(),
+        logger: Logger | MyLogger = default_logger,
     ) -> None:
         self.db: UserServiceDB = db
         self.config: ServiceConfig = config
@@ -307,48 +314,13 @@ class UserService:
                         )
                         # Print users_db later
                         print_users = True
-                case CommandName.ADD:
-                    if not self.config.load_users:
-                        # Users in config.command.data are validated
-                        _count = self.db.get_row_count(TableName.USERS)
-                        self.logger.info(self.USER_COUNT_MSG % _count)
-                        self.add_users(
-                            users=cast(list[User], self.config.command.data)
-                        )
-                case CommandName.UPD:
-                    if not self.config.load_users:
-                        # Users in config.command.data are validated
-                        _count = self.db.get_row_count(TableName.USERS)
-                        self.logger.info(self.USER_COUNT_MSG % _count)
-                        self.update_users(
-                            updates_list=cast(
-                                list[UserDict], self.config.command.data
-                            )
-                        )
-                case CommandName.DEL:
-                    if not self.config.load_users:
-                        _count = self.db.get_row_count(TableName.USERS)
-                        self.logger.info(self.USER_COUNT_MSG % _count)
-                        self.delete_users(
-                            usernames=cast(list[str], self.config.command.data)
-                        )
                 case CommandName.RESET:
                     _count = self.db.get_row_count(TableName.USERS)
                     self.logger.info(self.USER_COUNT_MSG % _count)
                     self.reset_seq()
-                case CommandName.CLEAR:
-                    if not self.config.load_users:
-                        _count = self.db.get_row_count(TableName.USERS)
-                        self.logger.info(self.USER_COUNT_MSG % _count)
-                        self.clear_tables(
-                            cast(list[TableName], self.config.command.data)
-                        )
                 case _:
-                    raise RuntimeError(
-                        f"Unknown command: {self.config.command.name}\n"
-                        + "Valid commands: "
-                        + ', '.join(name for name in CommandName)
-                    )
+                    if not self.config.load_users:
+                        self.handle_update_and_delete(self.config.command)
 
         # Retrieve all users after operations
         if self.config.save_users or fetch_all:
@@ -362,6 +334,29 @@ class UserService:
                 self.logger.info("Users retrieved:\n" + users_to_str(users_db))
             else:
                 self.logger.debug("All users:\n" + users_to_str(users_db))
+
+    def handle_update_and_delete(self, command: CommandRequest) -> None:
+        _count = self.db.get_row_count(TableName.USERS)
+        self.logger.info(self.USER_COUNT_MSG % _count)
+        match command.name:
+            case CommandName.ADD:
+                # Users in config.command.data are validated
+                self.add_users(users=cast(list[User], command.data))
+            case CommandName.UPD:
+                # Users in config.command.data are validated
+                self.update_users(
+                    updates_list=cast(list[UserDict], command.data)
+                )
+            case CommandName.DEL:
+                self.delete_users(usernames=cast(list[str], command.data))
+            case CommandName.CLEAR:
+                self.clear_tables(cast(list[TableName], command.data))
+            case _:
+                raise RuntimeError(
+                    f"Unknown command: {command.name}\n"
+                    + "Valid commands: "
+                    + ', '.join(name for name in CommandName)
+                )
 
     async def get_lists_for_all(self) -> None:
         """Fetches data in all cities and sets `cities_data`.
@@ -406,7 +401,7 @@ class UserService:
         self.cities_data = _cities_data
         self.logger.info("Updates from all cities are ready.")
 
-    async def fetch_data_and_send(self, es: EmailService) -> bool:
+    async def fetch_data_and_send(self, es: EmailService) -> None:
         """Fetches full lists of data and send to selected users."""
         # Determine the users to serve
         self.select_users()
@@ -414,14 +409,14 @@ class UserService:
         # Set query parameters based on all users
         _params_ready: bool = self.set_params_for_all()
         if not _params_ready:
-            return False
+            return
 
         # Fetch data in all cities specified by selected users
         self.logger.info("Collecting updates for all...")
         await self.get_lists_for_all()
 
         if not self.cities_data:
-            return False
+            return
 
         # Process each user
         body_to_send: str
@@ -456,9 +451,9 @@ class UserService:
         if success:
             if self.config.send:
                 self.logger.info("✓ All emails sent successfully.")
-                return True
+                self.cleanup_after_sent()
             else:
-                return False
+                return
         else:
             raise RuntimeError("Error during email sending.")
 
@@ -531,9 +526,21 @@ class UserService:
 
         return {'body': body_to_send, 'hashes': hashes_to_record}
 
+    def cleanup_after_sent(self) -> None:
+        """Cleans up old sent records."""
+        _stale_days = self.max_days_back + CLEANUP_BUFFER_DAYS
+        self.logger.info(
+            f"Cleaning records more than {_stale_days} days old..."
+        )
+        current_time = datetime.now().astimezone()
+        cutoff_date = current_time - timedelta(days=_stale_days)
+        self.db.cleanup_old_sent_items(cutoff_date)
+        _count = self.db.get_row_count(TableName.SENT)
+        self.logger.info(f"Current sent records: {_count}")
+
 
 async def run_service(
-    config: ServiceConfig, logger: Logger | MyLogger = getLogger()
+    config: ServiceConfig, logger: Logger | MyLogger = default_logger
 ) -> None:
     """Manages user data in the database and process daily updates."""
     if config.dryrun:
@@ -564,28 +571,12 @@ async def run_service(
             us.crud_and_get_users()
 
             # Go fetch and send data ----------------------------------|
-            if (
-                not config.dryrun
-                and not config.crud_only
-                and config.command is None
-            ):
+            if not any([config.dryrun, config.crud_only, config.command]):
                 # Initialize email service
                 es = EmailService(logger)
 
-                # Prepare data and send to all users
-                is_sent: bool = await us.fetch_data_and_send(es)
-
-                if is_sent:
-                    # Cleanup old records
-                    _stale_days = us.max_days_back + CLEANUP_BUFFER_DAYS
-                    logger.info(
-                        f"Removing records more than {_stale_days} days old..."
-                    )
-                    current_time = datetime.now().astimezone()
-                    cutoff_date = current_time - timedelta(days=_stale_days)
-                    db.cleanup_old_sent_items(cutoff_date)
-                    _count = db.get_row_count(TableName.SENT)
-                    logger.info(f"Current sent records: {_count}")
+                # Prepare data and send to all users (cleanup after sent)
+                await us.fetch_data_and_send(es)
 
             # Save User objects to JSON -------------------------------|
             if config.save_users:

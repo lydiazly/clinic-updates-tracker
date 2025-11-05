@@ -3,7 +3,7 @@
 """Main functions to fetch updates in a specified town/city."""
 
 import asyncio
-from logging import Logger, getLogger
+from logging import Logger
 from playwright.async_api import (
     async_playwright,
     Browser,
@@ -22,7 +22,7 @@ from typing import Self, Literal
 from clinictracker.selectors import HomePageSelectors, DetailPageSelectors
 from clinictracker.config import Config, RunConfig, TIMEOUT_PAGE, TIMEOUT_UL
 from clinictracker.models import ItemData, ListData
-from clinictracker.startup import QueryParams, MyLogger
+from clinictracker.startup import QueryParams, MyLogger, default_logger
 from clinictracker.browsers import get_browser
 from clinictracker.utils import (
     print_error,
@@ -48,7 +48,7 @@ class PageManager:
         query: QueryParams,
         config: Config,
         check_date: bool = True,
-        logger: Logger | MyLogger = getLogger(),
+        logger: Logger | MyLogger = default_logger,
     ) -> None:
         self.browser: Browser = browser
         self.context: BrowserContext = context
@@ -90,9 +90,23 @@ class PageManager:
         try:
             await page.goto(url, wait_until='domcontentloaded')
         except TimeoutError:
-            raise TimeoutError(TIMEOUT_ERR % (url, TIMEOUT_PAGE / 1000))
+            raise TimeoutError(
+                TIMEOUT_ERR % (url, TIMEOUT_PAGE / 1000)
+            ) from None
         except Exception as e:
             raise RuntimeError(f"Unable to load {url}.") from e
+
+    async def _find_empty_sign(self, locator: Locator) -> str:
+        try:
+            _empty_text: str = (
+                await locator.inner_text(timeout=TIMEOUT_UL)
+            ).strip()
+            return _empty_text
+        except TimeoutError:
+            _timeout = 2 * TIMEOUT_UL
+            raise TimeoutError(
+                TIMEOUT_ERR % ('updates', _timeout / 1000)
+            ) from None
 
     async def get_list(self) -> ListData:
         """Navigates to the page and collects the list items.
@@ -137,45 +151,43 @@ class PageManager:
 
         # Wait for the title to be loaded
         try:
-            self.logger.debug(
-                f"Page title: {(await title_locator.inner_text()).strip()}"
-            )
+            _title = (await title_locator.inner_text()).strip()
+            self.logger.debug(f"Page title: {_title}")
         except TimeoutError:
-            raise TimeoutError(TIMEOUT_ERR % ('title', TIMEOUT_PAGE / 1000))
+            raise TimeoutError(
+                TIMEOUT_ERR % ('title', TIMEOUT_PAGE / 1000)
+            ) from None
 
         # Wait for the list title to be loaded
         try:
-            self.logger.debug(
-                f"List title: {(await list_title_locator.inner_text()).strip()}"
-            )
+            _list_title = (await list_title_locator.inner_text()).strip()
+            self.logger.debug(f"List title: {_list_title}")
         except TimeoutError:
-            raise TimeoutError(TIMEOUT_ERR % ('list', TIMEOUT_PAGE / 1000))
+            raise TimeoutError(
+                TIMEOUT_ERR % ('list', TIMEOUT_PAGE / 1000)
+            ) from None
 
         n_tot: int = 0  # total number of updates on the page
         items: list[ItemData] = []
 
         # Wait for the list items to be loaded
+        _timeout: bool = False
         try:
             # If at least one <li> is loaded
             await items_locator.first.wait_for(
                 state="visible", timeout=TIMEOUT_UL
             )
-        except TimeoutError:
-            # First, look for "There is no recent news/alerts for this town."
-            try:
-                self.logger.info(
-                    (
-                        await empty_sign_locator.inner_text(timeout=TIMEOUT_UL)
-                    ).strip()
-                )
-                return ListData(items=items, n_tot=n_tot, query=self.query)
-            # Now timeout
-            except TimeoutError:
-                _timeout = 2 * TIMEOUT_UL
-                raise TimeoutError(TIMEOUT_ERR % ('updates', _timeout / 1000))
-        else:
             n_tot = await items_locator.count()
+        except TimeoutError:
+            _timeout = True
+        else:
             self.logger.info(f"{n_tot} items loaded.")
+
+        if _timeout:
+            # Look for "There is no recent news/alerts for this town."
+            _empty_text = await self._find_empty_sign(empty_sign_locator)
+            self.logger.info(_empty_text)
+            return ListData(items=items, n_tot=n_tot, query=self.query)
 
         # Get items
         self.logger.info(
@@ -190,41 +202,22 @@ class PageManager:
                 break
 
             # Parse each item
-            try:
-                _item_data = await self.parse_item(item_locator)
-            except Exception as e:
-                raise RuntimeError(
-                    f"(get_list) Unable to parse item {count + 1}."
-                ) from e
+            _item_data = await self.parse_item(item_locator)
 
-            has_valid_date = False
+            _to_collect: bool = not self.check_date
             # If within the time range, append the item to the list
             if self.check_date:
                 try:
-                    _is_within: bool = is_date_within(
+                    _to_collect = is_date_within(
                         _item_data.date, days_back, tz=tz
                     )
                 except Exception as e:
                     # If errors occur, warn and collect it later
                     self.logger.warning(f"{type(e).__name__}: {e}")
-                else:
-                    has_valid_date = True
-                    if _is_within:
-                        items.append(_item_data)
-                        count += 1
-                    else:
-                        break
-            elif _item_data.date.strip():
-                has_valid_date = True
+                    _to_collect = True
 
-            # If no valid date found, still append
-            if not has_valid_date:
-                self.logger.warning("Date unknown. Still collecting...")
-                items.append(_item_data)
-                count += 1
-
-            # If not checking the dates, append
-            elif not self.check_date:
+            # If no valid date found or not checking the dates, append
+            if _to_collect:
                 items.append(_item_data)
                 count += 1
 
@@ -235,7 +228,7 @@ class PageManager:
         return ListData(items=items, n_tot=n_tot, query=self.query)
 
     async def parse_item(self, item_locator: Locator) -> ItemData:
-        """Parses the page (and detail page) and retrieves the content this item.
+        """Parses pages and retrieves the content of this item.
 
         Returns:
             data (ItemData): (title, url, date, content, digest)
@@ -325,7 +318,7 @@ class PageManager:
 async def close_everything(
     browser: Browser,
     context: BrowserContext,
-    logger: Logger | MyLogger = getLogger(),
+    logger: Logger | MyLogger = default_logger,
 ) -> None:
     """Gracefully closes everything."""
     if context:
@@ -348,7 +341,7 @@ async def close_everything(
 async def run(
     queries: list[QueryParams],
     config: Config,
-    logger: Logger | MyLogger = getLogger(),
+    logger: Logger | MyLogger = default_logger,
     check_date: bool = True,
 ) -> list[ListData] | None:
     """Main function to run the application."""
@@ -381,35 +374,37 @@ async def run(
                     _list_data = await pm.get_list()
                     data_all.append(_list_data)
 
-                    if isinstance(config, RunConfig):
-                        # Print to STDOUT if selecting '--print' ------|
-                        if config.to_stdout:
-                            print_content(
-                                _list_data.items, _list_data.n_tot, query
-                            )
+                    if not isinstance(config, RunConfig):
+                        continue
 
-                        # Export to a file if not selecting '--no-o' --|
-                        if config.export:
-                            if len(_list_data.items) > 0:
-                                content = construct_content(
-                                    _list_data.items, _list_data.n_tot, query
-                                )
-                                outpath = config.output_path
-                                outpath.parent.mkdir(
-                                    parents=True, exist_ok=True
-                                )
-                                if len(queries) > 1:
-                                    outpath = (
-                                        outpath.parent
-                                        / f"{outpath.stem}_{i}{outpath.suffix}"
-                                    )
-                                with open(outpath, "w") as f:
-                                    f.write(content)
-                                logger.info(f"Exported to '{str(outpath)}'")
-                            else:
-                                logger.info(NO_UPDATES_MSG)
-                        else:
-                            logger.info(NO_EXPORT_MSG)
+                    # Print to STDOUT if selecting '--print' ----------|
+                    if config.to_stdout:
+                        print_content(
+                            _list_data.items, _list_data.n_tot, query
+                        )
+
+                    if not config.export:
+                        logger.info(NO_EXPORT_MSG)
+                        continue
+
+                    if not _list_data.items:
+                        logger.info(NO_UPDATES_MSG)
+                        continue
+
+                    # Export to a file if not selecting '--no-o' ------|
+                    content = construct_content(
+                        _list_data.items, _list_data.n_tot, query
+                    )
+                    _outpath = config.output_path
+                    _outpath.parent.mkdir(parents=True, exist_ok=True)
+                    if len(queries) > 1:
+                        _outpath = (
+                            _outpath.parent
+                            / f"{_outpath.stem}_{i}{_outpath.suffix}"
+                        )
+                    with open(_outpath, "w") as f:
+                        f.write(content)
+                    logger.info(f"Exported to '{str(_outpath)}'")
 
         except TimeoutError as e:
             print_error(e, logger, max_level=2)

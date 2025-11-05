@@ -4,12 +4,12 @@ import base64
 from dataclasses import dataclass
 from dotenv import load_dotenv, dotenv_values
 import json
-from logging import Logger, getLogger
+from logging import Logger
 import os
 import requests
 from textwrap import dedent
 
-from clinictracker.startup import MyLogger
+from clinictracker.startup import MyLogger, default_logger
 from clinictracker.user.models import User
 from clinictracker.user.config import SECRETS_PATH
 from clinictracker.utils import html_to_plain
@@ -36,9 +36,9 @@ class EmailService:
         %s
         <br><hr>
         <p style="color:gray">
-        You are receiving this email because 
-        a GitHub Actions workflow <strong>user-service</strong> 
-        in repository <strong>clinic-updates-tracker</strong> is triggered.
+        You are receiving this email because a&nbsp;
+        GitHub Actions workflow <strong>user-service</strong> in&nbsp;
+        repository <strong>clinic-updates-tracker</strong> is triggered.
         </p>
         <p style="color:gray">Sent automatically.
          Please do not reply directly.</p>
@@ -58,7 +58,7 @@ class EmailService:
 
     def __init__(
         self,
-        logger: Logger | MyLogger = getLogger(),
+        logger: Logger | MyLogger = default_logger,
     ) -> None:
         self.logger: Logger | MyLogger = logger
         load_dotenv()

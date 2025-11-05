@@ -59,41 +59,34 @@ def user_parser_closure(
         parts = user_string.split()
         user_dict: UserDict = {}
         for part in parts:
-            if '=' in part:
-                key, value = [trim_str(s) for s in part.split('=', maxsplit=1)]
-                match key:
-                    case 'username':
-                        user_dict[key] = value.lower()
-                    case 'emails':
-                        user_dict[key] = [
-                            trim_str(s).lower() for s in value.split(',')
-                        ]
-                    case 'cities':
-                        user_dict[key] = [
-                            trim_str(s) for s in value.split(',')
-                        ]
-                    case 'period' | 'nmax':
-                        if value.split('-', 1)[-1].isdigit():
-                            user_dict[key] = int(value)
-                        else:
-                            raise ArgumentTypeError(
-                                f"'{key}' must be a number."
-                            )
-                    case _:
-                        raise ArgumentTypeError(
-                            f"Unknown field: {key}\n" + USER_FORMAT
-                        )
-            else:
-                raise ArgumentTypeError(
-                    f"Syntax error: {part}\n" + USER_FORMAT
-                )
+            if '=' not in part:
+                raise ArgumentTypeError(f"Invalid arg: {part}\n" + USER_FORMAT)
+
+            key, value = [trim_str(s) for s in part.split('=', maxsplit=1)]
+            match key:
+                case 'username':
+                    user_dict[key] = value.lower()
+                case 'emails':
+                    user_dict[key] = [
+                        trim_str(s).lower() for s in value.split(',')
+                    ]
+                case 'cities':
+                    user_dict[key] = [trim_str(s) for s in value.split(',')]
+                case 'period' | 'nmax':
+                    if value.split('-', 1)[-1].isdigit():
+                        user_dict[key] = int(value)
+                    else:
+                        raise ArgumentTypeError(f"'{key}' must be a number.")
+                case _:
+                    raise ArgumentTypeError(
+                        f"Unknown field: {key}\n" + USER_FORMAT
+                    )
 
         # Fill in 'username'
         _username: str = trim_str(user_dict.get('username', ''))
         user_dict['username'] = _username
 
-        # Set defaults
-        # (Could be set later but set here for logging)
+        # Set defaults (could be set later but set here for logging)
         if command_name == CommandName.ADD:
             # If no email specified and username is an email, use it
             if not user_dict.get('emails') and is_valid_email(_username):
@@ -107,9 +100,9 @@ def user_parser_closure(
     return parse_user_args
 
 
-def get_args_and_logger_for_service() -> tuple[
-    Namespace, logging.Logger | MyLogger
-]:
+def get_args_and_logger_for_service() -> (
+    tuple[Namespace, logging.Logger | MyLogger]
+):
     """Gets CLI arguments and sets the logger."""
     parser = ArgumentParser(
         description=(
@@ -415,7 +408,7 @@ def get_args_and_logger_for_service() -> tuple[
         case CommandName.CLEAR:
             logger.debug(
                 "Tables to clear: "
-                f"{', '.join(set(args.tables) if args.tables else TABLE_NAMES)}"
+                + ', '.join(set(args.tables) if args.tables else TABLE_NAMES)
             )
 
     return args, logger

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # tests/test_url.py
 # pytest tests/test_url.py --browser-channel chromium
-import pytest
 from playwright.sync_api import Page, expect
+import pytest
+
 from clinictracker.config import TARGET_BASE_URL
 from clinictracker.startup import get_full_url
 

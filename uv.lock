@@ -122,14 +122,12 @@ dependencies = [
 dev = [
     { name = "mypy" },
     { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
     { name = "ruff" },
     { name = "types-psycopg2" },
     { name = "types-python-dateutil" },
     { name = "types-requests" },
-]
-test = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
 ]
 
 [package.metadata]
@@ -145,14 +143,12 @@ requires-dist = [
 dev = [
     { name = "mypy" },
     { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
     { name = "ruff" },
     { name = "types-psycopg2" },
     { name = "types-python-dateutil" },
     { name = "types-requests" },
-]
-test = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
 ]
 
 [[package]]

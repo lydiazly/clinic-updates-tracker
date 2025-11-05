@@ -196,10 +196,14 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
         create_only=args.create_only,
         json_path=args.file,
         load_users=args.load,
-        delete_users=args.delete if args.load and args.file else False,
-        save_users=args.save,
+        delete_users=args.load and args.file and args.delete,
+        save_users=not args.dry_run and args.save,
         crud_only=args.crud_only,
-        send=args.command is None and (args.send or SEND_EMAILS),
+        send=(
+            not args.dry_run
+            and args.command is None
+            and (args.send or SEND_EMAILS)
+        ),
         ignore_hash=args.command is None and args.ignore_hash,
         usernames=_usernames,
         retries=args.retries,

@@ -6,12 +6,12 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag, PageElement
 from datetime import datetime, timedelta, timezone, date, tzinfo, time
 from dateutil.parser import parse, ParserError
-from logging import Logger, getLogger
+from logging import Logger
 import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from clinictracker.models import ItemData
-from clinictracker.startup import QueryParams, MyLogger
+from clinictracker.startup import QueryParams, MyLogger, default_logger
 
 
 TITLE_TEMPLATE = "%(city)s clinic updates in the past %(days_back)s days"
@@ -156,7 +156,7 @@ def is_date_within(
     days_back: int,
     ref_datetime: datetime | None = None,
     tz: str = '',
-    logger: Logger | MyLogger = getLogger(),
+    logger: Logger | MyLogger = default_logger,
 ) -> bool:
     """Checks if a given date is within the past n days.
     1-hour buffer is considered.
@@ -263,18 +263,18 @@ def is_date_within(
                 "Target date must be a string, datetime, or date object."
             )
     except (ParserError, TypeError) as e:
-        raise ParserError(f"(is_date_within) Error parsing date:\n{e}")
+        raise ParserError(f"(is_date_within) Error parsing date:\n{e}") from e
+
+    if tzname == 'UTC':
+        target_str_all = target_parsed.strftime(datetime_utc_fmt)
     else:
-        if tzname == 'UTC':
-            target_str_all = target_parsed.strftime(datetime_utc_fmt)
-        else:
-            target_str_with_tz = (
-                f"{target_parsed.strftime(datetime_fmt)} ({tzname})"
-            )
-            # Convert to UTC (for logging only)
-            target_utc: datetime = target_parsed.astimezone(timezone.utc)
-            target_utc_str = target_utc.strftime(datetime_utc_fmt)
-            target_str_all = f"{target_str_with_tz} ({target_utc_str})"
+        target_str_with_tz = (
+            f"{target_parsed.strftime(datetime_fmt)} ({tzname})"
+        )
+        # Convert to UTC (for logging only)
+        target_utc: datetime = target_parsed.astimezone(timezone.utc)
+        target_utc_str = target_utc.strftime(datetime_utc_fmt)
+        target_str_all = f"{target_str_with_tz} ({target_utc_str})"
 
     # Compare dates ---------------------------------------------------|
     # Automatically handles timezone conversion for timezone-aware objects

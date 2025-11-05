@@ -5,7 +5,7 @@
 import asyncio
 from dataclasses import fields
 from datetime import datetime
-from logging import Logger, getLogger
+from logging import Logger
 import os
 from pathlib import Path
 import psycopg2
@@ -15,15 +15,18 @@ from textwrap import dedent
 from types import TracebackType
 from typing import Self, Literal, cast
 
-from clinictracker.user.models import User, UserDict, ALLOWED_COLS
+from clinictracker.user.models import (
+    User,
+    UserDict,
+    ALLOWED_COLS,
+)
 from clinictracker.user.config import (
     PGSERVICE_PATH,
     PGPASS_PATH,
-    PGSERVICE,
     ServiceName,
     TableName,
 )
-from clinictracker.startup import MyLogger
+from clinictracker.startup import MyLogger, default_logger
 from clinictracker.user.helpers import (
     get_valid_user,
     validate_user_field,
@@ -53,9 +56,9 @@ class UserServiceDB:
 
     def __init__(
         self,
-        service_name: ServiceName = ServiceName(PGSERVICE),
+        service_name: ServiceName = ServiceName.DEV_LOCAL,
         dryrun: bool = False,
-        logger: Logger | MyLogger = getLogger(),
+        logger: Logger | MyLogger = default_logger,
     ) -> None:
         self.service_name: ServiceName = service_name
         self.dryrun: bool = dryrun
@@ -121,6 +124,21 @@ class UserServiceDB:
         # Ensure service matching an entry in pgpass
         ensure_pgpass_match(self.service_name.value, service_path, pgpass_path)
 
+    def _print_conn_params(self) -> None:
+        conn, cur = self._ensure_connected()
+        _conn_params: dict[str, str] = conn.get_dsn_parameters()
+        self.logger.debug(
+            '\n'.join(
+                [
+                    "Connection parameters:",
+                    f"Host: {_conn_params.get('host')}",
+                    f"Port: {_conn_params.get('port')}",
+                    f"Database: {_conn_params.get('dbname')}",
+                    f"User: {_conn_params.get('user')}",
+                ]
+            )
+        )
+
     def connect(self) -> None:
         """Establishes database connection."""
         try:
@@ -131,6 +149,7 @@ class UserServiceDB:
             raise RuntimeError("Error connecting to database.") from e
         else:
             self.logger.info(self.CONNECT_MSG)
+            self._print_conn_params()
 
     def close(self) -> None:
         """Closes database connection."""
@@ -324,10 +343,7 @@ class UserServiceDB:
                 RETURNING u.username;
                 """
             )
-        ).format(
-            tb=tmp_tb_sql,
-            updates=set_sql,
-        )
+        ).format(tb=tmp_tb_sql, updates=set_sql)
         # Insert only new rows using LEFT JOIN and get inserted usernames
         # (doesn't increment sequence for existing rows)
         insert_from_tmp_query = sql.SQL(
@@ -341,11 +357,7 @@ class UserServiceDB:
                 RETURNING username;
                 """
             )
-        ).format(
-            tb=tmp_tb_sql,
-            cols=cols_sql,
-            tmp_cols=tmp_cols_sql,
-        )
+        ).format(tb=tmp_tb_sql, cols=cols_sql, tmp_cols=tmp_cols_sql)
         # self.logger.debug(tmp_tb_query.as_string(conn))
         # self.logger.debug(insert_query.as_string(conn))
         # self.logger.debug(upsert_query.as_string(conn))
@@ -663,14 +675,14 @@ class UserServiceDB:
             _res = cur.fetchone()
             if _res is None:
                 raise RuntimeError(self.SEQ_NOT_FOUND_MSG)
-            last_value_old, is_called = _res
+            last_value_old, is_called_old = _res
             # Reset to the max user id + 1 (is_called = false)
             # cur.execute(sql.SQL(reset_query).format(sql.Literal(seq_name)))
             cur.execute(reset_query)
             # Check the current value
             # cur.execute(sql.SQL(value_query).format(sql.Identifier(seq_name)))
             cur.execute(value_query)
-            last_value_new, is_called = cur.fetchone()  # type: ignore[misc]
+            last_value_new, is_called_new = cur.fetchone()  # type: ignore[misc]
             if not self.dryrun:
                 conn.commit()
             else:
@@ -679,10 +691,10 @@ class UserServiceDB:
             conn.rollback()
             raise RuntimeError("Unable to reset 'users_id_seq'.") from e
         else:
-            next_seq = last_value_new + 1 if is_called else last_value_new
+            next_seq = last_value_new + 1 if is_called_new else last_value_new
             self.logger.debug(
-                f"users_id_seq: {last_value_old} -> {last_value_new} "
-                f"(is_called: {is_called})"
+                f"users_id_seq: {last_value_old} (is_called: {is_called_old})"
+                f" -> {last_value_new} (is_called: {is_called_new})"
             )
             self.logger.info(f"Reset. Next user id: {next_seq}")
 
@@ -728,7 +740,7 @@ class UserServiceDB:
 # def initialize_db(
 #     pg_password_path: Path = PG_PASSWORD_PATH,
 #     dryrun: bool = False,
-#     logger: Logger | MyLogger = getLogger(),
+#     logger: Logger | MyLogger = default_logger,
 # ) -> UserServiceDB:
 #     """Initialize and connect to the database."""
 #     logger.debug(
