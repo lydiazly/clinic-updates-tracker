@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # user/startup.py
 """Logger setter and CLI argument parsers."""
+
 from argparse import (
     ArgumentParser,
     Namespace,
@@ -106,9 +107,9 @@ def user_parser_closure(
     return parse_user_args
 
 
-def get_args_and_logger_for_service() -> (
-    tuple[Namespace, logging.Logger | MyLogger]
-):
+def get_args_and_logger_for_service() -> tuple[
+    Namespace, logging.Logger | MyLogger
+]:
     """Gets CLI arguments and sets the logger."""
     parser = ArgumentParser(
         description=(

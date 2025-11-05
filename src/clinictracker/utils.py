@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # utils.py
 """Generic utility functions."""
+
 from bs4 import BeautifulSoup
 from bs4.element import Tag, PageElement
 from datetime import datetime, timedelta, timezone, date, tzinfo, time

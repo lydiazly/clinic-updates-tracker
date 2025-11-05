@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # user/cli.py
 """CLI interface and main entry point for database management."""
+
 import asyncio
 import os
 import sys

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # models.py
 """Data models and structures."""
+
 from dataclasses import dataclass, field
 import hashlib
 from typing import TypeVar, NamedTuple

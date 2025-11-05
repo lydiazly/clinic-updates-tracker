@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # user/config.py
 """Configuration and constants."""
+
 from argparse import Namespace
 from dataclasses import dataclass
 from dotenv import load_dotenv

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # core.py
 """Main functions to fetch updates in a specified town/city."""
+
 import asyncio
 from logging import Logger, getLogger
 from playwright.async_api import (
@@ -372,7 +373,6 @@ async def run(
                 async with PageManager(
                     browser, context, query, config, check_date, logger
                 ) as pm:
-
                     if config.test:
                         logger.info(TEST_MSG)
                         return None

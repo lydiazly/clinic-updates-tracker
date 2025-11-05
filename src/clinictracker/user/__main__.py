@@ -1,5 +1,6 @@
 # user/__main__.py
 """python -m clinictracker-user [args]"""
+
 from clinictracker.cli import main
 
 

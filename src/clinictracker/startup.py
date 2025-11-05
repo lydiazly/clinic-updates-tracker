@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # startup.py
 """Logger setter and CLI argument parsers."""
+
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from enum import StrEnum  # python 3.11+
 import logging

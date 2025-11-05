@@ -5,9 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "clinictracker"
 version = "0.1.2"
-authors = [
-    { name = "Lydia Zhang" },
-]
+authors = [{ name = "Lydia Zhang" }]
 description = "Fetches clinic updates across specified regions from a target website."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,9 +21,24 @@ license = "MIT"
 license-files = ["LICEN[CS]E*"]
 dependencies = [
     "beautifulsoup4>=4.13.5",
+    "psycopg2-binary>=2.9.10",
+    "python-dateutil>=2.9.0",
+    "python-dotenv>=1.2.0",
     "pytest-playwright>=0.7.1",
-    "python-dateutil",
-    "python-dotenv",
+]
+
+[dependency-groups]
+dev = [
+    "mypy",
+    "pre-commit",
+    "ruff",
+    "types-psycopg2",
+    "types-python-dateutil",
+    "types-requests",
+]
+test = [
+    "pytest",
+    "pytest-asyncio",
 ]
 
 [project.scripts]
@@ -39,3 +52,10 @@ clinictracker-user = "clinictracker.user.cli:main"
 [tool.pytest.ini_options]
 addopts = "--browser-channel chromium -s"
 testpaths = ["tests"]
+
+[tool.ruff]
+include = ["*.py"]
+line-length = 79
+
+[tool.ruff.format]
+quote-style = "preserve"

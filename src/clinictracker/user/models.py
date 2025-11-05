@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # user/models.py
 """Data models and structures."""
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from dotenv import load_dotenv

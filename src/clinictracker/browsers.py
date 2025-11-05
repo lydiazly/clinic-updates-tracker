@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # browsers.py
 """Installs and launches browsers."""
+
 import asyncio
 from logging import Logger, getLogger
 import os
@@ -101,8 +102,7 @@ async def get_browser(
             browser = await getattr(p, config.browser_name).launch(**kwargs)
         except Exception as e:
             logger.error(
-                f"{config.browser_name} not launched:\n"
-                f"{type(e).__name__}: {e}"
+                f"{config.browser_name} not launched:\n{type(e).__name__}: {e}"
             )
             raise RuntimeError
         else:

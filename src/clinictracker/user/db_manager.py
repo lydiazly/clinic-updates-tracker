@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # user/db_manager.py
 """PostSQL database manager."""
+
 import asyncio
 from dataclasses import fields
 from datetime import datetime

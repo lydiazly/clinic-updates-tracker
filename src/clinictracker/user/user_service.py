@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # user/user_service.py
 """User service."""
+
 import asyncio
 from datetime import datetime, timedelta
 from logging import Logger, getLogger
@@ -545,7 +546,6 @@ async def run_service(
             dryrun=config.dryrun,
             logger=logger,
         ) as db:
-
             if config.test:
                 logger.info(TEST_MSG)
                 return
