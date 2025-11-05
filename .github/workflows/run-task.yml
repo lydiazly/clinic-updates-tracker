@@ -66,10 +66,10 @@ jobs:
           sudo apt-get update
 
       - name: Checkout repository
-        uses: actions/checkout@v4  # default: fetch-depth=1
+        uses: actions/checkout@v5  # default: fetch-depth=1
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - name: Install the latest version of uv and set the python version
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
 
@@ -77,19 +77,13 @@ jobs:
         run: |
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Install dependencies
+      - name: Install the project
         run: |
-          python3 --version
-          python3 -m pip install --no-cache-dir --upgrade --user pip
-          python3 -m pip install --no-cache-dir --user -r requirements.txt
+          uv sync --locked --no-dev --no-editable
 
       - name: Install chromium headless shell
         run: |
-          python3 -m playwright install --with-deps --only-shell chromium
-
-      - name: Install clinictracker
-        run: |
-          python3 -m pip install --no-cache-dir --user .
+          uv run playwright install --with-deps --only-shell chromium
 
       - name: Run script and save to OUTPUT_HTML_PATH
         shell: bash
@@ -106,7 +100,7 @@ jobs:
           )
 
           for i in $(seq 0 ${{ vars.RETRIES }}); do
-            clinictracker "${args[@]}"
+            uv run clinictracker "${args[@]}"
             if [ $? -eq 0 ]; then break; fi
             if [ $i -eq ${{ vars.RETRIES }} ]; then exit 1; fi
             echo "> Waiting to retry ($((i+1))/${{ vars.RETRIES }})..."
