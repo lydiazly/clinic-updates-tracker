@@ -69,6 +69,7 @@ def load_query(args: Namespace) -> QueryParams:
 # Logging
 default_logger: logging.Logger = logging.getLogger()
 
+
 class Color(StrEnum):
     """Preset ANSI color escape codes:
     BOLD, GRAY, GREEN, YELLOW, RED, RED_B, END
