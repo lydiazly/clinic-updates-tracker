@@ -29,14 +29,14 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "mypy",
-    "pre-commit",
+    "pytest",
+    "pytest-asyncio",
     "ruff",
+    "mypy",
     "types-psycopg2",
     "types-python-dateutil",
     "types-requests",
-    "pytest",
-    "pytest-asyncio",
+    "pre-commit",
 ]
 
 [project.scripts]
