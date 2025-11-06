@@ -33,5 +33,5 @@ docker compose down
 #   --env-file .secrets \
 #   -e PGSERVICE=$PGSERVICE \
 #   --rm \
-#   $(docker build --target $tag -t $IMAGE:$TAG -f "$DOCKERFILE" -q .) \
+#   $(docker build --target $TAG -t $IMAGE:$TAG -f "$DOCKERFILE" -q .) \
 #   "$@"
