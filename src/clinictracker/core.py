@@ -14,7 +14,6 @@ from playwright.async_api import (
 )
 import random
 import re
-
 import traceback
 from types import TracebackType
 from typing import Self, Literal
@@ -345,6 +344,7 @@ async def run(
     check_date: bool = True,
 ) -> list[ListData] | None:
     """Main function to run the application."""
+
     data_all: list[ListData] = []
     browser: Browser | None = None
 
@@ -404,7 +404,7 @@ async def run(
                         )
                     with open(_outpath, "w") as f:
                         f.write(content)
-                    logger.info(f"Exported to '{str(_outpath)}'")
+                    logger.info(f"Exported to '{_outpath}'")
 
         except TimeoutError as e:
             print_error(e, logger, max_level=2)

@@ -97,12 +97,12 @@ class UserServiceDB:
         """Sets environment variables `PGSERVICEFILE` and `PGPASSFILE`."""
         if not PGSERVICE_PATH.is_file():
             raise RuntimeError(
-                f"Service file not found: {str(PGSERVICE_PATH)}. "
+                f"Service file not found: {PGSERVICE_PATH}. "
                 "Set $PGSERVICEFILE to the service file path."
             )
         if not PGPASS_PATH.is_file():
             raise RuntimeError(
-                f"Password file not found: {str(PGPASS_PATH)}. "
+                f"Password file not found: {PGPASS_PATH}. "
                 "Set $PGPASSFILE to the password file path."
             )
         # Tell libpq where to find the service and password file
@@ -112,8 +112,8 @@ class UserServiceDB:
         service_path: Path = Path(os.getenv('PGSERVICEFILE', 'void'))
         pgpass_path: Path = Path(os.getenv('PGPASSFILE', 'void'))
         _perm = oct(pgpass_path.stat().st_mode)[-3:]
-        self.logger.debug(f"PGSERVICEFILE: {str(service_path)}")
-        self.logger.debug(f"PGPASSFILE: {str(pgpass_path)} (perm: {_perm})")
+        self.logger.debug(f"PGSERVICEFILE: {service_path}")
+        self.logger.debug(f"PGPASSFILE: {pgpass_path} (perm: {_perm})")
 
         # Check file permissions (should be 0600)
         if _perm != '600':
@@ -753,6 +753,6 @@ class UserServiceDB:
 #         logger.debug(f"Unable to load password: {e}")
 #         pg_password = getpass("Enter your PostgreSQL password: ")
 #     else:
-#         logger.debug(f"Loaded password from: {str(pg_password_path)}")
+#         logger.debug(f"Loaded password from: {pg_password_path}")
 #     db = UserServiceDB(password=pg_password, dryrun=dryrun, logger=logger)
 #     return db

@@ -75,9 +75,9 @@ def load_users_from_json(
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
     except FileNotFoundError:
-        raise FileNotFoundError(f"{str(json_path)}: file not found") from None
+        raise FileNotFoundError(f"{json_path}: file not found") from None
     except Exception as e:
-        raise RuntimeError(f"Failed to load file: '{str(json_path)}'") from e
+        raise RuntimeError(f"Failed to load file: '{json_path}'") from e
 
     # Validate the data
     if (
