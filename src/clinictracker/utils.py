@@ -159,7 +159,7 @@ def is_date_within(
     logger: Logger | MyLogger = default_logger,
 ) -> bool:
     """Checks if a given date is within the past n days.
-    1-hour buffer is considered.
+    1-hour buffer time before ref_datetime is applied.
 
     Args:
         target_date (str | datetime | date): the date to be checked,

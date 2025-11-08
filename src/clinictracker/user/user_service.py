@@ -98,15 +98,16 @@ class UserService:
         else:
             # Check if enough time has passed since last_sent_at
             current_time = datetime.now().astimezone()  # timezone-aware
+            buffer: timedelta = self.db.PERIOD_BUFFER  # in minutes
             _users: list[User] = []
             for user in self.users:
                 if usernames is None or user.username in usernames:
-                    if self.db.should_send_to_user(user, current_time):
+                    if self.db.should_send_to_user(user, current_time, buffer):
                         _users.append(user)
                     else:
                         self.logger.info(
                             f"Skipping {user.username}: Not enough time "
-                            "passed since last send"
+                            f"passed since last send (buffer: {buffer})"
                         )
             self.selected_users = _users
         self.logger.debug(
@@ -415,6 +416,9 @@ class UserService:
         self.logger.info("Collecting updates for all...")
         await self.get_lists_for_all()
 
+        # Set this time as the last_sent_at
+        current_time = datetime.now().astimezone()  # timezone-aware
+
         if not self.cities_data:
             return
 
@@ -444,7 +448,6 @@ class UserService:
                 success = False
                 continue
             else:
-                current_time = datetime.now().astimezone()  # timezone-aware
                 self.db.record_sent_items(user, hashes_to_record, current_time)
                 self.db.update_last_sent_at(user, current_time)
 

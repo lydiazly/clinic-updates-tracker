@@ -4,7 +4,7 @@
 
 import asyncio
 from dataclasses import fields
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import Logger
 import os
 from pathlib import Path
@@ -35,6 +35,7 @@ from clinictracker.user.helpers import (
 
 
 class UserServiceDB:
+    PERIOD_BUFFER: timedelta = timedelta(minutes=30)
     CONNECT_MSG = "Connected to PostgreSQL database."
     CLOSED_MSG = "Database connection closed."
     CHECK_TABLE_QUERY = dedent(
@@ -538,15 +539,25 @@ class UserServiceDB:
         else:
             return {row[0] for row in cur.fetchall()}
 
-    @staticmethod
-    def should_send_to_user(user: User, current_time: datetime) -> bool:
+    @classmethod
+    def should_send_to_user(
+        cls,
+        user: User,
+        current_time: datetime,
+        buffer: timedelta | None = None,
+    ) -> bool:
         """Checks if enough time has passed based on user's period.
         Automatically handles timezone conversion for timezone-aware objects.
+
+        30-minute buffer time before last_sent_at is applied.
         """
+        if buffer is None:
+            buffer = cls.PERIOD_BUFFER
+
         # Never sent before, should send
         if user.last_sent_at is None:
             return True
-        time_diff = current_time - user.last_sent_at
+        time_diff = current_time - user.last_sent_at + buffer
         return time_diff.days >= user.period
 
     def record_sent_items(
