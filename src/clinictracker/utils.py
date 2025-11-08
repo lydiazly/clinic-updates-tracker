@@ -19,7 +19,7 @@ TITLE_TEMPLATE = "%(city)s clinic updates in the past %(days_back)s days"
 
 def print_error(
     exc: Exception | BaseException,
-    logger: Logger | MyLogger,
+    logger: Logger | MyLogger = default_logger,
     max_level: int = 5,
 ) -> None:
     """Prints error messages and causes."""
