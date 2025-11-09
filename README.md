@@ -82,7 +82,7 @@ options:
                         (default to false or from $DEBUG_MODE)
   --test                Exit after opening a page without any further operation
                         (default: false)
-  -q, --quiet           Suppress INFO level outputs unless --debug is selected
+  -q, --quiet           Suppress INFO level outputs unless --debug
                         (default: print all)
 ```
 

@@ -36,7 +36,7 @@ TIMEOUT_ERR = "Timeout loading %s after %gs."
 TEST_MSG = "*** Test only (no operation) ***"
 BROWSER_CLOSED_MSG = "Browser closed."
 NO_UPDATES_MSG = "No updates. No file exported."
-NO_EXPORT_MSG = "'--no-o' selected. No file exported."
+NO_EXPORT_MSG = "'--no-o' applied. No file exported."
 
 
 class PageManager:
@@ -192,7 +192,7 @@ class PageManager:
         self.logger.info(
             f"Checking updates in {city} "
             + (f"in the past {days_back} days " if self.check_date else '')
-            + f"(collecting {nmax}/{n_tot} items)..."
+            + f"(limiting to {nmax}/{n_tot} items)..."
         )
         count = 0
         _item_data: ItemData
@@ -211,14 +211,16 @@ class PageManager:
                         _item_data.date, days_back, tz=tz
                     )
                 except Exception as e:
-                    # If errors occur, warn and collect it later
+                    # If errors occur, warn and collect it anyway
                     self.logger.warning(f"{type(e).__name__}: {e}")
                     _to_collect = True
 
+            if not _to_collect:
+                break
+
             # If no valid date found or not checking the dates, append
-            if _to_collect:
-                items.append(_item_data)
-                count += 1
+            items.append(_item_data)
+            count += 1
 
             # Pause for a random interval
             await asyncio.sleep(random.uniform(1, 3))

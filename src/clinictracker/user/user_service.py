@@ -37,7 +37,12 @@ from clinictracker.user.helpers import (
     user_updates_to_str,
 )
 from clinictracker.core import run, TEST_MSG
-from clinictracker.utils import print_error, construct_content
+from clinictracker.utils import (
+    print_error,
+    construct_content,
+    print_content,
+    DATETIME_TZ_FMT,
+)
 from clinictracker.user.db_manager import UserServiceDB
 from clinictracker.user.email_service import EmailParams, EmailService
 
@@ -47,10 +52,13 @@ DRYRUN_END_MSG = f"{Color.GREEN}*** DRY RUN END ***{Color.END}"
 DRYRUN_SEQ_MSG = "User id sequence increment keeps after dry run of insertion."
 CREATE_ONLY_MSG = "*** Create only (data fetching skipped) ***"
 CRUD_ONLY_MSG = "*** CRUD only (data fetching skipped) ***"
-SKIP_CREATION_MSG = "'--skip-creation' selected. Table creation skipped."
+SKIP_CREATION_MSG = "'--skip-creation' applied. Table creation skipped."
+FORGET_LAST_MSG = "'--forget-last' applied. Skipping last sent %s checking..."
+NO_TABLES_ERR = "One or more tables not exist."
 
 
 class UserService:
+    NO_CHECK_DATE_THRD = 10  # skip checking date in full lists if nmax < thrd
     ABORT_MSG = "Operation cancelled."
     CAUTION_FLG = f"{Color.BOLD}{Color.YELLOW}**CAUTION**{Color.END} "
     USER_COUNT_MSG = "Total users in database: %d"
@@ -72,14 +80,18 @@ class UserService:
         self.logger: Logger | MyLogger = logger
         self.users: list[User] = []
         self.selected_users: list[User] = []
+        self.check_date: bool = True
         self.cities_data: UserService._CitiesDataType = {}
         self.city_set: set[str] = set()
-        self.max_days_back: int = DAYS_BACK_MIN
+        self.max_days_back: int = DAYS_BACK_MIN  # no effect if not check_date
         self.max_nmax: int = MAX_ITEMS_MIN
         self.tables_ready: bool = False
         # Create tables
         if config.skip_creation:
             logger.info(SKIP_CREATION_MSG)
+            self.tables_ready = db.tables_exist(
+                TableName.USERS, TableName.SENT
+            )
         else:
             _created = db.create_users_table()
             self.tables_ready = _created and db.create_sent_items_table()
@@ -88,7 +100,8 @@ class UserService:
         """Selects users to serve. Sets `selected_users`."""
         usernames: list[str] | None = self.config.usernames
 
-        if self.config.ignore_hash:
+        if self.config.forget_last:
+            self.logger.debug(FORGET_LAST_MSG % 'time')
             if usernames is None:
                 self.selected_users = self.users
             else:
@@ -111,14 +124,15 @@ class UserService:
                         )
             self.selected_users = _users
         self.logger.debug(
-            "Specified users: " + ', '.join(usernames) if usernames else 'all'
+            "Requested users: "
+            + (', '.join(usernames) if usernames else 'all')
         )
         self.logger.debug(
             "Users to serve: "
             + ', '.join(u.username for u in self.selected_users)
         )
 
-    def set_params_for_all(self) -> bool:
+    def set_params_global(self) -> bool:
         """Sets `city_set`, `max_days_back`, and `max_nmax` for
         fetching full lists in all cities requested from selected users.
         Returns `True` if succeed.
@@ -138,15 +152,20 @@ class UserService:
         self.max_days_back = max(DAYS_BACK_MIN, max_user_period + 1)
         self.max_nmax = max(MAX_ITEMS_MIN, max_user_nmax)
 
+        # For small max_nmax, skip filtering by date in full lists
+        if self.max_nmax < self.NO_CHECK_DATE_THRD:
+            self.check_date = False
+
         self.logger.debug(
-            f"max_days_back={self.max_days_back}, max_nmax={self.max_nmax}"
+            f"max_days_back={self.max_days_back}, max_nmax={self.max_nmax}, "
+            f"check_date={self.check_date}"
         )
         self.logger.info(f"Cities to check: {', '.join(self.city_set)}")
 
         return True
 
-    def set_params_for_each(self, city: str) -> QueryParams:
-        """Sets query parameters for fetching full list for each city."""
+    def set_params_per_city(self, city: str) -> QueryParams:
+        """Sets query parameters for fetching full list in each city."""
         query_dict = {'only_accepting': 'yes', 'list_town': city}
         full_url = get_full_url(self.config.url, query_dict)
         return QueryParams(
@@ -361,12 +380,12 @@ class UserService:
 
     async def get_lists_for_all(self) -> None:
         """Fetches data in all cities and sets `cities_data`.
-        Calls `core.run(query, config, logger, check_date=False)`
+        Calls `core.run(query, config, logger, check_date)`
         """
         _cities: list[str] = list(self.city_set)
         _cities_data: UserService._CitiesDataType = {}
         _queries: list[QueryParams] = [
-            self.set_params_for_each(city) for city in _cities
+            self.set_params_per_city(city) for city in _cities
         ]
 
         _data_all: list[ListData] | None = None
@@ -376,7 +395,7 @@ class UserService:
                     queries=_queries,
                     config=self.config,
                     logger=self.logger,
-                    check_date=False,
+                    check_date=self.check_date,
                 )
             except TimeoutError:
                 if i == self.config.retries:
@@ -400,7 +419,7 @@ class UserService:
             else:
                 self.logger.info(f"No updates from {city}.")
         self.cities_data = _cities_data
-        self.logger.info("Updates from all cities are ready.")
+        self.logger.info("✓ Updates from all cities are ready.")
 
     async def fetch_data_and_send(self, es: EmailService) -> None:
         """Fetches full lists of data and send to selected users."""
@@ -408,7 +427,7 @@ class UserService:
         self.select_users()
 
         # Set query parameters based on all users
-        _params_ready: bool = self.set_params_for_all()
+        _params_ready: bool = self.set_params_global()
         if not _params_ready:
             return
 
@@ -416,8 +435,11 @@ class UserService:
         self.logger.info("Collecting updates for all...")
         await self.get_lists_for_all()
 
-        # Set this time as the last_sent_at
+        # Set this time (checking time) as the last_sent_at
         current_time = datetime.now().astimezone()  # timezone-aware
+        self.logger.info(
+            f"Current time: {current_time.strftime(DATETIME_TZ_FMT)}"
+        )
 
         if not self.cities_data:
             return
@@ -428,6 +450,7 @@ class UserService:
         _content_to_send: UserService._ContentToSend
         success: bool = True
         for user in self.selected_users:
+            self.logger.info('')
             self.logger.info(f"Processing user {user.username}...")
             _content_to_send = self.process_user(user)
             body_to_send = _content_to_send.get('body', '')
@@ -472,7 +495,24 @@ class UserService:
         body_to_send: str = ''
         hashes_to_record: list[str] = []
         username: str = user.username
+        period: int = user.period
         nmax: int = user.nmax
+
+        # Check which items have already been sent to this user
+        _sent_hashes: set[str] = set()
+        if self.config.forget_last:
+            self.logger.debug(FORGET_LAST_MSG % 'items')
+        else:
+            self.logger.info(f"Filtering updates for {username}...")
+            _hashes = [
+                item.digest
+                for city in user.cities
+                for item in self.cities_data[city].items
+            ]
+            _sent_hashes = self.db.get_sent_item_hashes(user.id, _hashes)
+            self.logger.debug(
+                f"{len(_sent_hashes)} updates have been sent to {username}."
+            )
 
         _email_body_list: list[str] = []
         _unsent_items: list[ItemData]
@@ -482,39 +522,36 @@ class UserService:
             ):
                 continue
 
-            # Check which items in this city have already been sent
-            self.logger.info(f"Filtering updates in {city} for {username}...")
+            # Get unsent items in this city
             _unsent_items = []
-            _n_tot = self.cities_data[city].n_tot
-            _query = self.cities_data[city].query
-            _hashes = [item.digest for item in _items]
-            _sent_hashes: set[str] = set()
-            if not self.config.ignore_hash:
-                _sent_hashes = self.db.get_sent_item_hashes(user.id, _hashes)
-                self.logger.debug(
-                    f"Found {len(_sent_hashes)} updates of {city} "
-                    f"have been sent to {username}."
-                )
-            else:
-                self.logger.debug(
-                    "'--ignore-hash' selected. Skipping sent items checking..."
-                )
-
-            # Get unsent items in this city and limit to nmax
             for item in _items:
                 if item.digest not in _sent_hashes:
                     _unsent_items.append(item)
 
+            # Limit number of items to nmax
             items_to_send = _unsent_items[:nmax]
-            hashes_to_record.extend([item.digest for item in items_to_send])
 
+            _n_tot = self.cities_data[city].n_tot
+            # Reset days_back and nmax for displaying
+            _query = self.cities_data[city].query._replace(
+                days_back=period, nmax=nmax
+            )
             if items_to_send:
-                _email_body_list.append(
-                    construct_content(items_to_send, _n_tot, _query, False)
+                if self.config.send:
+                    _content = construct_content(
+                        items_to_send, _n_tot, _query, False
+                    )
+                else:
+                    _content = print_content(
+                        items_to_send, _n_tot, _query, False
+                    )
+                _email_body_list.append(_content)
+                hashes_to_record.extend(
+                    [item.digest for item in items_to_send]
                 )
                 self.logger.debug(
-                    f"About to send {len(items_to_send)} new updates of "
-                    f"{city} to {username} (at most {nmax} items)."
+                    f"Prepared {len(items_to_send)}/{_n_tot} new updates "
+                    f"of {city} for {username}."
                 )
             else:
                 self.logger.debug(
@@ -568,7 +605,7 @@ async def run_service(
                 return
 
             if not us.tables_ready:
-                return
+                raise RuntimeError(NO_TABLES_ERR)
 
             # Perform CRUD operations and retrieve all users ----------|
             us.crud_and_get_users()

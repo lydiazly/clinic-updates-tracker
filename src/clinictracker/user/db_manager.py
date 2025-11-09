@@ -173,6 +173,21 @@ class UserServiceDB:
         else:
             self.logger.info(self.CLOSED_MSG)
 
+    def tables_exist(self, *table_names: TableName) -> bool:
+        """Checks if tables exist."""
+        conn, cur = self._ensure_connected()
+
+        for table_name in table_names:
+            try:
+                cur.execute(self.CHECK_TABLE_QUERY, (table_name,))
+            except Exception as e:
+                raise RuntimeError(self.TABLE_CHECK_ERR % table_name) from e
+            row = cur.fetchone()
+            if not row or not row[0]:
+                return False
+
+        return True
+
     def create_users_table(self) -> bool:
         """Creates "users" table. Returns `True` if created.
         - Columns: id, username, nickname, emails, cities, period, nmax,
@@ -181,13 +196,7 @@ class UserServiceDB:
         """
         conn, cur = self._ensure_connected()
 
-        try:
-            cur.execute(self.CHECK_TABLE_QUERY, (TableName.USERS,))
-        except Exception as e:
-            raise RuntimeError(self.TABLE_CHECK_ERR % TableName.USERS) from e
-
-        row = cur.fetchone()
-        if row and row[0]:
+        if self.tables_exist(TableName.USERS):
             self.logger.info(self.TABLE_EXIST_MSG % TableName.USERS)
             return True
 
@@ -243,13 +252,7 @@ class UserServiceDB:
         """
         conn, cur = self._ensure_connected()
 
-        try:
-            cur.execute(self.CHECK_TABLE_QUERY, (TableName.SENT,))
-        except Exception as e:
-            raise RuntimeError(self.TABLE_CHECK_ERR % TableName.SENT) from e
-
-        row = cur.fetchone()
-        if row and row[0]:
+        if self.tables_exist(TableName.SENT):
             self.logger.info(self.TABLE_EXIST_MSG % TableName.SENT)
             return True
 

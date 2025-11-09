@@ -118,7 +118,7 @@ class ServiceConfig(Config):
         save_users (bool): Save/Overwrite all user data to the JSON file
         crud_only (bool): Exit after CRUD operations on users
         send (bool): Send fetched data to users
-        ignore_hash (bool): Don't filter out items that are already sent
+        forget_last (bool): Skip checking last sent time and items
         usernames (list[str]): Only send to these users
         retries (int): Maximum retries if timeout
         dryrun (bool): Dry run for data management then exit
@@ -135,7 +135,7 @@ class ServiceConfig(Config):
     save_users: bool
     crud_only: bool
     send: bool
-    ignore_hash: bool
+    forget_last: bool
     usernames: list[str] | None
     retries: int
     dryrun: bool
@@ -204,7 +204,7 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
             and args.command is None
             and (args.send or SEND_EMAILS)
         ),
-        ignore_hash=args.command is None and args.ignore_hash,
+        forget_last=args.command is None and args.forget_last,
         usernames=_usernames,
         retries=args.retries,
         dryrun=args.dry_run,

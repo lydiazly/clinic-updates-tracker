@@ -14,7 +14,14 @@ from clinictracker.models import ItemData
 from clinictracker.startup import QueryParams, MyLogger, default_logger
 
 
+# DATE_FMT = '%B %d, %Y'
+# DATE_UTC_FMT = '%Y-%m-%d (UTC)'
+DATETIME_FMT = '%Y-%m-%d %H:%M:%S'
+DATETIME_TZ_FMT = DATETIME_FMT + ' (%Z)'
+DATETIME_UTC_FMT = '%Y-%m-%dT%H:%M:%SZ'
+
 TITLE_TEMPLATE = "%(city)s clinic updates in the past %(days_back)s days"
+SEE_MORE = "Go to website to view full list"
 
 
 def print_error(
@@ -73,7 +80,7 @@ def clear_content(html_content: str) -> str:
     return cleared_content
 
 
-def html_to_plain(html_content: str) -> str:
+def html_to_plain(html_content: str, indent: str = '') -> str:
     """Converts HTML to plain text. Removes extra links."""
     remove_list = [
         "Clinic Website",
@@ -86,7 +93,7 @@ def html_to_plain(html_content: str) -> str:
     for tag in soup.find_all('a'):
         if tag.string and tag.string.strip() in remove_list:
             tag.decompose()
-    text = soup.get_text('\n', strip=True)
+    text = soup.get_text(f"\n{indent}", strip=True)
     return text
 
 
@@ -110,13 +117,10 @@ def construct_content(
             f" (Posted {item.date if item.date else 'Unknown'})"
             "</strong></li>"
         )
-        if item.content:
-            lines.append(item.content)
+        lines.append(item.content)
     if len(items) < n_tot:
         lines.append(
-            f'<p><a href="{query.url}">'
-            "<em>Go to website to view full list</em>"
-            "</a></p>"
+            f'<p><a href="{query.url}">' f"<em>{SEE_MORE}</em>" "</a></p>"
         )
     lines.append("</ol>")
     if full_html:
@@ -131,24 +135,35 @@ def construct_content(
 
 
 def print_content(
-    items: list[ItemData], n_tot: int, query: QueryParams
-) -> None:
-    """Prints content as plain text to STDOUT."""
+    items: list[ItemData],
+    n_tot: int,
+    query: QueryParams,
+    to_stdout: bool = True,
+) -> str:
+    """Returns content as plain text. Prints to STDOUT if `to_stdout`."""
+    lines: list[str] = []
+    indent: str = '  '
     if len(items) > 0:
-        print("\n" + TITLE_TEMPLATE % query._asdict() + ":\n")
+        lines.append('\n# ' + TITLE_TEMPLATE % query._asdict())
         for i, item in enumerate(items):
-            print(f"{i + 1}.")
+            lines.append(f"\n{indent}{i + 1}.")
             if item.url:
-                print(f"{item.url}")
-            print(f"{item.title}")
-            print(f"(Date: {item.date if item.date else 'Unknown'})")
-            if item.content:
-                print(html_to_plain(item.content))
-            print('')
+                lines.append(f"{indent}{item.url}")
+            lines.append(
+                f"{indent}{item.title}"
+                f" (Posted {item.date if item.date else 'Unknown'})"
+            )
+            lines.append(indent + html_to_plain(item.content, indent))
         if len(items) < n_tot:
-            print(f"--> Go to website to view full list:\n{query.url}\n")
+            lines.append(f"\n{indent}--> {SEE_MORE}:\n{query.url}\n")
     else:
-        print("Nothing to print.")
+        lines.append("Nothing to print.")
+
+    text: str = '\n'.join(lines)
+    if to_stdout:
+        print(text)
+
+    return text
 
 
 def is_date_within(
@@ -183,11 +198,6 @@ def is_date_within(
     if ref_datetime is None:
         ref_datetime = datetime.now().astimezone()  # timezone-aware
 
-    # date_fmt = '%B %d, %Y'
-    # date_utc_fmt = '%Y-%m-%d (UTC)'
-    datetime_fmt = '%Y-%m-%d %H:%M:%S'
-    datetime_utc_fmt = '%Y-%m-%dT%H:%M:%SZ'
-
     # Prepare reference time ------------------------------------------|
     # Preset time (**adjust this if needed**)
     ref_time: time = time(12, 0, 0)
@@ -206,13 +216,13 @@ def is_date_within(
     ref_local -= buffer
 
     if ref_local.tzname() == 'UTC':
-        ref_str_all = ref_local.strftime(datetime_utc_fmt)
+        ref_str_all = ref_local.strftime(DATETIME_UTC_FMT)
     else:
-        ref_local_str = ref_local.strftime(datetime_fmt + ' (%Z)')
+        ref_local_str = ref_local.strftime(DATETIME_TZ_FMT)
         # Note: '%Z' may be different from the TZ name
         # Get reference time in UTC (for logging only)
         ref_utc: datetime = ref_local.astimezone(timezone.utc)
-        ref_utc_str = ref_utc.strftime(datetime_utc_fmt)
+        ref_utc_str = ref_utc.strftime(DATETIME_UTC_FMT)
         ref_str_all = f"{ref_local_str} ({ref_utc_str})"
 
     # Verify TZ info --------------------------------------------------|
@@ -266,14 +276,14 @@ def is_date_within(
         raise ParserError(f"(is_date_within) Error parsing date:\n{e}") from e
 
     if tzname == 'UTC':
-        target_str_all = target_parsed.strftime(datetime_utc_fmt)
+        target_str_all = target_parsed.strftime(DATETIME_UTC_FMT)
     else:
         target_str_with_tz = (
-            f"{target_parsed.strftime(datetime_fmt)} ({tzname})"
+            f"{target_parsed.strftime(DATETIME_FMT)} ({tzname})"
         )
         # Convert to UTC (for logging only)
         target_utc: datetime = target_parsed.astimezone(timezone.utc)
-        target_utc_str = target_utc.strftime(datetime_utc_fmt)
+        target_utc_str = target_utc.strftime(DATETIME_UTC_FMT)
         target_str_all = f"{target_str_with_tz} ({target_utc_str})"
 
     # Compare dates ---------------------------------------------------|

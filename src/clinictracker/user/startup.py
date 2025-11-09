@@ -270,7 +270,7 @@ def get_args_and_logger_for_service() -> (
         dest='delete',
         action='store_true',
         help=(
-            "**CAUTION** When --load is selected and the JSON file specified "
+            "**CAUTION** When --load and the JSON file specified "
             "by -f is non-empty,\ndelete users that are not in the file "
             "(will prompt for confirmation) (default: false)"
         ),
@@ -302,9 +302,9 @@ def get_args_and_logger_for_service() -> (
         ),
     )
     parser.add_argument(
-        '--ignore-hash',
+        '--forget-last',
         action='store_true',
-        help=("Don't filter out items that are already sent (default: false)"),
+        help=("Skip checking last sent time and items (default: false)"),
     )
     parser.add_argument(
         '-u',
@@ -370,8 +370,7 @@ def get_args_and_logger_for_service() -> (
         '--quiet',
         action='store_true',
         help=(
-            "Suppress INFO level outputs unless --debug is selected "
-            "(default: print all)"
+            "Suppress INFO level outputs unless --debug (default: print all)"
         ),
     )
     parser.add_argument(

@@ -12,7 +12,6 @@ from textwrap import dedent
 from clinictracker.startup import MyLogger, default_logger
 from clinictracker.user.models import User
 from clinictracker.user.config import SECRETS_PATH
-from clinictracker.utils import html_to_plain
 
 
 @dataclass
@@ -84,7 +83,7 @@ class EmailService:
         hr = '-' * 60  # horizontal line
         # Prepare email
         recipients: str = ', '.join(email_params.user.emails)
-        body_content: str = html_to_plain(email_params.body)
+        body_content: str = email_params.body
         # Build subject
         subject_prefix: str = " [TEST]" if self.test else ''
         subject_text: str = f"{subject_prefix} {self.SUBJECT}"
@@ -93,12 +92,12 @@ class EmailService:
             'from': self.sender,
             'to': recipients,
             'subject': subject_text,
-            'body': body_content,
+            'body': body_content.strip(),
         }
         print(
             '\n'.join(
                 [
-                    f"\nEmail preview for {email_params.user.username}:",
+                    f"\n>>> Email preview for {email_params.user.username} <<<",
                     hr,
                     message,
                     hr,

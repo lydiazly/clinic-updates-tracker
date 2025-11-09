@@ -305,8 +305,7 @@ def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
         '--quiet',
         action='store_true',
         help=(
-            "Suppress INFO level outputs unless --debug is selected "
-            "(default: print all)"
+            "Suppress INFO level outputs unless --debug (default: print all)"
         ),
     )
 
