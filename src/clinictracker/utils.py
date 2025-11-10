@@ -20,7 +20,7 @@ DATETIME_FMT = '%Y-%m-%d %H:%M:%S'
 DATETIME_TZ_FMT = DATETIME_FMT + ' (%Z)'
 DATETIME_UTC_FMT = '%Y-%m-%dT%H:%M:%SZ'
 
-TITLE_TEMPLATE = "%(city)s clinic updates in the past %(days_back)s days"
+TITLE_TEMPLATE = "%(city)s clinic updates in the past %(days)s"
 SEE_MORE = "Go to website to view full list"
 
 
@@ -107,7 +107,10 @@ def construct_content(
     if len(items) == 0:
         return ''
 
-    title = TITLE_TEMPLATE % query._asdict()
+    title = TITLE_TEMPLATE % {
+        'city': query.city,
+        'days': days_str(query.days_back),
+    }
     lines = [f"<h2>{title}</h2>"]
     lines.append("<ol>")
     for item in items:
@@ -144,7 +147,11 @@ def print_content(
     lines: list[str] = []
     indent: str = '  '
     if len(items) > 0:
-        lines.append('\n# ' + TITLE_TEMPLATE % query._asdict())
+        title = TITLE_TEMPLATE % {
+            'city': query.city,
+            'days': days_str(query.days_back),
+        }
+        lines.append('\n# ' + title)
         for i, item in enumerate(items):
             lines.append(f"\n{indent}{i + 1}.")
             if item.url:
@@ -293,17 +300,21 @@ def is_date_within(
     days_diff: float = time_diff.total_seconds() / 3600 / 24
     is_within: bool = days_diff <= days_back
 
-    days_diff_str = f"{days_diff:.3g}"
-    _days = 'day' if days_diff_str == '1' else 'days'
     if is_within:
         logger.debug(
-            f"{target_str_all} is within {days_back} {_days} before "
+            f"{target_str_all} is within {days_str(days_back)} before "
             f"{ref_str_all}. Collecting..."
         )
     else:
         logger.debug(
-            f"{target_str_all} is {days_diff_str} {_days} earlier than "
+            f"{target_str_all} is {days_str(days_diff)} earlier than "
             f"{ref_str_all}. Returning..."
         )
 
     return is_within
+
+
+def days_str(days: int | float) -> str:
+    "Returns '1 day' or 'N days'"
+    _days = f"{days:.3g}" if isinstance(days, float) else str(days)
+    return f"{_days} day{'' if _days == '1' else 's'}"

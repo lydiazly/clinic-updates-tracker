@@ -5,6 +5,7 @@
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from enum import StrEnum  # python 3.11+
 import logging
+from logging import Logger, LogRecord, getLogger
 from pathlib import Path
 import sys
 from typing import Any, NamedTuple
@@ -67,7 +68,18 @@ def load_query(args: Namespace) -> QueryParams:
 
 # ---------------------------------------------------------------------|
 # Logging
-default_logger: logging.Logger = logging.getLogger()
+default_logger: Logger = getLogger()
+
+
+class RecordCollector(logging.Handler):
+    """Handler that collects log records in a list."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.records: list[LogRecord] = []
+
+    def emit(self, record: LogRecord) -> None:
+        self.records.append(record)
 
 
 class Color(StrEnum):
@@ -85,9 +97,12 @@ class Color(StrEnum):
 
 
 class MyLogger:
-    def __init__(self, logger: logging.Logger, is_quiet: bool = False) -> None:
+    def __init__(self, logger: Logger, is_quiet: bool = False) -> None:
         self.logger = logger
         self.is_quiet = is_quiet
+        # Expose common Logger attributes explicitly
+        self.propagate = logger.propagate
+        self.level = logger.level
 
     def info(self, msg: str) -> None:
         if not self.is_quiet:
@@ -110,7 +125,7 @@ class LogFormatter(logging.Formatter):
         logging.CRITICAL: logging.Formatter(Color.RED_B + FMT + Color.END),
     }
 
-    def format(self, record: logging.LogRecord) -> str:
+    def format(self, record: LogRecord) -> str:
         formatter = self.FORMATTERS.get(
             record.levelno, logging.Formatter(self.FMT)
         )
@@ -134,13 +149,11 @@ class DebugLogFormatter(LogFormatter):
     }
 
 
-def setup_logger(
-    name: str = '', is_quiet: bool = False
-) -> logging.Logger | MyLogger:
+def setup_logger(name: str = '', is_quiet: bool = False) -> Logger | MyLogger:
     """Sets and returns a logger."""
     if name:
         # Level: INFO, use a local logger with a name
-        logger = logging.getLogger(name)
+        logger = getLogger(name)
         logger.setLevel(logging.INFO)
         handler = logging.StreamHandler(stream=sys.stderr)
         handler.setLevel(logging.INFO)
@@ -150,7 +163,7 @@ def setup_logger(
         logger.addHandler(handler)
         logger.propagate = False
         # Suppress urllib3 warnings
-        logging.getLogger('urllib3').setLevel(logging.ERROR)
+        getLogger('urllib3').setLevel(logging.ERROR)
         # Wrap the logger
         return MyLogger(logger, is_quiet)
     else:
@@ -167,7 +180,7 @@ def setup_logger(
 
 # ---------------------------------------------------------------------|
 # CLI arguments
-def get_args_and_logger() -> tuple[Namespace, logging.Logger | MyLogger]:
+def get_args_and_logger() -> tuple[Namespace, Logger | MyLogger]:
     """Gets CLI arguments and sets the logger."""
     parser = ArgumentParser(
         usage="%(prog)s [-h] [options] [town/city]",

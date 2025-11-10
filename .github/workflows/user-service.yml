@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       test_mode:
-        description: 'Test mode (--ignore-hash)'
+        description: 'Test mode (--forget-last)'
         required: false
         type: boolean
         default: false
@@ -32,7 +32,7 @@ jobs:
 
     env:
       TEST_MODE: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
-      IGNORE_HASH: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
+      FORGET_LAST: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
       MAX_ITEMS_MIN: ${{ github.event.inputs.test_mode == 'true' && '1' || vars.MAX_ITEMS_MIN }}
 
     steps:
@@ -103,10 +103,11 @@ jobs:
             --url "${{ vars.TARGET_BASE_URL }}"
             --tz "${{ vars.TARGET_TZ }}"
             --retries ${{ vars.RETRIES }}
+            --skip-creation
             --send
           )
-          if [ "${{ env.IGNORE_HASH }}" = 'true' ]; then
-            args+=(--ignore-hash)
+          if [ "${{ env.FORGET_LAST }}" = 'true' ]; then
+            args+=(--forget-last)
           fi
 
           uv run clinictracker-user "${args[@]}"

@@ -9,7 +9,7 @@ export MAX_ITEMS_MIN=${MAX_ITEMS_MIN:-10}
 export MAX_ITEMS_USER=${MAX_ITEMS_USER:-10}
 export CLEANUP_BUFFER_DAYS=${CLEANUP_BUFFER_DAYS:-7}
 export USERS_JSON_PATH="/app/data/users.json"
-export IGNORE_HASH=${IGNORE_HASH:-false}
+export FORGET_LAST=${FORGET_LAST:-false}
 export RETRIES=${RETRIES:-3}
 export PGSERVICEFILE="/app/config/pg_service.conf"
 export PGPASSFILE="/app/.pgpass"
@@ -53,7 +53,7 @@ echo "        RETRIES: ${RETRIES}"
 echo "TARGET_BASE_URL: ${TARGET_BASE_URL}"
 echo "      TARGET_TZ: ${TARGET_TZ}"
 echo "USERS_JSON_PATH: ${USERS_JSON_PATH}"
-echo "    IGNORE_HASH: ${IGNORE_HASH}"
+echo "    FORGET_LAST: ${FORGET_LAST}"
 echo "   SECRETS_PATH: ${SECRETS_PATH:-none}"
 echo ""
 echo "PGSERVICEFILE: $(ls ${PGSERVICEFILE})"
@@ -79,12 +79,13 @@ args=(
   --url "${TARGET_BASE_URL}"
   --tz "${TARGET_TZ}"
   --retries ${RETRIES}
+  --skip-creation
 )
 if [ "${SEND_EMAILS}" = 'true' ]; then
   args+=(--send)
 fi
-if [ "${IGNORE_HASH}" = 'true' ]; then
-  args+=(--ignore-hash)
+if [ "${FORGET_LAST}" = 'true' ]; then
+  args+=(--forget-last)
 fi
 
 echo -e "\n=== Step: Run script and send emails ===\n"

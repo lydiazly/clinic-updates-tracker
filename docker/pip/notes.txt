@@ -43,7 +43,7 @@ docker run -it --name clinic-test --env-file .env --env-file .secrets \
   -v "$(pwd)"/output:/app/output \
   -e TZ=UTC -e DAYS_BACK=1 -e MAX_ITEMS=10 --rm clinic-test:$tag  # ✓
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
-  --entrypoint pytest --rm clinic-test:$tag  # ✓
+  --rm clinic-test:$tag pytest  # ✓
 
 tag='user-pip'
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
@@ -51,7 +51,7 @@ docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
   -e PGSERVICE=prod --rm clinic-test:$tag list  # ✓
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
-  -e PGSERVICE=prod --rm clinic-test:$tag --ignore-hash  # ✓
+  -e PGSERVICE=prod --rm clinic-test:$tag --forget-last  # ✓
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
-  -e PGSERVICE=prod --rm clinic-test:$tag --ignore-hash --send  # ✓
+  -e PGSERVICE=prod --rm clinic-test:$tag --forget-last --send  # ✓
 

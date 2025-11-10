@@ -5,9 +5,9 @@ DOCKERFILE=docker/Dockerfile
 IMAGE=clinic-test
 TAG=user
 SERVICE=user
-ENV_FILE=.env.test
+ENV_FILE=.env.test  # use ./.pgpass
 PGSERVICE=prod
-IGNORE_HASH=true
+FORGET_LAST=true
 
 if [ -t 1 ]; then
     INTERACTIVE="-it"
@@ -19,7 +19,7 @@ docker compose build -q user
 
 docker compose run \
   --name $IMAGE \
-  -e IGNORE_HASH=$IGNORE_HASH \
+  -e FORGET_LAST=$FORGET_LAST \
   --rm \
   $SERVICE \
   "$@"

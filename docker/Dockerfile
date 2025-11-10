@@ -30,6 +30,7 @@ COPY src ./src/
 RUN --mount=type=cache,target=/root/.cache/uv <<EOF
 touch README.md
 uv sync --frozen --no-dev --no-editable
+uv pip install pytest-asyncio
 EOF
 
 

@@ -4,26 +4,13 @@
 
 from dataclasses import dataclass, field
 import hashlib
+from logging import LogRecord
 from typing import TypeVar, NamedTuple
 
 from clinictracker.startup import QueryParams
 
 
 T = TypeVar('T')
-
-
-# class Result(NamedTuple, Generic[T]):
-#     """For passing result data and messages.
-
-#     Attributes:
-#         data (T): Any data
-#         messages (list[str]): Each message will be printed by logger.info()
-#         warnings (list[str]): Each warning will be printed by logger.warning()
-#     """
-
-#     data: T
-#     messages: list[str]
-#     warnings: list[str]
 
 
 @dataclass(frozen=True)
@@ -68,3 +55,17 @@ class ListData(NamedTuple):
     items: list[ItemData]
     n_tot: int
     query: QueryParams
+
+
+class TaskResult(NamedTuple):
+    """For passing results and log records of a task.
+
+    Attributes:
+        task_id (int): Task ID
+        data (ListData | None): List data
+        records (list[LogRecord]): Log records
+    """
+
+    task_id: int
+    data: ListData | None
+    records: list[LogRecord]

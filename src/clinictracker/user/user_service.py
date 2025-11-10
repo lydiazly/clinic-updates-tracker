@@ -380,19 +380,19 @@ class UserService:
 
     async def get_lists_for_all(self) -> None:
         """Fetches data in all cities and sets `cities_data`.
-        Calls `core.run(query, config, logger, check_date)`
+        Calls `core.run(queries, config, logger, check_date)`
         """
-        _cities: list[str] = list(self.city_set)
+        cities: list[str] = list(self.city_set)
         _cities_data: UserService._CitiesDataType = {}
-        _queries: list[QueryParams] = [
-            self.set_params_per_city(city) for city in _cities
+        queries: list[QueryParams] = [
+            self.set_params_per_city(city) for city in cities
         ]
 
-        _data_all: list[ListData] | None = None
-        for i in range(0, self.config.retries + 1):
+        data_all: list[ListData] = []
+        for i in range(self.config.retries + 1):
             try:
-                _data_all = await run(
-                    queries=_queries,
+                data_all = await run(
+                    queries=queries,
                     config=self.config,
                     logger=self.logger,
                     check_date=self.check_date,
@@ -409,13 +409,13 @@ class UserService:
             else:
                 break
 
-        if _data_all is None:
-            self.logger.warning("Data not fetched.")
+        if not data_all:
+            self.logger.warning("No data fetched.")
             return
 
-        for i, city in enumerate(_cities):
-            if len(_data_all[i].items) > 0:
-                _cities_data[city] = _data_all[i]
+        for i, city in enumerate(cities):
+            if len(data_all[i].items) > 0:
+                _cities_data[city] = data_all[i]
             else:
                 self.logger.info(f"No updates from {city}.")
         self.cities_data = _cities_data
@@ -523,10 +523,9 @@ class UserService:
                 continue
 
             # Get unsent items in this city
-            _unsent_items = []
-            for item in _items:
-                if item.digest not in _sent_hashes:
-                    _unsent_items.append(item)
+            _unsent_items = [
+                item for item in _items if item.digest not in _sent_hashes
+            ]
 
             # Limit number of items to nmax
             items_to_send = _unsent_items[:nmax]

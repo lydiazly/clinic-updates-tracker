@@ -3,7 +3,8 @@
 """Main functions to fetch updates in a specified town/city."""
 
 import asyncio
-from logging import Logger
+from asyncio import Task
+from logging import Logger, getLogger
 from playwright.async_api import (
     async_playwright,
     Browser,
@@ -20,8 +21,13 @@ from typing import Self, Literal
 
 from clinictracker.selectors import HomePageSelectors, DetailPageSelectors
 from clinictracker.config import Config, RunConfig, TIMEOUT_PAGE, TIMEOUT_UL
-from clinictracker.models import ItemData, ListData
-from clinictracker.startup import QueryParams, MyLogger, default_logger
+from clinictracker.models import ItemData, ListData, TaskResult
+from clinictracker.startup import (
+    QueryParams,
+    RecordCollector,
+    MyLogger,
+    default_logger,
+)
 from clinictracker.browsers import get_browser
 from clinictracker.utils import (
     print_error,
@@ -37,6 +43,8 @@ TEST_MSG = "*** Test only (no operation) ***"
 BROWSER_CLOSED_MSG = "Browser closed."
 NO_UPDATES_MSG = "No updates. No file exported."
 NO_EXPORT_MSG = "'--no-o' applied. No file exported."
+TASK_START_MSG = "Starting concurrent tasks..."
+TASK_TITLE = "#%(id)s Town/City: %(city)s"
 
 
 class PageManager:
@@ -208,7 +216,7 @@ class PageManager:
             if self.check_date:
                 try:
                     _to_collect = is_date_within(
-                        _item_data.date, days_back, tz=tz
+                        _item_data.date, days_back, tz=tz, logger=self.logger
                     )
                 except Exception as e:
                     # If errors occur, warn and collect it anyway
@@ -339,16 +347,88 @@ async def close_everything(
     logger.info(BROWSER_CLOSED_MSG)
 
 
+async def run_task(
+    browser: Browser,
+    context: BrowserContext,
+    query: QueryParams,
+    config: Config,
+    check_date: bool = True,
+    task_id: int = -1,
+    logger: Logger | MyLogger = default_logger,
+) -> TaskResult:
+    """Opens a page and fetches data."""
+    # Create child logger, inheriting parent's level
+    task_logger: Logger | MyLogger = getLogger(f'{logger.name}.task_{task_id}')
+    task_logger.handlers.clear()
+    record_collector: RecordCollector = RecordCollector()
+    task_logger.addHandler(record_collector)
+    task_logger.propagate = False
+
+    # Run task
+    list_data: ListData
+    async with PageManager(
+        browser, context, query, config, check_date, task_logger
+    ) as pm:
+        if config.test:
+            task_logger.info(TEST_MSG)
+            return TaskResult(
+                task_id=task_id, data=None, records=record_collector.records
+            )
+
+        # Go to the landing page and get data -------------------------|
+        list_data = await pm.get_list()
+
+    return TaskResult(
+        task_id=task_id, data=list_data, records=record_collector.records
+    )
+
+
+def handle_output(
+    data_all: list[ListData],
+    queries: list[QueryParams],
+    config: RunConfig,
+    logger: Logger | MyLogger,
+) -> None:
+    for i, list_data in enumerate(data_all):
+        # Print to STDOUT if --print
+        if config.to_stdout:
+            print_content(list_data.items, list_data.n_tot, queries[i])
+
+        if not config.export:
+            logger.info(NO_EXPORT_MSG)
+            continue
+
+        if not list_data.items:
+            logger.info(NO_UPDATES_MSG)
+            continue
+
+        # Export to a file unless --no-o
+        content = construct_content(
+            list_data.items, list_data.n_tot, queries[i]
+        )
+        outpath = config.output_path
+        outpath.parent.mkdir(parents=True, exist_ok=True)
+        if len(queries) > 1:
+            outpath = (
+                outpath.parent / f"{outpath.stem}_{i + 1}{outpath.suffix}"
+            )
+        with open(outpath, "w") as f:
+            f.write(content)
+        logger.info(f"Exported to '{outpath}'")
+
+
 async def run(
     queries: list[QueryParams],
     config: Config,
     logger: Logger | MyLogger = default_logger,
     check_date: bool = True,
-) -> list[ListData] | None:
-    """Main function to run the application."""
+) -> list[ListData]:
+    """Main function to run the application concurrently."""
 
-    data_all: list[ListData] = []
+    task_num: int = len(queries)
+    results: list[TaskResult | None] = [None] * task_num
     browser: Browser | None = None
+    data_all: list[ListData] = []
 
     # Let playwright close browser automatically
     async with async_playwright() as p:
@@ -363,50 +443,63 @@ async def run(
             context = await browser.new_context()  # incognito
             context.set_default_timeout(TIMEOUT_PAGE)
 
-            _list_data: ListData
-            for i, query in enumerate(queries):
-                async with PageManager(
-                    browser, context, query, config, check_date, logger
-                ) as pm:
-                    if config.test:
-                        logger.info(TEST_MSG)
-                        return None
+            logger.info(TASK_START_MSG)
 
-                    # Go to the landing page and get data -------------|
-                    _list_data = await pm.get_list()
-                    data_all.append(_list_data)
-
-                    if not isinstance(config, RunConfig):
-                        continue
-
-                    # Print to STDOUT if selecting '--print' ----------|
-                    if config.to_stdout:
-                        print_content(
-                            _list_data.items, _list_data.n_tot, query
+            # Run tasks in parallel
+            async with asyncio.TaskGroup() as tg:
+                tasks: list[Task[TaskResult]] = []
+                # Keep the same order as queries
+                for task_id, query in enumerate(queries):
+                    task: Task[TaskResult] = tg.create_task(
+                        run_task(
+                            browser=browser,
+                            context=context,
+                            query=query,
+                            config=config,
+                            check_date=check_date,
+                            task_id=task_id,
+                            logger=logger,
                         )
-
-                    if not config.export:
-                        logger.info(NO_EXPORT_MSG)
-                        continue
-
-                    if not _list_data.items:
-                        logger.info(NO_UPDATES_MSG)
-                        continue
-
-                    # Export to a file if not selecting '--no-o' ------|
-                    content = construct_content(
-                        _list_data.items, _list_data.n_tot, query
                     )
-                    _outpath = config.output_path
-                    _outpath.parent.mkdir(parents=True, exist_ok=True)
-                    if len(queries) > 1:
-                        _outpath = (
-                            _outpath.parent
-                            / f"{_outpath.stem}_{i}{_outpath.suffix}"
-                        )
-                    with open(_outpath, "w") as f:
-                        f.write(content)
-                    logger.info(f"Exported to '{_outpath}'")
+                    tasks.append(task)
+
+                    if config.test:
+                        break
+
+            # Fill results
+            for task in tasks:
+                _result = task.result()
+                if _result.data is None:
+                    [logger.handle(record) for record in _result.records]
+                    return []
+                results[_result.task_id] = _result
+            del _result
+
+            # Collect data in same order as queries and process buffered logs
+            hr = '=' * 40
+            for task_id in range(task_num):
+                _task_result = results[task_id]
+                if _task_result is None or _task_result.data is None:
+                    raise RuntimeError(f"#{task_id + 1}: no data returned")
+
+                data_all.append(_task_result.data)
+                logger.info(hr)
+                logger.info(
+                    TASK_TITLE
+                    % {'id': task_id + 1, 'city': queries[task_id].city}
+                )
+                logger.info(hr)
+                [logger.handle(record) for record in _task_result.records]
+
+            if not isinstance(config, RunConfig):
+                return data_all
+
+            handle_output(
+                data_all=data_all,
+                queries=queries,
+                config=config,
+                logger=logger,
+            )
 
         except TimeoutError as e:
             print_error(e, logger, max_level=2)

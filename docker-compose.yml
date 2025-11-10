@@ -37,7 +37,7 @@ services:
       - TEST_MODE=false
       - SEND_EMAILS=false
       - SECRETS_PATH=/run/secrets/gmail_api
-      - IGNORE_HASH=false
+      - FORGET_LAST=false
       - PGSERVICE=prod
     volumes:
       - ./output:/app/output
@@ -59,7 +59,7 @@ services:
       - TEST_MODE=true
       - SEND_EMAILS=false
       - SECRETS_PATH=/run/secrets/gmail_api
-      - IGNORE_HASH=true
+      - FORGET_LAST=true
       - PGSERVICE=dev
     volumes:
       - ./output:/app/output

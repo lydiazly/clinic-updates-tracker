@@ -43,7 +43,7 @@ docker run -it --name clinic-test --env-file .env --env-file .secrets \
   -v "$(pwd)"/output:/app/output \
   -e TZ=UTC -e DAYS_BACK=1 -e MAX_ITEMS=10 --rm clinic-test:$tag  # ✓
 docker run -it --name clinic-test --env-file .env --env-file .secrets \
-  --entrypoint pytest --rm clinic-test:$tag  # ✓
+  --rm clinic-test:$tag pytest  # ✓
 
 tag='user'
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
@@ -51,9 +51,9 @@ docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
   -e PGSERVICE=prod --rm clinic-test:$tag list  # ✓
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
-  -e PGSERVICE=prod --rm clinic-test:$tag --ignore-hash  # ✓
+  -e PGSERVICE=prod --rm clinic-test:$tag --forget-last  # ✓
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
-  -e PGSERVICE=prod --rm clinic-test:$tag --ignore-hash --send  # ✓
+  -e PGSERVICE=prod --rm clinic-test:$tag --forget-last --send  # ✓
 
 #----------------------------------------------------------------------|
 # Compose
@@ -81,7 +81,7 @@ docker compose run --name clinic-test -e SEND_EMAILS=true --rm run-task  # ✓
 docker compose run --name clinic-test --rm user-dev  # ✓
 docker compose run --name clinic-test --rm user-dev list  # ✓
 # Use external database
-docker compose run --name clinic-test -e IGNORE_HASH=true --rm user list  # ✓
+docker compose run --name clinic-test -e FORGET_LAST=true --rm user list  # ✓
 
 # Create & start container
 docker compose up -d test-mode  # ✓

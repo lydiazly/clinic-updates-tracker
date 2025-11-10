@@ -6,7 +6,12 @@ import pytest
 
 from clinictracker.config import Config, TARGET_BASE_URL
 from clinictracker.startup import QueryParams, get_full_url
-from clinictracker.core import run, TEST_MSG, BROWSER_CLOSED_MSG
+from clinictracker.core import (
+    run,
+    TEST_MSG,
+    BROWSER_CLOSED_MSG,
+    TASK_START_MSG,
+)
 
 
 @pytest.mark.asyncio
@@ -31,10 +36,11 @@ async def test_chromium(caplog):
     )
 
     with caplog.at_level(logging.INFO):
-        res = await run(query, config)
-        # Assert returns None
-        assert res is None
+        data_all = await run(query, config)
+        # Assert returns empty list
+        assert isinstance(data_all, list) and not data_all
         # Check the log records more specifically
-        assert len(caplog.records) >= 2
+        assert len(caplog.records) >= 3
+        assert caplog.records[0].message == TASK_START_MSG
         assert caplog.records[-2].message == TEST_MSG
         assert caplog.records[-1].message == BROWSER_CLOSED_MSG
