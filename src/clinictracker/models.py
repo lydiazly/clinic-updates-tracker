@@ -5,12 +5,9 @@
 from dataclasses import dataclass, field
 import hashlib
 from logging import LogRecord
-from typing import TypeVar, NamedTuple
+from typing import NamedTuple
 
 from clinictracker.startup import QueryParams
-
-
-T = TypeVar('T')
 
 
 @dataclass(frozen=True)
