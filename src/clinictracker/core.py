@@ -188,7 +188,7 @@ class PageManager:
         except TimeoutError:
             _timeout = True
         else:
-            self.logger.info(f"{n_tot} items loaded.")
+            self.logger.info(f"Loaded {n_tot} items on the page.")
 
         if _timeout:
             # Look for "There is no recent news/alerts for this town."
@@ -200,7 +200,7 @@ class PageManager:
         self.logger.info(
             f"Checking updates in {city} "
             + (f"in the past {days_back} days " if self.check_date else '')
-            + f"(limiting to {nmax}/{n_tot} items)..."
+            + f"(limiting to {min(nmax, n_tot)}/{n_tot} items)..."
         )
         count = 0
         _item_data: ItemData
@@ -356,7 +356,15 @@ async def run_task(
     task_id: int = -1,
     logger: Logger | MyLogger = default_logger,
 ) -> TaskResult:
-    """Opens a page and fetches data."""
+    """Opens a page and fetches data.
+
+    Returns:
+        TaskResult: A namedtuple with fields:
+            task_id: int
+            data: ListData | None
+                If --test, set to None
+            records: list[LogRecord]
+    """
     # Create child logger, inheriting parent's level
     task_logger: Logger | MyLogger = getLogger(f'{logger.name}.task_{task_id}')
     task_logger.handlers.clear()
@@ -370,10 +378,7 @@ async def run_task(
         browser, context, query, config, check_date, task_logger
     ) as pm:
         if config.test:
-            task_logger.info(TEST_MSG)
-            return TaskResult(
-                task_id=task_id, data=None, records=record_collector.records
-            )
+            return TaskResult(task_id=task_id, data=None, records=[])
 
         # Go to the landing page and get data -------------------------|
         list_data = await pm.get_list()
@@ -417,17 +422,22 @@ def handle_output(
         logger.info(f"Exported to '{outpath}'")
 
 
+# =====================================================================|
 async def run(
     queries: list[QueryParams],
     config: Config,
     logger: Logger | MyLogger = default_logger,
     check_date: bool = True,
 ) -> list[ListData]:
-    """Main function to run the application concurrently."""
+    """Main function to run the application concurrently.
 
+    Returns:
+        data_all: list[ListData]
+    """
+
+    browser: Browser | None = None
     task_num: int = len(queries)
     results: list[TaskResult | None] = [None] * task_num
-    browser: Browser | None = None
     data_all: list[ListData] = []
 
     # Let playwright close browser automatically
@@ -443,39 +453,42 @@ async def run(
             context = await browser.new_context()  # incognito
             context.set_default_timeout(TIMEOUT_PAGE)
 
+            # ---------------------------------------------------------|
+            # Run tasks in parallel
             logger.info(TASK_START_MSG)
 
-            # Run tasks in parallel
             async with asyncio.TaskGroup() as tg:
                 tasks: list[Task[TaskResult]] = []
                 # Keep the same order as queries
                 for task_id, query in enumerate(queries):
-                    task: Task[TaskResult] = tg.create_task(
-                        run_task(
-                            browser=browser,
-                            context=context,
-                            query=query,
-                            config=config,
-                            check_date=check_date,
-                            task_id=task_id,
-                            logger=logger,
+                    tasks.append(
+                        tg.create_task(
+                            run_task(
+                                browser=browser,
+                                context=context,
+                                query=query,
+                                config=config,
+                                check_date=check_date,
+                                task_id=task_id,
+                                logger=logger,
+                            )
                         )
                     )
-                    tasks.append(task)
 
                     if config.test:
+                        logger.info(TEST_MSG)
                         break
 
-            # Fill results
+            # ---------------------------------------------------------|
+            # Collect results
             for task in tasks:
                 _result = task.result()
-                if _result.data is None:
-                    [logger.handle(record) for record in _result.records]
+                # If any data is None (--test), return an empty list
+                if config.test or _result.data is None:
                     return []
                 results[_result.task_id] = _result
-            del _result
 
-            # Collect data in same order as queries and process buffered logs
+            # Assign data in same order as queries
             hr = '=' * 40
             for task_id in range(task_num):
                 _task_result = results[task_id]
@@ -483,6 +496,8 @@ async def run(
                     raise RuntimeError(f"#{task_id + 1}: no data returned")
 
                 data_all.append(_task_result.data)
+
+                # Process buffered logs
                 logger.info(hr)
                 logger.info(
                     TASK_TITLE
@@ -491,9 +506,16 @@ async def run(
                 logger.info(hr)
                 [logger.handle(record) for record in _task_result.records]
 
+            # Ensure nothing went wrong
+            if len(data_all) != task_num:
+                raise RuntimeError("Incomplete data.")
+
+            # Return if running as a service
             if not isinstance(config, RunConfig):
                 return data_all
 
+            # ---------------------------------------------------------|
+            # Output
             handle_output(
                 data_all=data_all,
                 queries=queries,

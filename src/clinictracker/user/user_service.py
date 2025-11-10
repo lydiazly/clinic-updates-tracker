@@ -419,7 +419,9 @@ class UserService:
             else:
                 self.logger.info(f"No updates from {city}.")
         self.cities_data = _cities_data
-        self.logger.info("✓ Updates from all cities are ready.")
+        self.logger.info(
+            f"✓ Updates ready: {', '.join(self.cities_data.keys())}"
+        )
 
     async def fetch_data_and_send(self, es: EmailService) -> None:
         """Fetches full lists of data and send to selected users."""
@@ -506,7 +508,7 @@ class UserService:
             self.logger.info(f"Filtering updates for {username}...")
             _hashes = [
                 item.digest
-                for city in user.cities
+                for city in self.cities_data.keys()
                 for item in self.cities_data[city].items
             ]
             _sent_hashes = self.db.get_sent_item_hashes(user.id, _hashes)
