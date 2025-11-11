@@ -5,7 +5,7 @@ import os
 from playwright.sync_api import Page, expect
 
 from clinictracker.selectors import HomePageSelectors, DetailPageSelectors
-from clinictracker.utils import clear_content, html_to_plain
+from clinictracker.utils import sanitize_content, html_to_plain
 
 
 TIMEOUT = 500
@@ -97,18 +97,18 @@ def test_selectors_detail(page: Page):
         ">Clinic Website<",
         ">Contact Information &amp; Map<",
     ]
-    content_html = clear_content(content.inner_html())
+    content_html = sanitize_content(content.inner_html())
     content_plain = html_to_plain(content.inner_html())
     assert len(content_html.split('\n')) == 4
-    assert all(
-        [
-            s in content_html and s not in content_plain
-            for s in substring_in_html_list
-        ]
-    )
     # print("Content:")
     # print(content.inner_html())
     # print("Cleared content:")
     # print(content_html)
     # print("Plain text content:")
     # print(content_plain)
+    assert all(
+        [
+            s in content_html and s not in content_plain
+            for s in substring_in_html_list
+        ]
+    )

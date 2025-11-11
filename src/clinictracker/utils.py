@@ -3,10 +3,12 @@
 """Generic utility functions."""
 
 from bs4 import BeautifulSoup
-from bs4.element import Tag, PageElement
+
+# from bs4.element import Tag, PageElement
 from datetime import datetime, timedelta, timezone, date, tzinfo, time
 from dateutil.parser import parse, ParserError
 from logging import Logger
+import nh3
 import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -44,40 +46,35 @@ def print_error(
             return
 
 
-def preserve_tags(element: PageElement) -> str:
-    """Extracts the textual content of an HTML element while
-    preserving certain tags.
-    """
-    keep_tag_list = ['br', 'p', 'i', 'b', 'a', 'em']
-    if isinstance(element, Tag) and element.name not in keep_tag_list:
-        text = element.get_text()
-    else:
-        text = str(element)
-    text = re.sub(r"\s+", " ", text.replace("\n", " ")).strip()
-    return text
-
-
-def clear_content(html_content: str) -> str:
-    """Clears HTML content."""
+def sanitize_content(html_content: str) -> str:
+    """Sanitizes HTML content while preserving certain tags."""
+    allowed_tags = {'br', 'p', 'strong', 'i', 'b', 'a', 'em'}
     soup = BeautifulSoup(html_content, 'html.parser')
-    cleared_content = '\n'.join(
-        s.strip() for s in map(preserve_tags, soup) if s.strip()
+    # Join spaces, tabs, and new lines in each element ----------------|
+    raw_html = '\n'.join(
+        re.sub(r"\s+", ' ', str(elem)).strip() for elem in soup
+    )
+    # Sanitize while keeping allowed tags -----------------------------|
+    sanitized_content = nh3.clean(raw_html, tags=allowed_tags)
+    # Trim each line
+    sanitized_content = '\n'.join(
+        s.strip() for s in sanitized_content.split('\n') if s.strip()
     )
     # Remove any empty '<p></p>' --------------------------------------|
-    cleared_content = re.sub(r"(<p>\s*</p>)+", "", cleared_content)
+    sanitized_content = re.sub(r"(<p>\s*</p>)+", '', sanitized_content)
     # '<p>...</p>' --> '<br>...<br>' ----------------------------------|
-    # cleared_content = re.sub(
-    #     r"[ \t]*<p>|</p>[ \t]*", "<br>", cleared_content
+    # sanitized_content = re.sub(
+    #     r"[ \t]*<p>|</p>[ \t]*", "<br>", sanitized_content
     # )
     # Multiple <br> or <br /> --> <br> --------------------------------|
-    cleared_content = re.sub(
-        r"([ \t]*<br\s*/?>[ \t]*)+", "<br>", cleared_content
+    sanitized_content = re.sub(
+        r"([ \t]*<br\s*/?>[ \t]*)+", '<br>', sanitized_content
     )
     # Remove leading and trailing <br> or <br /> ----------------------|
-    cleared_content = re.sub(
-        r'^[ \t]*(<br\s*/?>)+|(<br\s*/?>)+[ \t]*$', '', cleared_content
+    sanitized_content = re.sub(
+        r'^[ \t]*(<br\s*/?>)+|(<br\s*/?>)+[ \t]*$', '', sanitized_content
     )
-    return cleared_content
+    return sanitized_content
 
 
 def html_to_plain(html_content: str, indent: str = '') -> str:

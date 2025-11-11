@@ -31,7 +31,7 @@ from clinictracker.startup import (
 from clinictracker.browsers import get_browser
 from clinictracker.utils import (
     print_error,
-    clear_content,
+    sanitize_content,
     construct_content,
     print_content,
     is_date_within,
@@ -314,7 +314,7 @@ class PageManager:
             content_locator = new_page.locator(
                 DetailPageSelectors.CONTENT
             ).describe("Detail content")
-            content = clear_content(await content_locator.inner_html())
+            content = sanitize_content(await content_locator.inner_html())
         except Exception:  # propagate to upper level
             raise
         finally:

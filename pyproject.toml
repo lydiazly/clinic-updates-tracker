@@ -25,6 +25,7 @@ dependencies = [
     "python-dateutil>=2.9.0",
     "python-dotenv>=1.2.0",
     "pytest-playwright>=0.7.1",
+    "nh3>=0.3.2",
 ]
 
 [dependency-groups]
