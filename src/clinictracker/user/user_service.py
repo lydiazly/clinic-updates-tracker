@@ -181,9 +181,9 @@ class UserService:
         self.logger.info(
             f"Inserting/Updating {len(users_src)} users into database..."
         )
-        if self.config.dryrun:
+        has_inserted: bool = self.db.insert_users(users_src, update=True)
+        if has_inserted and self.config.dryrun:
             self.logger.warning(DRYRUN_SEQ_MSG)
-        self.db.insert_users(users_src, update=True)
 
         users_db: list[User] | None
         if self.config.delete_users:
@@ -236,9 +236,9 @@ class UserService:
     def add_users(self, users: list[User]) -> None:
         """Inserts users to database."""
         self.logger.info(f"Inserting {len(users)} users into database...")
-        if self.config.dryrun:
+        has_inserted: bool = self.db.insert_users(users)
+        if has_inserted and self.config.dryrun:
             self.logger.warning(DRYRUN_SEQ_MSG)
-        self.db.insert_users(users)
 
     def update_users(self, updates_list: list[UserDict]) -> None:
         """Updates users in database from dicts."""
@@ -256,6 +256,8 @@ class UserService:
                     self.logger.info(self.ABORT_MSG)
             else:
                 self.logger.warning(self.db.USER_NOT_FOUND_MSG % _username)
+                usernames_db = self.db.get_all_usernames()
+                self.logger.debug(f"Existent users: {', '.join(usernames_db)}")
 
     def delete_users(self, usernames: list[str]) -> None:
         """Deletes specified users in database."""
@@ -269,6 +271,8 @@ class UserService:
                     self.logger.info(self.ABORT_MSG)
             else:
                 self.logger.warning(self.db.USER_NOT_FOUND_MSG % username)
+                usernames_db = self.db.get_all_usernames()
+                self.logger.debug(f"Existent users: {', '.join(usernames_db)}")
 
     def reset_seq(self) -> None:
         """Resets user id sequence in database."""

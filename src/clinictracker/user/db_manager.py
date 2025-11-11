@@ -282,10 +282,11 @@ class UserServiceDB:
             self.logger.info(self.TABLE_CREATE_MSG % TableName.SENT)
             return not self.dryrun
 
-    def insert_users(self, users: list[User], update: bool = False) -> None:
+    def insert_users(self, users: list[User], update: bool = False) -> bool:
         """Inserts/Updates `User` objects into database and increment
         sequence only after inserting new rows.
         If `update=False`, insert only.
+        Returns `True` if inserted new entries.
         """
         conn, cur = self._ensure_connected()
 
@@ -300,7 +301,7 @@ class UserServiceDB:
                 continue
         if not validated_users:
             self.logger.warning("No valid users to insert/update.")
-            return
+            return False
 
         values = [
             {field: getattr(user, field) for field in ALLOWED_COLS}
@@ -393,7 +394,7 @@ class UserServiceDB:
         #     username = re.search(r'\(username\)=\(([^)]+)\)', str(e))
         #     username = username.group(1) if username else e
         #     self.logger.warning(self.USER_EXIST_MSG % username)
-        #     return
+        #     return False
         except Exception as e:
             conn.rollback()
             raise RuntimeError(
@@ -407,16 +408,18 @@ class UserServiceDB:
                         + ', '.join(updated_usernames)
                     )
             else:
+                # Warn conflicts if insert only
                 for user in validated_users:
                     if user.username not in inserted_usernames:
                         self.logger.warning(
                             self.USER_EXIST_MSG % user.username
                         )
-            if insert_count > 0:
+            if (has_inserted := insert_count > 0):
                 self.logger.info(
                     f"Inserted {insert_count} users: "
                     + ', '.join(inserted_usernames)
                 )
+            return has_inserted
 
     def update_user(self, username: str, updates: UserDict) -> None:
         """Validates and updates user fields from a dict."""
@@ -482,6 +485,19 @@ class UserServiceDB:
             raise RuntimeError(f"Unable to delete user: {username}") from e
         else:
             self.logger.info(f"Deleted user: {username}")
+
+    def get_all_usernames(self) -> list[str]:
+        """Retrieves all usernames from database."""
+        conn, cur = self._ensure_connected()
+
+        query = "SELECT username FROM users ORDER BY id;"
+
+        try:
+            cur.execute(query)
+        except Exception as e:
+            raise RuntimeError("Unable to fetch usernames.") from e
+        else:
+            return [row[0] for row in cur.fetchall()]
 
     def get_all_users(self) -> list[User]:
         """Retrieves all users from database."""
