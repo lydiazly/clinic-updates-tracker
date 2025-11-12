@@ -50,17 +50,15 @@ TASK_TITLE = "#%(id)s Town/City: %(city)s"
 class PageManager:
     def __init__(
         self,
+        query: QueryParams,
         browser: Browser,
         context: BrowserContext,
-        query: QueryParams,
-        config: Config,
         check_date: bool = True,
         logger: Logger | MyLogger = default_logger,
     ) -> None:
+        self.query: QueryParams = query
         self.browser: Browser = browser
         self.context: BrowserContext = context
-        self.query: QueryParams = query
-        self.config: Config = config
         self.check_date: bool = check_date
         self.logger: Logger | MyLogger = logger
         self.page: Page | None = None
@@ -375,7 +373,11 @@ async def run_task(
     # Run task
     list_data: ListData
     async with PageManager(
-        browser, context, query, config, check_date, task_logger
+        query=query,
+        browser=browser,
+        context=context,
+        check_date=check_date,
+        logger=task_logger,
     ) as pm:
         if config.test:
             return TaskResult(task_id=task_id, data=None, records=[])
