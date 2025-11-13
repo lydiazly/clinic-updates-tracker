@@ -483,31 +483,32 @@ async def run(
 
             # ---------------------------------------------------------|
             # Collect results
+            hr = '=' * 40
             for task in tasks:
-                _result = task.result()
-                # If any data is None (--test), return an empty list
-                if config.test or _result.data is None:
+                # If --test, return an empty list
+                if config.test:
                     return []
-                results[_result.task_id] = _result
+                _result = task.result()
+                _task_id = _result.task_id
+                results[_task_id] = _result
+
+                # Process buffered logs
+                logger.info(hr)
+                logger.info(
+                    TASK_TITLE.format(
+                        id=_task_id + 1, city=queries[_task_id].city
+                    )
+                )
+                logger.info(hr)
+                [logger.handle(record) for record in _result.records]
 
             # Assign data in same order as queries
-            hr = '=' * 40
             for task_id in range(task_num):
                 _task_result = results[task_id]
                 if _task_result is None or _task_result.data is None:
                     raise RuntimeError(f"#{task_id + 1}: no data returned")
 
                 data_all.append(_task_result.data)
-
-                # Process buffered logs
-                logger.info(hr)
-                logger.info(
-                    TASK_TITLE.format(
-                        id=task_id + 1, city=queries[task_id].city
-                    )
-                )
-                logger.info(hr)
-                [logger.handle(record) for record in _task_result.records]
 
             # Ensure nothing went wrong
             if len(data_all) != task_num:
