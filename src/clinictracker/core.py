@@ -44,7 +44,7 @@ BROWSER_CLOSED_MSG = "Browser closed."
 NO_UPDATES_MSG = "No updates. No file exported."
 NO_EXPORT_MSG = "'--no-o' applied. No file exported."
 TASK_START_MSG = "Starting concurrent tasks..."
-TASK_TITLE = "#%(id)s Town/City: %(city)s"
+TASK_TITLE = "#{id} Town/City: {city}"
 
 
 class PageManager:
@@ -502,8 +502,9 @@ async def run(
                 # Process buffered logs
                 logger.info(hr)
                 logger.info(
-                    TASK_TITLE
-                    % {'id': task_id + 1, 'city': queries[task_id].city}
+                    TASK_TITLE.format(
+                        id=task_id + 1, city=queries[task_id].city
+                    )
                 )
                 logger.info(hr)
                 [logger.handle(record) for record in _task_result.records]

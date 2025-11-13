@@ -22,7 +22,7 @@ DATETIME_FMT = '%Y-%m-%d %H:%M:%S'
 DATETIME_TZ_FMT = DATETIME_FMT + ' (%Z)'
 DATETIME_UTC_FMT = '%Y-%m-%dT%H:%M:%SZ'
 
-TITLE_TEMPLATE = "%(city)s clinic updates in the past %(days)s"
+TITLE_TEMPLATE = "{city} clinic updates in the past {days}"
 SEE_MORE = "Go to website to view full list"
 
 
@@ -104,10 +104,9 @@ def construct_content(
     if len(items) == 0:
         return ''
 
-    title = TITLE_TEMPLATE % {
-        'city': query.city,
-        'days': days_str(query.days_back),
-    }
+    title = TITLE_TEMPLATE.format(
+        city=query.city, days=days_str(query.days_back)
+    )
     lines = [f"<h2>{title}</h2>"]
     lines.append("<ol>")
     for item in items:
@@ -144,10 +143,9 @@ def print_content(
     lines: list[str] = []
     indent: str = '  '
     if len(items) > 0:
-        title = TITLE_TEMPLATE % {
-            'city': query.city,
-            'days': days_str(query.days_back),
-        }
+        title = TITLE_TEMPLATE.format(
+            city=query.city, days=days_str(query.days_back)
+        )
         lines.append('\n# ' + title)
         for i, item in enumerate(items):
             lines.append(f"\n{indent}{i + 1}.")

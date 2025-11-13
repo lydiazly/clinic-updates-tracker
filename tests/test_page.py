@@ -45,7 +45,7 @@ async def test_page(caplog):
         nmax=10,
         tz='',
     )
-    task_title = TASK_TITLE % {'id': 1, 'city': city}
+    task_title = TASK_TITLE.format(id=1, city=city)
 
     with caplog.at_level(logging.DEBUG):
         data_all = await run([query], config)

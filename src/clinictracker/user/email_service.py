@@ -46,12 +46,12 @@ class EmailService:
     ).strip()
     MESSAGE_TEMPLATE: str = dedent(
         """
-        From: %(from)s
-        To: %(to)s
-        Subject: %(subject)s
+        From: {sender}
+        To: {recipients}
+        Subject: {subject}
         Content-Type: text/html; charset=UTF-8
 
-        %(body)s
+        {body}
         """
     ).strip()
 
@@ -88,12 +88,12 @@ class EmailService:
         subject_prefix: str = " [TEST]" if self.test else ''
         subject_text: str = f"{subject_prefix} {self.SUBJECT}"
         # Create RFC 2822 message
-        message: str = self.MESSAGE_TEMPLATE % {
-            'from': self.sender,
-            'to': recipients,
-            'subject': subject_text,
-            'body': body_content.strip(),
-        }
+        message: str = self.MESSAGE_TEMPLATE.format(
+            sender=self.sender,
+            recipients=recipients,
+            subject=subject_text,
+            body=body_content.strip(),
+        )
         print(
             '\n'.join(
                 [
@@ -175,12 +175,12 @@ class EmailService:
         body: str = self.BODY_TEMPLATE % body_content
 
         # Create RFC 2822 message
-        message: str = self.MESSAGE_TEMPLATE % {
-            'from': self.sender,
-            'to': recipients,
-            'subject': subject,
-            'body': body,
-        }
+        message: str = self.MESSAGE_TEMPLATE.format(
+            sender=self.sender,
+            recipients=recipients,
+            subject=subject,
+            body=body,
+        )
 
         # Encode message for Gmail API
         raw_message: str = base64.urlsafe_b64encode(
