@@ -296,22 +296,23 @@ class PageManager:
         # Create a new page (tab)
         new_page = await self.open_page()
 
+        title_locator = new_page.locator(DetailPageSelectors.TITLE).describe(
+            "Detail title"
+        )
+        date_locator = (
+            new_page.locator(DetailPageSelectors.DATE_PARENT)
+            .get_by_role('time')
+            .describe("Detail date")
+        )
+        content_locator = new_page.locator(
+            DetailPageSelectors.CONTENT
+        ).describe("Detail content")
+
         try:
             await self.goto_page(new_page, url)
             self.logger.debug(f"Detail page loaded in new tab: {new_page.url}")
-            title_locator = new_page.locator(
-                DetailPageSelectors.TITLE
-            ).describe("Detail title")
             title = (await title_locator.inner_text()).strip()
-            date_locator = (
-                new_page.locator(DetailPageSelectors.DATE_PARENT)
-                .get_by_role('time')
-                .describe("Detail date")
-            )
             date = (await date_locator.inner_text()).strip()
-            content_locator = new_page.locator(
-                DetailPageSelectors.CONTENT
-            ).describe("Detail content")
             content = sanitize_content(await content_locator.inner_html())
         except Exception:  # propagate to upper level
             raise
@@ -537,6 +538,14 @@ async def run(
             raise
 
         # Other unexpected exceptions
+        except ExceptionGroup as eg:
+            for exc in eg.exceptions:
+                if isinstance(exc, TimeoutError):
+                    print_error(exc, logger, 2)
+                else:
+                    print_error(exc, logger)
+            raise
+
         except Exception as e:
             if config.debug:
                 traceback.print_exc()

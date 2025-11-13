@@ -34,6 +34,8 @@ async def cli() -> None:
     # except KeyboardInterrupt:
     #     print("\nInterrupted by user.", file=sys.stderr)
     #     sys.exit(130)
+    except TimeoutError:
+        os._exit(130)
     except Exception:
         # print(f"{type(e).__name__}: {e}", file=sys.stderr)
         sys.exit(1)
