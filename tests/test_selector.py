@@ -93,22 +93,18 @@ def test_selectors_detail(page: Page):
         "<p>",
         "<strong>",
         "<a href",
-        "<br>",
+        "<br/>",
         ">Clinic Website<",
         ">Contact Information &amp; Map<",
     ]
     content_html = sanitize_content(content.inner_html())
     content_plain = html_to_plain(content.inner_html())
-    assert len(content_html.split('\n')) == 4
     # print("Content:")
     # print(content.inner_html())
     # print("Cleared content:")
     # print(content_html)
     # print("Plain text content:")
     # print(content_plain)
-    assert all(
-        [
-            s in content_html and s not in content_plain
-            for s in substring_in_html_list
-        ]
-    )
+    assert len(content_html.split('\n')) == 5
+    for s in substring_in_html_list:
+        assert s in content_html and s not in content_plain

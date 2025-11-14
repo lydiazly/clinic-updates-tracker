@@ -46,33 +46,33 @@ def print_error(
             return
 
 
-def sanitize_content(html_content: str) -> str:
+def sanitize_content(raw_html: str) -> str:
     """Sanitizes HTML content while preserving certain tags."""
     allowed_tags = {'br', 'p', 'strong', 'i', 'b', 'a', 'em'}
-    soup = BeautifulSoup(html_content, 'html.parser')
-    # Join spaces, tabs, and new lines in each element ----------------|
-    raw_html = '\n'.join(
-        re.sub(r"\s+", ' ', str(elem)).strip() for elem in soup
-    )
     # Sanitize while keeping allowed tags -----------------------------|
     sanitized_content = nh3.clean(raw_html, tags=allowed_tags)
-    # Trim each line
-    sanitized_content = '\n'.join(
-        s.strip() for s in sanitized_content.split('\n') if s.strip()
-    )
     # Remove any empty '<p></p>' --------------------------------------|
     sanitized_content = re.sub(r"(<p>\s*</p>)+", '', sanitized_content)
-    # '<p>...</p>' --> '<br>...<br>' ----------------------------------|
+    # '<p>...</p>' --> '<br/>...<br/>' --------------------------------|
     # sanitized_content = re.sub(
-    #     r"[ \t]*<p>|</p>[ \t]*", "<br>", sanitized_content
+    #     r"<p>|</p>", "<br/>", sanitized_content
     # )
-    # Multiple <br> or <br /> --> <br> --------------------------------|
+    # Multiple <br> or <br /> --> <br/> -------------------------------|
     sanitized_content = re.sub(
-        r"([ \t]*<br\s*/?>[ \t]*)+", '<br>', sanitized_content
+        r"(\s*<br\s*/?>\s*)+", '<br/>', sanitized_content
     )
-    # Remove leading and trailing <br> or <br /> ----------------------|
+    # Remove leading and trailing <br/> -------------------------------|
     sanitized_content = re.sub(
-        r'^[ \t]*(<br\s*/?>)+|(<br\s*/?>)+[ \t]*$', '', sanitized_content
+        r'^(\s*<br/>\s*)+|(\s*<br/>\s*)+$', '', sanitized_content
+    )
+    # Join spaces, tabs, and new lines in each element ----------------|
+    soup = BeautifulSoup(sanitized_content, 'html.parser')
+    sanitized_content = '\n'.join(
+        re.sub(r"\s+", ' ', str(elem)).strip() for elem in soup
+    )
+    # Trim lines
+    sanitized_content = '\n'.join(
+        s.strip() for s in sanitized_content.split('\n') if s.strip()
     )
     return sanitized_content
 
