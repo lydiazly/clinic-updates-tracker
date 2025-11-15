@@ -50,31 +50,29 @@ def sanitize_content(raw_html: str) -> str:
     """Sanitizes HTML content while preserving certain tags."""
     allowed_tags = {'br', 'p', 'strong', 'i', 'b', 'a', 'em'}
     # Sanitize while keeping allowed tags -----------------------------|
-    sanitized_content = nh3.clean(raw_html, tags=allowed_tags)
+    sanitized_html: str = nh3.clean(raw_html, tags=allowed_tags)
     # Remove any empty '<p></p>' --------------------------------------|
-    sanitized_content = re.sub(r"(<p>\s*</p>)+", '', sanitized_content)
+    sanitized_html = re.sub(r"(<p>\s*</p>)+", '', sanitized_html)
     # '<p>...</p>' --> '<br/>...<br/>' --------------------------------|
-    # sanitized_content = re.sub(
-    #     r"<p>|</p>", "<br/>", sanitized_content
+    # sanitized_html = re.sub(
+    #     r"<p>|</p>", "<br/>", sanitized_html
     # )
     # Multiple <br> or <br /> --> <br/> -------------------------------|
-    sanitized_content = re.sub(
-        r"(\s*<br\s*/?>\s*)+", '<br/>', sanitized_content
-    )
+    sanitized_html = re.sub(r"(\s*<br\s*/?>\s*)+", '<br/>', sanitized_html)
     # Remove leading and trailing <br/> -------------------------------|
-    sanitized_content = re.sub(
-        r'^(\s*<br/>\s*)+|(\s*<br/>\s*)+$', '', sanitized_content
+    sanitized_html = re.sub(
+        r'^(\s*<br/>\s*)+|(\s*<br/>\s*)+$', '', sanitized_html
     )
     # Join spaces, tabs, and new lines in each element ----------------|
-    soup = BeautifulSoup(sanitized_content, 'html.parser')
-    sanitized_content = '\n'.join(
+    soup = BeautifulSoup(sanitized_html, 'html.parser')
+    sanitized_html = '\n'.join(
         re.sub(r"\s+", ' ', str(elem)).strip() for elem in soup
     )
-    # Trim lines
-    sanitized_content = '\n'.join(
-        s.strip() for s in sanitized_content.split('\n') if s.strip()
+    # Join blank lines
+    sanitized_html = '\n'.join(
+        s.strip() for s in sanitized_html.split('\n') if s.strip()
     )
-    return sanitized_content
+    return sanitized_html
 
 
 def html_to_plain(html_content: str, indent: str = '') -> str:
