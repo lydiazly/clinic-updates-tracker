@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clinictracker"
-version = "0.1.4"
+version = "0.1.5"
 authors = [{ name = "Lydia Zhang" }]
 description = "Fetches clinic updates across specified regions from a target website."
 readme = "README.md"
