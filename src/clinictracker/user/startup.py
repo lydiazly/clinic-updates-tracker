@@ -188,7 +188,7 @@ def get_args_and_logger_for_service() -> (
     delete_parser: ArgumentParser = subparsers.add_parser(
         CommandName.DEL,
         description=(
-            "Delete users\n"
+            "**CAUTION** Delete users\n"
             "(overridden by --load; will prompt for confirmation)"
         ),
     )
@@ -205,8 +205,8 @@ def get_args_and_logger_for_service() -> (
     subparsers.add_parser(
         CommandName.RESET,
         description=(
-            "**CAUTION** Reset user id sequence in database. Perform "
-            "after updating from file\n(will prompt for confirmation) "
+            "**CAUTION** Reset user id sequence in database\n"
+            "(overridden by --load; will prompt for confirmation) "
             "(default: false)"
         ),
         formatter_class=RawTextHelpFormatter,
@@ -261,8 +261,8 @@ def get_args_and_logger_for_service() -> (
         action='store_true',
         help=(
             "Load user data from the JSON file specified by -f "
-            "and update the data in database\n(overriding "
-            "add/update/delete/clear commands) (default: false)"
+            "and update the data in database,\nthen exit before data fetching "
+            "(overriding add/update/delete/reset/clear)\n(default: false)"
         ),
     )
     parser.add_argument(
@@ -271,7 +271,7 @@ def get_args_and_logger_for_service() -> (
         action='store_true',
         help=(
             "**CAUTION** When --load and the JSON file specified "
-            "by -f is non-empty,\ndelete users that are not in the file "
+            "by -f is non-empty,\nwill delete users that are not in the file "
             "(will prompt for confirmation) (default: false)"
         ),
     )

@@ -264,7 +264,9 @@ class UserService:
         for username in usernames:
             _user_db = self.db.get_user_by_username(username)
             if _user_db is not None:
-                if prompt_to_confirm(f"About to delete user:\n{_user_db!s}"):
+                if prompt_to_confirm(
+                    f"{self.CAUTION_FLG}About to delete user:\n{_user_db!s}"
+                ):
                     self.logger.info(f"Deleting {username} in database...")
                     self.db.delete_user(username)
                 else:
@@ -301,9 +303,9 @@ class UserService:
         """Performs CRUD operations then retrieves all users in database.
         Sets `users`.
         - If `config.load_users` is `True`, overrides
-        add/update/delete/clear commands.
+        `add/update/delete/reset/clear`
         - If `config.load_users` is `True` and `config.delete_users` is `True`,
-        delete the users in database that are not in the JSON file.
+        delete the users in database that are not in the JSON file
         """
         users_db: list[User] | None = None
         fetch_all: bool = True
@@ -338,10 +340,6 @@ class UserService:
                         )
                         # Print users_db later
                         print_users = True
-                case CommandName.RESET:
-                    _count = self.db.get_row_count(TableName.USERS)
-                    self.logger.info(self.USER_COUNT_MSG % _count)
-                    self.reset_seq()
                 case _:
                     if not self.config.load_users:
                         self.handle_update_and_delete(self.config.command)
@@ -373,6 +371,8 @@ class UserService:
                 )
             case CommandName.DEL:
                 self.delete_users(usernames=cast(list[str], command.data))
+            case CommandName.RESET:
+                self.reset_seq()
             case CommandName.CLEAR:
                 self.clear_tables(cast(list[TableName], command.data))
             case _:
@@ -616,7 +616,7 @@ async def run_service(
             us.crud_and_get_users()
 
             # Go fetch and send data ----------------------------------|
-            if not any([config.dryrun, config.crud_only, config.command]):
+            if not any([config.dryrun, config.crud_only]):
                 # Initialize email service
                 es = EmailService(logger)
 

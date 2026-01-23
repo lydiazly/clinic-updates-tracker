@@ -198,7 +198,7 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
         load_users=args.load,
         delete_users=args.load and args.file and args.delete,
         save_users=not args.dry_run and args.save,
-        crud_only=args.crud_only,
+        crud_only=args.crud_only or args.command is not None or args.load,
         send=(
             not args.dry_run
             and args.command is None
