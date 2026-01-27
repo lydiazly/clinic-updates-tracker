@@ -1,12 +1,14 @@
 #!/usr/bin/env sh
-# Build and run the Docker image.
+# Build and run a one-off command on a service.
 
 DOCKERFILE=docker/Dockerfile
 IMAGE=clinic-test
-TAG=user
-SERVICE=user
+# TAG=user
+SERVICE=user-dev
 ENV_FILE=.env.test  # use ./.pgpass
-PGSERVICE=prod
+PGSERVICE=dev
+
+SEND_EMAILS=false
 FORGET_LAST=true
 
 if [ -t 1 ]; then
@@ -19,12 +21,13 @@ docker compose build -q user
 
 docker compose run \
   --name $IMAGE \
+  -e SEND_EMAILS=$SEND_EMAILS \
   -e FORGET_LAST=$FORGET_LAST \
   --rm \
   $SERVICE \
   "$@"
 
-docker compose down
+# docker compose down
 
 # docker run \
 #   $INTERACTIVE \

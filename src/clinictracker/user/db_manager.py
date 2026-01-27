@@ -35,7 +35,7 @@ from clinictracker.user.helpers import (
 
 
 class UserServiceDB:
-    PERIOD_BUFFER: timedelta = timedelta(minutes=30)
+    INTERVAL_BUFFER: timedelta = timedelta(minutes=30)
     CONNECT_MSG = "Connected to PostgreSQL database."
     CLOSED_MSG = "Database connection closed."
     CHECK_TABLE_QUERY = dedent(
@@ -190,8 +190,8 @@ class UserServiceDB:
 
     def create_users_table(self) -> bool:
         """Creates "users" table. Returns `True` if created.
-        - Columns: id, username, nickname, emails, cities, period, nmax,
-                   last_sent_at, created_at, updated_at
+        - Columns: id, username, nickname, emails, cities, interval, nmax,
+                   is_active, last_sent_at, created_at, updated_at
         - Primary key: id
         """
         conn, cur = self._ensure_connected()
@@ -209,8 +209,9 @@ class UserServiceDB:
                 nickname VARCHAR(30),
                 emails VARCHAR(50)[] NOT NULL CHECK (array_length(emails, 1) >= 1),
                 cities VARCHAR(50)[] NOT NULL CHECK (array_length(cities, 1) >= 1),
-                period INTEGER DEFAULT 1 CHECK (period > 0),
+                interval INTEGER DEFAULT 1 CHECK (interval > 0),
                 nmax INTEGER DEFAULT 10 CHECK (nmax > 0),
+                is_active BOOLEAN DEFAULT TRUE,
                 last_sent_at TIMESTAMPTZ,
                 created_at TIMESTAMPTZ DEFAULT now(),
                 updated_at TIMESTAMPTZ DEFAULT now()
@@ -425,7 +426,7 @@ class UserServiceDB:
         """Validates and updates user fields from a dict."""
         conn, cur = self._ensure_connected()
 
-        # Validate all keys are in the whitelist
+        # Validate that all keys are in the whitelist
         invalid_keys: set[str] = set(updates.keys()) - set(ALLOWED_COLS)
         if invalid_keys:
             raise ValueError(
@@ -516,6 +517,23 @@ class UserServiceDB:
         else:
             return [User(*row) for row in cur.fetchall()]
 
+    def get_active_users(self) -> list[User]:
+        """Retrieves all active users from database."""
+        conn, cur = self._ensure_connected()
+
+        field_names = [field.name for field in fields(User)]
+        query = sql.SQL(
+            "SELECT {cols} FROM users WHERE is_active ORDER BY id;"
+        ).format(cols=sql.SQL(', ').join(map(sql.Identifier, field_names)))
+        # self.logger.debug(query.as_string(conn))
+
+        try:
+            cur.execute(query)
+        except Exception as e:
+            raise RuntimeError("Unable to fetch users.") from e
+        else:
+            return [User(*row) for row in cur.fetchall()]
+
     def get_user_by_username(self, username: str) -> User | None:
         """Retrieves a specific user by username."""
         conn, cur = self._ensure_connected()
@@ -565,19 +583,22 @@ class UserServiceDB:
         current_time: datetime,
         buffer: timedelta | None = None,
     ) -> bool:
-        """Checks if enough time has passed based on user's period.
+        """Checks if enough time has passed based on active user's settings.
         Automatically handles timezone conversion for timezone-aware objects.
 
         30-minute buffer time before last_sent_at is applied.
         """
+        if not user.is_active:
+            return False
+
         if buffer is None:
-            buffer = cls.PERIOD_BUFFER
+            buffer = cls.INTERVAL_BUFFER
 
         # Never sent before, should send
         if user.last_sent_at is None:
             return True
         time_diff = current_time - user.last_sent_at + buffer
-        return time_diff.days >= user.period
+        return time_diff.days >= user.interval
 
     def record_sent_items(
         self,

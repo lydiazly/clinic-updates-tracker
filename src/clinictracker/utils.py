@@ -115,11 +115,11 @@ def construct_content(
             "</strong></li>"
         )
         lines.append(item.content)
+    lines.append("</ol>")
     if len(items) < n_tot:
         lines.append(
             f'<p><a href="{query.url}">' f"<em>{SEE_MORE}</em>" "</a></p>"
         )
-    lines.append("</ol>")
     if full_html:
         lines = (
             ["<!DOCTYPE html>", "<html>", "<head>"]

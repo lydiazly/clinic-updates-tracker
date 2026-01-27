@@ -17,12 +17,13 @@ ALLOWED_COLS: list[str] = [
     'nickname',
     'emails',
     'cities',
-    'period',
+    'interval',
     'nmax',
+    'is_active',
 ]
 
-# Default schedule period in days
-PERIOD_USER: int = int(os.getenv('PERIOD_USER', 1))  # default: 1
+# Default check interval in days
+INTERVAL_USER: int = int(os.getenv('INTERVAL_USER', 1))  # default: 1
 # Default number of items
 MAX_ITEMS_USER: int = int(os.getenv('MAX_ITEMS_USER', 10))  # default: 10
 
@@ -36,8 +37,9 @@ class User:
         nickname (str): Default to null
         emails (list[str]): (non-empty) Recipient list
         cities (list[str]): (non-empty) Town/City list
-        period (int): (> 0) Schedule period in days, default to 1
+        interval (int): (> 0) Check interval in days, default to 1
         nmax (int): (> 0) Maximum number of items to collect, default to 10
+        is_active (bool): Default to True
         last_sent_at (datetime): Time of last sent (automatically generated)
         id (int): Assigned by database (-1: not assigned)
     """
@@ -46,8 +48,9 @@ class User:
     nickname: str | None = None
     emails: list[str] = field(default_factory=list)
     cities: list[str] = field(default_factory=list)
-    period: int = PERIOD_USER
+    interval: int = INTERVAL_USER
     nmax: int = MAX_ITEMS_USER
+    is_active: bool = True
     last_sent_at: datetime | None = None
     id: int = -1
 
@@ -71,5 +74,6 @@ class UserDict(TypedDict, total=False):
     nickname: str | None
     emails: list[str]
     cities: list[str]
-    period: int
+    interval: int
     nmax: int
+    is_active: bool

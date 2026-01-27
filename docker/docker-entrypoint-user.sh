@@ -4,7 +4,7 @@ set -e
 export TEST_MODE=${TEST_MODE:-true}
 export SEND_EMAILS=${SEND_EMAILS:-false}
 export DAYS_BACK_MIN=${DAYS_BACK_MIN:-2}
-export PERIOD_USER=${PERIOD_USER:-1}
+export INTERVAL_USER=${INTERVAL_USER:-1}
 export MAX_ITEMS_MIN=${MAX_ITEMS_MIN:-10}
 export MAX_ITEMS_USER=${MAX_ITEMS_USER:-10}
 export CLEANUP_BUFFER_DAYS=${CLEANUP_BUFFER_DAYS:-7}
@@ -46,7 +46,7 @@ echo "             TZ: ${TZ}"
 echo "      TEST_MODE: ${TEST_MODE}"
 echo "    SEND_EMAILS: ${SEND_EMAILS}"
 echo "  DAYS_BACK_MIN: ${DAYS_BACK_MIN}"
-echo "    PERIOD_USER: ${PERIOD_USER}"
+echo "  INTERVAL_USER: ${INTERVAL_USER}"
 echo "  MAX_ITEMS_MIN: ${MAX_ITEMS_MIN}"
 echo " MAX_ITEMS_USER: ${MAX_ITEMS_USER}"
 echo "        RETRIES: ${RETRIES}"
@@ -79,7 +79,6 @@ args=(
   --url "${TARGET_BASE_URL}"
   --tz "${TARGET_TZ}"
   --retries ${RETRIES}
-  --skip-creation
 )
 if [ "${SEND_EMAILS}" = 'true' ]; then
   args+=(--send)

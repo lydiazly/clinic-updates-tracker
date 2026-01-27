@@ -7,11 +7,37 @@ import json
 from logging import Logger
 import os
 import requests
-from textwrap import dedent
 
 from clinictracker.startup import MyLogger, default_logger
 from clinictracker.user.models import User
-from clinictracker.user.config import SECRETS_PATH
+from clinictracker.user.config import SECRETS_PATH, UPDATE_URL, UNSUBSCRIBE_URL
+
+
+SUBJECT = "Clinic Update Alerts"
+
+BODY_TEMPLATE: str = """
+<body>
+%s
+<br><hr>
+<div style="color:gray">
+  <p>You are receiving this automated notification because you subscribed&nbsp;
+  to <em>Clinic Update Tracker</em>.</p>
+  <p>Please do not reply directly to this email.</p>
+  <p>
+    <a href="%s">Manage Subscription</a> | <a href="%s">Unsubscribe</a>
+  </p>
+</div>
+</body>
+""".strip()
+
+MESSAGE_TEMPLATE: str = """
+From: {sender}
+To: {recipients}
+Subject: {subject}
+Content-Type: text/html; charset=UTF-8
+
+{body}
+""".strip()
 
 
 @dataclass
@@ -28,33 +54,6 @@ class EmailParams:
 
 
 class EmailService:
-    SUBJECT = "Clinic Update Alerts"
-    BODY_TEMPLATE: str = dedent(
-        """
-        <body>
-        %s
-        <br><hr>
-        <p style="color:gray">
-        You are receiving this email because a&nbsp;
-        GitHub Actions workflow <strong>user-service</strong> in&nbsp;
-        repository <strong>clinic-updates-tracker</strong> is triggered.
-        </p>
-        <p style="color:gray">Sent automatically.
-         Please do not reply directly.</p>
-        </body>
-        """
-    ).strip()
-    MESSAGE_TEMPLATE: str = dedent(
-        """
-        From: {sender}
-        To: {recipients}
-        Subject: {subject}
-        Content-Type: text/html; charset=UTF-8
-
-        {body}
-        """
-    ).strip()
-
     def __init__(
         self,
         logger: Logger | MyLogger = default_logger,
@@ -86,9 +85,9 @@ class EmailService:
         body_content: str = email_params.body
         # Build subject
         subject_prefix: str = " [TEST]" if self.test else ''
-        subject_text: str = f"{subject_prefix} {self.SUBJECT}"
+        subject_text: str = f"{subject_prefix} {SUBJECT}"
         # Create RFC 2822 message
-        message: str = self.MESSAGE_TEMPLATE.format(
+        message: str = MESSAGE_TEMPLATE.format(
             sender=self.sender,
             recipients=recipients,
             subject=subject_text,
@@ -165,17 +164,17 @@ class EmailService:
 
         # Build subject
         subject_prefix: str = " [TEST]" if self.test else ''
-        subject_text: str = f"{subject_prefix} {self.SUBJECT}"
+        subject_text: str = f"{subject_prefix} {SUBJECT}"
         subject_encoded: str = base64.b64encode(
             subject_text.encode('utf-8')
         ).decode('ascii')
         subject: str = f"=?UTF-8?B?{subject_encoded}?="
 
         # Build body
-        body: str = self.BODY_TEMPLATE % body_content
+        body: str = BODY_TEMPLATE % (body_content, UPDATE_URL, UNSUBSCRIBE_URL)
 
         # Create RFC 2822 message
-        message: str = self.MESSAGE_TEMPLATE.format(
+        message: str = MESSAGE_TEMPLATE.format(
             sender=self.sender,
             recipients=recipients,
             subject=subject,

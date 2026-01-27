@@ -199,11 +199,17 @@ def validate_user_field(username: str, field: str, data: Any) -> None:  # noqa
                         raise ValueError(
                             ERR_TEMPLATE % f"Invalid email: {email}"
                         )
-        case 'period' | 'nmax':
+        case 'interval' | 'nmax':
             if not isinstance(data, int) or data <= 0:
                 raise ValueError(
                     ERR_TEMPLATE
                     % f"'{field}' must be a positive integer, got: {data}"
+                )
+        case 'is_active':
+            if not isinstance(data, bool):
+                raise ValueError(
+                    ERR_TEMPLATE
+                    % f"'{field}' must be True or False, got: {data}"
                 )
 
 

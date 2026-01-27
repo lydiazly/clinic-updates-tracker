@@ -111,10 +111,12 @@ class UserService:
         else:
             # Check if enough time has passed since last_sent_at
             current_time = datetime.now().astimezone()  # timezone-aware
-            buffer: timedelta = self.db.PERIOD_BUFFER  # in minutes
+            buffer: timedelta = self.db.INTERVAL_BUFFER  # in minutes
             _users: list[User] = []
             for user in self.users:
-                if usernames is None or user.username in usernames:
+                if user.is_active and (
+                    usernames is None or user.username in usernames
+                ):
                     if self.db.should_send_to_user(user, current_time, buffer):
                         _users.append(user)
                     else:
@@ -145,11 +147,11 @@ class UserService:
         for user in self.selected_users:
             _cities.extend(user.cities)
 
-        max_user_period = max(user.period for user in self.selected_users)
+        max_user_interval = max(user.interval for user in self.selected_users)
         max_user_nmax = max(user.nmax for user in self.selected_users)
 
         self.city_set = set(_cities)
-        self.max_days_back = max(DAYS_BACK_MIN, max_user_period + 1)
+        self.max_days_back = max(DAYS_BACK_MIN, max_user_interval + 1)
         self.max_nmax = max(MAX_ITEMS_MIN, max_user_nmax)
 
         # For small max_nmax, skip filtering by date in full lists
@@ -216,12 +218,18 @@ class UserService:
 
         return None
 
-    def get_users(self, usernames: list[str] | None) -> list[User]:
-        """Retrieves users from database."""
+    def get_users(
+        self, usernames: list[str] | None = None, active_only: bool = False
+    ) -> list[User]:
+        """Retrieves users from database.
+        `active_only` works only when `usernames` is None.
+        """
         users_db: list[User] = []
         if usernames is None:
-            users_db = self.db.get_all_users()
-            self.logger.info(self.USER_COUNT_MSG % len(users_db))
+            if active_only:
+                users_db = self.db.get_active_users()
+            else:
+                users_db = self.db.get_all_users()
         else:
             # Retrieve specified users in database
             for username in usernames:
@@ -230,7 +238,7 @@ class UserService:
                     users_db.append(_user)
                 else:
                     self.logger.warning(self.db.USER_NOT_FOUND_MSG % username)
-            self.logger.info(f"Retrieved {len(users_db)} users.")
+        self.logger.info(f"Retrieved {len(users_db)} users.")
         return users_db
 
     def add_users(self, users: list[User]) -> None:
@@ -306,9 +314,14 @@ class UserService:
         `add/update/delete/reset/clear`
         - If `config.load_users` is `True` and `config.delete_users` is `True`,
         delete the users in database that are not in the JSON file
+        - If no CRUD operations and `config.save_users` is not `True`, fetch
+        active users only
         """
         users_db: list[User] | None = None
-        fetch_all: bool = True
+        fetch_users: bool = self.config.command is None
+        active_only: bool = (
+            not self.config.crud_only and not self.config.save_users
+        )
         print_users: bool = False
 
         # Load data from JSON file and insert/update into database
@@ -320,13 +333,12 @@ class UserService:
             if users_src:
                 users_db = self.upsert_users(users_src)
                 if users_db is not None:  # won't fetch again
-                    fetch_all = False
+                    fetch_users = False
             else:
                 self.logger.info("Skipping updating users in database...")
 
         # Handle commands
         if self.config.command is not None:
-            fetch_all = False
             match self.config.command.name:
                 case CommandName.LIST:
                     if self.config.load_users and self.config.dryrun:
@@ -345,17 +357,18 @@ class UserService:
                         self.handle_update_and_delete(self.config.command)
 
         # Retrieve all users after operations
-        if self.config.save_users or fetch_all:
-            users_db = self.db.get_all_users()
-            self.logger.info(self.USER_COUNT_MSG % len(users_db))
+        if self.config.save_users or fetch_users:
+            users_db = self.get_users(active_only=active_only)
+            self.logger.debug(f"(active only: {active_only})")
 
-        # Print users in database
+        # Print retrieved users
         if users_db:
             self.users = users_db
+            _user_list = "Users retrieved:\n" + users_to_str(users_db)
             if print_users:
-                self.logger.info("Users retrieved:\n" + users_to_str(users_db))
+                self.logger.info(_user_list)
             else:
-                self.logger.debug("All users:\n" + users_to_str(users_db))
+                self.logger.debug(_user_list)
 
     def handle_update_and_delete(self, command: CommandRequest) -> None:
         _count = self.db.get_row_count(TableName.USERS)
@@ -501,7 +514,7 @@ class UserService:
         body_to_send: str = ''
         hashes_to_record: list[str] = []
         username: str = user.username
-        period: int = user.period
+        interval: int = user.interval
         nmax: int = user.nmax
 
         # Check which items have already been sent to this user
@@ -539,7 +552,7 @@ class UserService:
             _n_tot = self.cities_data[city].n_tot
             # Reset days_back and nmax for displaying
             _query = self.cities_data[city].query._replace(
-                days_back=period, nmax=nmax
+                days_back=interval, nmax=nmax
             )
             if items_to_send:
                 if self.config.send:

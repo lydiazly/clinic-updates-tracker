@@ -15,7 +15,7 @@ from textwrap import dedent
 from typing import Callable
 
 from clinictracker.config import TARGET_BASE_URL, TARGET_TZ, BROWSER_CHOICES
-from clinictracker.user.models import UserDict, PERIOD_USER, MAX_ITEMS_USER
+from clinictracker.user.models import UserDict, INTERVAL_USER, MAX_ITEMS_USER
 from clinictracker.user.config import CommandName, USERS_JSON_PATH, TABLE_NAMES
 from clinictracker.startup import MyLogger, setup_logger
 from clinictracker.startup import trim_str
@@ -25,24 +25,26 @@ from clinictracker.user.helpers import is_valid_email, user_dicts_to_str
 # ---------------------------------------------------------------------|
 # CLI arguments
 USER_FORMAT = (
-    "Format:\n    -u "
-    '"username=str [nickname=str] emails=str[,...] cities=str[,...] '
-    '[period=int] [nmax=int]"'
+    "Format:\n"
+    '    -u "username=str [nickname=str] emails=str[,...] cities=str[,...]\n'
+    '    [interval=int] [nmax=int] [is_active=true|false]"'
 )
 USER_ARGS_HINT = (
     f"{USER_FORMAT}\n"
     + dedent(
         """
-    Fields:
-        username: a unique string (case insensitive)
-        nickname: default to null
-        emails: recipients (if not given and username is a valid email,
-                set it as a recipient)
-        cities: town/city list
-        period: schedule period in days (default to 1 or from $PERIOD_USER)
-        nmax: maximum number of items to collect
-              (default to 10 or from $MAX_ITEMS_USER)
-    """
+        Fields:
+            username: a unique string (case insensitive)
+            nickname: default to null
+            emails: recipients (if not given and username is a valid email,
+                    set it as a recipient)
+            cities: town/city list
+            interval: check interval in days
+                      (default to 1 or from $INTERVAL_USER)
+            nmax: maximum number of items to collect
+                  (default to 10 or from $MAX_ITEMS_USER)
+            is_active: default to true
+        """
     ).strip()
 )
 
@@ -72,11 +74,21 @@ def user_parser_closure(
                     ]
                 case 'cities':
                     user_dict[key] = [trim_str(s) for s in value.split(',')]
-                case 'period' | 'nmax':
+                case 'interval' | 'nmax':
                     if value.split('-', 1)[-1].isdigit():
                         user_dict[key] = int(value)
                     else:
                         raise ArgumentTypeError(f"'{key}' must be a number.")
+                case 'is_active':
+                    if value.lower() == 'true':
+                        user_dict[key] = True
+                    elif value.lower() == 'false':
+                        user_dict[key] = False
+                    else:
+                        raise ArgumentTypeError(
+                            f"Invalid value of '{key}': {value}\n"
+                            + USER_FORMAT
+                        )
                 case _:
                     raise ArgumentTypeError(
                         f"Unknown field: {key}\n" + USER_FORMAT
@@ -86,13 +98,13 @@ def user_parser_closure(
         _username: str = trim_str(user_dict.get('username', ''))
         user_dict['username'] = _username
 
-        # Set defaults (could be set later but set here for logging)
+        # Set defaults (could be set later but set them here for logging)
         if command_name == CommandName.ADD:
-            # If no email specified and username is an email, use it
+            # If no email is specified and username is an email, use it
             if not user_dict.get('emails') and is_valid_email(_username):
                 user_dict['emails'] = [_username]
             # Fill with defaults
-            user_dict['period'] = user_dict.get('period', PERIOD_USER)
+            user_dict['interval'] = user_dict.get('interval', INTERVAL_USER)
             user_dict['nmax'] = user_dict.get('nmax', MAX_ITEMS_USER)
 
         return user_dict
