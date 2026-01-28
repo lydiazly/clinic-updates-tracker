@@ -22,7 +22,7 @@ ALLOWED_COLS: list[str] = [
     'is_active',
 ]
 
-# Default check interval in days
+# Default sending interval in days
 INTERVAL_USER: int = int(os.getenv('INTERVAL_USER', 1))  # default: 1
 # Default number of items
 MAX_ITEMS_USER: int = int(os.getenv('MAX_ITEMS_USER', 10))  # default: 10
@@ -37,7 +37,7 @@ class User:
         nickname (str): Default to null
         emails (list[str]): (non-empty) Recipient list
         cities (list[str]): (non-empty) Town/City list
-        interval (int): (> 0) Check interval in days, default to 1
+        interval (int): (> 0) sending interval in days, default to 1
         nmax (int): (> 0) Maximum number of items to collect, default to 10
         is_active (bool): Default to True
         last_sent_at (datetime): Time of last sent (automatically generated)

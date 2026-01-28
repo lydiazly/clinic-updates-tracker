@@ -415,7 +415,7 @@ class UserServiceDB:
                         self.logger.warning(
                             self.USER_EXIST_MSG % user.username
                         )
-            if (has_inserted := insert_count > 0):
+            if has_inserted := insert_count > 0:
                 self.logger.info(
                     f"Inserted {insert_count} users: "
                     + ', '.join(inserted_usernames)
@@ -583,14 +583,12 @@ class UserServiceDB:
         current_time: datetime,
         buffer: timedelta | None = None,
     ) -> bool:
-        """Checks if enough time has passed based on active user's settings.
+        """Checks if enough time has passed since last email sent to the
+        user for any city based on this user's preferences.
         Automatically handles timezone conversion for timezone-aware objects.
 
         30-minute buffer time before last_sent_at is applied.
         """
-        if not user.is_active:
-            return False
-
         if buffer is None:
             buffer = cls.INTERVAL_BUFFER
 

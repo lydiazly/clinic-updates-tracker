@@ -16,6 +16,9 @@ async def cli() -> None:
     try:
         args, logger = get_args_and_logger_for_service()
         config = load_config_for_service(args)
+    except KeyboardInterrupt:
+        print("\nInterrupted by user.", file=sys.stderr)
+        sys.exit(130)
     except Exception as e:
         print(f"{type(e).__name__}: {e}", file=sys.stderr)
         sys.exit(1)

@@ -42,6 +42,7 @@ from clinictracker.utils import (
     construct_content,
     print_content,
     DATETIME_TZ_FMT,
+    pretty_time_delta,
 )
 from clinictracker.user.db_manager import UserServiceDB
 from clinictracker.user.email_service import EmailParams, EmailService
@@ -99,32 +100,36 @@ class UserService:
     def select_users(self) -> None:
         """Selects users to serve. Sets `selected_users`."""
         usernames: list[str] | None = self.config.usernames
+        _users: list[User] = []
 
         if self.config.forget_last:
             self.logger.debug(FORGET_LAST_MSG % 'time')
-            if usernames is None:
-                self.selected_users = self.users
-            else:
-                self.selected_users = [
-                    u for u in self.users if u.username in usernames
-                ]
+            for user in self.users:
+                if not user.is_active:
+                    self.logger.warning(f"Skipping inactive {user.username}")
+                    continue
+                if usernames is None or user.username in usernames:
+                    _users.append(user)
         else:
             # Check if enough time has passed since last_sent_at
             current_time = datetime.now().astimezone()  # timezone-aware
             buffer: timedelta = self.db.INTERVAL_BUFFER  # in minutes
-            _users: list[User] = []
             for user in self.users:
-                if user.is_active and (
-                    usernames is None or user.username in usernames
-                ):
+                if not user.is_active:
+                    self.logger.warning(f"Skipping inactive {user.username}")
+                    continue
+                if usernames is None or user.username in usernames:
                     if self.db.should_send_to_user(user, current_time, buffer):
                         _users.append(user)
                     else:
                         self.logger.info(
                             f"Skipping {user.username}: Not enough time "
-                            f"passed since last send (buffer: {buffer})"
+                            f"passed since last send "
+                            f"(buffer: {pretty_time_delta(buffer)})"
                         )
-            self.selected_users = _users
+
+        self.selected_users = _users
+
         self.logger.debug(
             "Requested users: "
             + (', '.join(usernames) if usernames else 'all')
@@ -358,8 +363,8 @@ class UserService:
 
         # Retrieve all users after operations
         if self.config.save_users or fetch_users:
+            self.logger.debug(f"Retrieve active users only: {active_only}")
             users_db = self.get_users(active_only=active_only)
-            self.logger.debug(f"(active only: {active_only})")
 
         # Print retrieved users
         if users_db:

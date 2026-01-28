@@ -20,7 +20,7 @@ BODY_TEMPLATE: str = """
 %s
 <br><hr>
 <div style="color:gray">
-  <p>You are receiving this automated notification because you subscribed&nbsp;
+  <p>You are receiving this automated notification because you subscribed
   to <em>Clinic Update Tracker</em>.</p>
   <p>Please do not reply directly to this email.</p>
   <p>

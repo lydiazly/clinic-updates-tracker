@@ -19,7 +19,11 @@ from clinictracker.user.models import UserDict, INTERVAL_USER, MAX_ITEMS_USER
 from clinictracker.user.config import CommandName, USERS_JSON_PATH, TABLE_NAMES
 from clinictracker.startup import MyLogger, setup_logger
 from clinictracker.startup import trim_str
-from clinictracker.user.helpers import is_valid_email, user_dicts_to_str
+from clinictracker.user.helpers import (
+    is_valid_email,
+    prompt_to_confirm,
+    user_dicts_to_str,
+)
 
 
 # ---------------------------------------------------------------------|
@@ -39,7 +43,7 @@ USER_ARGS_HINT = (
             emails: recipients (if not given and username is a valid email,
                     set it as a recipient)
             cities: town/city list
-            interval: check interval in days
+            interval: sending interval in days
                       (default to 1 or from $INTERVAL_USER)
             nmax: maximum number of items to collect
                   (default to 10 or from $MAX_ITEMS_USER)
@@ -153,7 +157,7 @@ def get_args_and_logger_for_service() -> (
     )
     # Subcommand: list
     list_parser: ArgumentParser = subparsers.add_parser(
-        CommandName.LIST, description="List all users"
+        CommandName.LIST, description="List user preferences"
     )
     list_parser.add_argument(
         '-u',
@@ -161,7 +165,7 @@ def get_args_and_logger_for_service() -> (
         nargs='+',
         type=str.lower,
         metavar='str',
-        help="Usernames (if not provided, list all users)",
+        help="If not provided, select all users in database",
     )
     # Subcommand: add
     add_parser: ArgumentParser = subparsers.add_parser(
@@ -211,7 +215,7 @@ def get_args_and_logger_for_service() -> (
         type=str.lower,
         required=True,
         metavar='str',
-        help="List of usernames",
+        help="User entries to be deleted",
     )
     # Subcommand: reset
     subparsers.add_parser(
@@ -324,7 +328,11 @@ def get_args_and_logger_for_service() -> (
         nargs='+',
         type=str.lower,
         metavar='str',
-        help="List of usernames. If specified, only send to these users",
+        help=(
+            "Recipients. If not provided, will select all active users.\n"
+            "Can't be placed before COMMAND. "
+            "For any COMMAND with -u option, -u must come after the COMMAND"
+        ),
     )
     parser.add_argument(
         '--retries',
@@ -403,6 +411,20 @@ def get_args_and_logger_for_service() -> (
     )
 
     logger.debug(f"Args:\n{vars(args)}")
+
+    # Warn if -u is found before COMMAND
+    if args.command is None and args.usernames is not None:
+        for _username in args.usernames:
+            if _username in CommandName:
+                logger.warning(
+                    f"'{_username}' is found after -u. If it's meant to "
+                    "be a command, move it before -u"
+                )
+                if not prompt_to_confirm(
+                    prompt=f"Are you sure '{_username}' is a username"
+                ):
+                    print("Aborted.")
+                    raise KeyboardInterrupt
 
     match args.command:
         case CommandName.LIST:

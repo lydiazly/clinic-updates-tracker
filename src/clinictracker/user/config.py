@@ -44,7 +44,7 @@ SECRETS_PATH: Path = Path(os.getenv('SECRETS_PATH', '.secrets').strip())
 DAYS_BACK_MIN: int = int(os.getenv('DAYS_BACK_MIN', 2))  # default: 2 days
 # Minimum items to collect in full list (before filtering for each user)
 MAX_ITEMS_MIN: int = int(os.getenv('MAX_ITEMS_MIN', 10))  # default: 10 items
-# Extra days to keep records beyond the maximum check interval among users
+# Extra days to keep records beyond the maximum sending interval among users
 CLEANUP_BUFFER_DAYS: int = int(os.getenv('CLEANUP_BUFFER_DAYS', 7))
 
 # Source file containing a list of user data

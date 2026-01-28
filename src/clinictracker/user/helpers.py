@@ -213,9 +213,9 @@ def validate_user_field(username: str, field: str, data: Any) -> None:  # noqa
                 )
 
 
-def prompt_to_confirm(description: str) -> bool:
+def prompt_to_confirm(description: str = '', prompt: str = 'Continue') -> bool:
     """Prompts to confirm an action."""
-    prompt = '\n'.join([description, "Continue? (y/N): "])
+    prompt = '\n'.join([description, f"{prompt}? (y/N): "])
     while True:
         response = input(prompt).lower().strip()
         if response in ['', 'n']:
