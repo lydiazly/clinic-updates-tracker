@@ -59,11 +59,13 @@ async def test_page(caplog):
         # Check the log records more specifically
         assert len(caplog.records) >= 12
         assert "Options: {'headless':" in caplog.records[0].message
-        assert caplog.records[1].message == TASK_START_MSG
-        assert task_title in caplog.records[3].message
-        assert full_url in caplog.records[5].message
-        assert f"{TITLE_PREFIX} {city}" in caplog.records[6].message
-        assert f"{LIST_TITLE_PREFIX} {city}" in caplog.records[7].message
-        assert EMPTY_SIGN_PREFIX in caplog.records[8].message
+        assert caplog.records[1].message == TASK_START_MSG.format(
+            start=1, end=1, total=1
+        )
+        assert full_url in caplog.records[3].message
+        assert EMPTY_SIGN_PREFIX in caplog.records[4].message
+        assert task_title in caplog.records[6].message
+        assert f"{TITLE_PREFIX} {city}" in caplog.records[8].message
+        assert f"{LIST_TITLE_PREFIX} {city}" in caplog.records[9].message
         assert caplog.records[-3].message == NO_EXPORT_MSG
         assert caplog.records[-1].message == BROWSER_CLOSED_MSG

@@ -4,6 +4,7 @@
 
 import asyncio
 from asyncio import Task
+from itertools import batched  # python 3.12+
 from logging import Logger, getLogger
 from playwright.async_api import (
     async_playwright,
@@ -17,10 +18,17 @@ import random
 import re
 import traceback
 from types import TracebackType
-from typing import Self, Literal
+from typing import NamedTuple, Self, Literal
 
 from clinictracker.selectors import HomePageSelectors, DetailPageSelectors
-from clinictracker.config import Config, RunConfig, TIMEOUT_PAGE, TIMEOUT_UL
+from clinictracker.config import (
+    Config,
+    RunConfig,
+    BATCH_SIZE,
+    TIMEOUT_PAGE,
+    TIMEOUT_UL,
+    MAX_ITEMS,
+)
 from clinictracker.models import ItemData, ListData, TaskResult
 from clinictracker.startup import (
     QueryParams,
@@ -43,24 +51,30 @@ TEST_MSG = "*** Test only (no operation) ***"
 BROWSER_CLOSED_MSG = "Browser closed."
 NO_UPDATES_MSG = "No updates. No file exported."
 NO_EXPORT_MSG = "'--no-o' applied. No file exported."
-TASK_START_MSG = "Starting concurrent tasks..."
-TASK_TITLE = "#{id} Town/City: {city}"
+TASK_START_MSG = "==> Starting tasks {start}-{end} out of {total}..."
+TASK_TITLE = "Task {id}: {city}"
+
+
+class TaskContext(NamedTuple):
+    browser: Browser
+    context: BrowserContext
+    logger: Logger | MyLogger = default_logger
 
 
 class PageManager:
     def __init__(
         self,
         query: QueryParams,
-        browser: Browser,
-        context: BrowserContext,
+        task_context: TaskContext,
+        task_logger: Logger | MyLogger,
         check_date: bool = True,
-        logger: Logger | MyLogger = default_logger,
     ) -> None:
         self.query: QueryParams = query
-        self.browser: Browser = browser
-        self.context: BrowserContext = context
+        self.browser: Browser = task_context.browser
+        self.context: BrowserContext = task_context.context
+        self.logger: Logger | MyLogger = task_context.logger
+        self.task_logger: Logger | MyLogger = task_logger
         self.check_date: bool = check_date
-        self.logger: Logger | MyLogger = logger
         self.page: Page | None = None
 
     async def __aenter__(self) -> Self:
@@ -77,6 +91,7 @@ class PageManager:
         return False
 
     async def open_page(self) -> Page:
+        """Opens and returns a new blank page."""
         return await self.context.new_page()
 
     async def close(self) -> None:
@@ -157,7 +172,7 @@ class PageManager:
         # Wait for the title to be loaded
         try:
             _title = (await title_locator.inner_text()).strip()
-            self.logger.debug(f"Page title: {_title}")
+            self.task_logger.debug(f"Page title: {_title}")
         except TimeoutError:
             raise TimeoutError(
                 TIMEOUT_ERR % ('title', TIMEOUT_PAGE / 1000)
@@ -166,7 +181,7 @@ class PageManager:
         # Wait for the list title to be loaded
         try:
             _list_title = (await list_title_locator.inner_text()).strip()
-            self.logger.debug(f"List title: {_list_title}")
+            self.task_logger.debug(f"List title: {_list_title}")
         except TimeoutError:
             raise TimeoutError(
                 TIMEOUT_ERR % ('list', TIMEOUT_PAGE / 1000)
@@ -185,20 +200,24 @@ class PageManager:
             n_tot = await items_locator.count()
         except TimeoutError:
             _timeout = True
-        else:
-            self.logger.info(f"Loaded {n_tot} items on the page.")
+
+        if n_tot > MAX_ITEMS:
+            self.logger.warning(
+                f"[{city}] {n_tot} items found on the page. "
+                f"Increase MAX_ITEMS if needed (current value: {MAX_ITEMS})."
+            )
 
         if _timeout:
             # Look for "There is no recent news/alerts for this town."
             _empty_text = await self._find_empty_sign(empty_sign_locator)
-            self.logger.info(_empty_text)
+            self.logger.info(f"[{city}] {_empty_text}")
             return ListData(items=items, n_tot=n_tot, query=self.query)
 
-        # Get items
+        # Get items and parse details
         self.logger.info(
-            f"Checking updates in {city} "
-            + (f"in the past {days_back} days " if self.check_date else '')
-            + f"(limiting to {min(nmax, n_tot)}/{n_tot} items)..."
+            f"[{city}] Checking first {min(nmax, n_tot)} from {n_tot} updates"
+            + (f" in the past {days_back} days " if self.check_date else '')
+            + "..."
         )
         count = 0
         _item_data: ItemData
@@ -214,11 +233,14 @@ class PageManager:
             if self.check_date:
                 try:
                     _to_collect = is_date_within(
-                        _item_data.date, days_back, tz=tz, logger=self.logger
+                        target_date=_item_data.date,
+                        days_back=days_back,
+                        tz=tz,
+                        logger=self.task_logger,
                     )
                 except Exception as e:
                     # If errors occur, warn and collect it anyway
-                    self.logger.warning(f"{type(e).__name__}: {e}")
+                    self.task_logger.warning(f"{type(e).__name__}: {e}")
                     _to_collect = True
 
             if not _to_collect:
@@ -231,14 +253,21 @@ class PageManager:
             # Pause for a random interval
             await asyncio.sleep(random.uniform(1, 3))
 
-        self.logger.info(f"✓ Collected {len(items)} updates from: {city}")
+        self.logger.info(
+            f"[{city}] ✓ Collected {len(items)} updates from: {city}"
+        )
         return ListData(items=items, n_tot=n_tot, query=self.query)
 
     async def parse_item(self, item_locator: Locator) -> ItemData:
         """Parses pages and retrieves the content of this item.
 
         Returns:
-            data (ItemData): (title, url, date, content, digest)
+            ItemData: A namedtuple with fields:
+                title: str
+                url: str
+                date: str
+                content: str
+                digest: str
         """
         # Get title and link of the item from the current page
         try:
@@ -263,7 +292,7 @@ class PageManager:
             detail_data = await self.get_details(url)
         except Exception as e:
             # If failed, set the content to empty and go on
-            self.logger.warning(
+            self.task_logger.warning(
                 f"Problems encountered when getting details:\n{e}\n"
                 "Empty content will be returned."
             )
@@ -310,7 +339,9 @@ class PageManager:
 
         try:
             await self.goto_page(new_page, url)
-            self.logger.debug(f"Detail page loaded in new tab: {new_page.url}")
+            self.task_logger.debug(
+                f"Detail page loaded in new tab: {new_page.url}"
+            )
             title = (await title_locator.inner_text()).strip()
             date = (await date_locator.inner_text()).strip()
             content = sanitize_content(await content_locator.inner_html())
@@ -323,37 +354,33 @@ class PageManager:
         return ItemData(title=title, url=url, date=date, content=content)
 
 
-async def close_everything(
-    browser: Browser,
-    context: BrowserContext,
-    logger: Logger | MyLogger = default_logger,
-) -> None:
+async def close_everything(task_context: TaskContext) -> None:
     """Gracefully closes everything."""
-    if context:
+    if not task_context:
+        return
+    if task_context.context:
         try:
-            await asyncio.wait_for(context.close(), timeout=2)
+            await asyncio.wait_for(task_context.context.close(), timeout=2)
         except asyncio.TimeoutError:
-            logger.debug("Context closing timeout.")
+            task_context.logger.debug("Context closing timeout.")
         except Exception:
             pass
-    if browser:
+    if task_context.browser:
         try:
-            await asyncio.wait_for(browser.close(), timeout=2)
+            await asyncio.wait_for(task_context.browser.close(), timeout=2)
         except asyncio.TimeoutError:
-            logger.debug("Browser closing timeout.")
+            task_context.logger.debug("Browser closing timeout.")
         except Exception:
             pass
-    logger.info(BROWSER_CLOSED_MSG)
+    task_context.logger.info(BROWSER_CLOSED_MSG)
 
 
 async def run_task(
-    browser: Browser,
-    context: BrowserContext,
     query: QueryParams,
     config: Config,
+    task_context: TaskContext,
     check_date: bool = True,
     task_id: int = -1,
-    logger: Logger | MyLogger = default_logger,
 ) -> TaskResult:
     """Opens a page and fetches data.
 
@@ -364,6 +391,7 @@ async def run_task(
                 If --test, set to None
             records: list[LogRecord]
     """
+    logger: Logger | MyLogger = task_context.logger
     # Create child logger, inheriting parent's level
     task_logger: Logger | MyLogger = getLogger(f'{logger.name}.task_{task_id}')
     task_logger.handlers.clear()
@@ -375,20 +403,101 @@ async def run_task(
     list_data: ListData
     async with PageManager(
         query=query,
-        browser=browser,
-        context=context,
+        task_context=task_context,
+        task_logger=task_logger,
         check_date=check_date,
-        logger=task_logger,
     ) as pm:
         if config.test:
             return TaskResult(task_id=task_id, data=None, records=[])
 
-        # Go to the landing page and get data -------------------------|
+        # Parse the result page for this city -------------------------|
+        logger.info(f"==> Checking [{query.city}]...")
         list_data = await pm.get_list()
 
     return TaskResult(
         task_id=task_id, data=list_data, records=record_collector.records
     )
+
+
+async def get_and_save_cities(task_context: TaskContext) -> None:
+    """Get the list of towns/cities and stores in JSON."""
+    pass
+
+
+async def assign_and_gather_tasks(
+    queries: list[QueryParams],
+    config: Config,
+    task_context: TaskContext,
+    check_date: bool = True,
+) -> list[ListData]:
+    """Assign tasks, handles logs, and returns results."""
+    logger: Logger | MyLogger = task_context.logger
+    task_num: int = len(queries)
+    tasks: list[Task[TaskResult]]
+    data_all: list[ListData] = []
+    hr = '=' * 40
+
+    # Batch tasks
+    for batch in batched(range(task_num), BATCH_SIZE):
+        logger.info(
+            TASK_START_MSG.format(
+                start=batch[0] + 1, end=batch[-1] + 1, total=task_num
+            )
+        )
+        async with asyncio.TaskGroup() as tg:
+            tasks = []
+            for task_id in batch:
+                tasks.append(
+                    tg.create_task(
+                        run_task(
+                            query=queries[task_id],
+                            config=config,
+                            task_context=task_context,
+                            check_date=check_date,
+                            task_id=task_id,
+                        )
+                    )
+                )
+
+                if config.test:
+                    logger.info(TEST_MSG)
+                    break
+
+        # Collect results
+        for task in tasks:
+            # If --test, return an empty list
+            if config.test:
+                return []
+
+            _result = task.result()
+            _task_id = _result.task_id
+
+            # Process buffered logs
+            logger.info(hr)
+            logger.info(
+                TASK_TITLE.format(id=_task_id + 1, city=queries[_task_id].city)
+            )
+            logger.info(hr)
+            for record in _result.records:
+                logger.handle(record)
+
+            if _result.data is None:
+                raise RuntimeError(
+                    f"Task {_task_id + 1}: {queries[_task_id].city} - "
+                    "failed to return data"
+                )
+
+            data_all.append(_result.data)
+
+        await asyncio.sleep(random.uniform(1, 3))
+
+    # Ensure nothing went wrong
+    if len(data_all) != task_num:
+        raise RuntimeError("Incomplete data.")
+
+    logger.info("✓ All tasks completed.")
+
+    return data_all
 
 
 def handle_output(
@@ -439,8 +548,6 @@ async def run(
     """
 
     browser: Browser | None = None
-    task_num: int = len(queries)
-    results: list[TaskResult | None] = [None] * task_num
     data_all: list[ListData] = []
 
     # Let playwright close browser automatically
@@ -452,68 +559,22 @@ async def run(
             )
             raise RuntimeError
 
-        try:
-            context = await browser.new_context()  # incognito
-            context.set_default_timeout(TIMEOUT_PAGE)
+        context = await browser.new_context()  # incognito
+        context.set_default_timeout(TIMEOUT_PAGE)
 
+        task_context: TaskContext = TaskContext(
+            browser=browser, context=context, logger=logger
+        )
+
+        try:
             # ---------------------------------------------------------|
             # Run tasks in parallel
-            logger.info(TASK_START_MSG)
-
-            async with asyncio.TaskGroup() as tg:
-                tasks: list[Task[TaskResult]] = []
-                # Keep the same order as queries
-                for task_id, query in enumerate(queries):
-                    tasks.append(
-                        tg.create_task(
-                            run_task(
-                                browser=browser,
-                                context=context,
-                                query=query,
-                                config=config,
-                                check_date=check_date,
-                                task_id=task_id,
-                                logger=logger,
-                            )
-                        )
-                    )
-
-                    if config.test:
-                        logger.info(TEST_MSG)
-                        break
-
-            # ---------------------------------------------------------|
-            # Collect results
-            hr = '=' * 40
-            for task in tasks:
-                # If --test, return an empty list
-                if config.test:
-                    return []
-                _result = task.result()
-                _task_id = _result.task_id
-                results[_task_id] = _result
-
-                # Process buffered logs
-                logger.info(hr)
-                logger.info(
-                    TASK_TITLE.format(
-                        id=_task_id + 1, city=queries[_task_id].city
-                    )
-                )
-                logger.info(hr)
-                [logger.handle(record) for record in _result.records]
-
-            # Assign data in same order as queries
-            for task_id in range(task_num):
-                _task_result = results[task_id]
-                if _task_result is None or _task_result.data is None:
-                    raise RuntimeError(f"#{task_id + 1}: no data returned")
-
-                data_all.append(_task_result.data)
-
-            # Ensure nothing went wrong
-            if len(data_all) != task_num:
-                raise RuntimeError("Incomplete data.")
+            data_all = await assign_and_gather_tasks(
+                queries=queries,
+                config=config,
+                task_context=task_context,
+                check_date=check_date,
+            )
 
             # Return if running as a service
             if not isinstance(config, RunConfig):
@@ -559,4 +620,4 @@ async def run(
 
         # Cleanup
         finally:
-            await close_everything(browser, context, logger)
+            await close_everything(task_context)

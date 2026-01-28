@@ -15,6 +15,9 @@ APP_ENV: str = os.getenv('APP_ENV', 'dev')
 
 DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'false').strip().lower() == 'true'
 
+# Maximum number of concurrent tasks
+BATCH_SIZE: int = int(os.getenv('BATCH_SIZE', 2))
+
 # Timeout in milliseconds
 TIMEOUT_PAGE: int = int(os.getenv('TIMEOUT_PAGE', 30000))  # for loading page
 TIMEOUT_UL: int = int(os.getenv('TIMEOUT_UL', 3000))  # for loading list

@@ -36,11 +36,13 @@ async def test_chromium(caplog):
     )
 
     with caplog.at_level(logging.INFO):
-        data_all = await run(query, config)
+        data_all = await run([query], config)
         # Assert returns empty list
         assert isinstance(data_all, list) and not data_all
         # Check the log records more specifically
         assert len(caplog.records) >= 3
-        assert caplog.records[0].message == TASK_START_MSG
+        assert caplog.records[0].message == TASK_START_MSG.format(
+            start=1, end=1, total=1
+        )
         assert caplog.records[-2].message == TEST_MSG
         assert caplog.records[-1].message == BROWSER_CLOSED_MSG
