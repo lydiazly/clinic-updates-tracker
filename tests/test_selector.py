@@ -3,12 +3,38 @@
 # pytest tests/test_selector.py --browser-channel chromium -s
 import os
 from playwright.sync_api import Page, expect
+import re
 
 from clinictracker.selectors import HomePageSelectors, DetailPageSelectors
 from clinictracker.utils import sanitize_content, html_to_plain
 
 
 TIMEOUT = 500
+
+
+def test_city_list_selector(page: Page):
+    """Tests city list selector on landing page using sample HTML."""
+    # Load HTML file
+    html_file_path = os.path.abspath("./tests/sample1.html")
+    page.goto(f"file://{html_file_path}")
+    # Locate the dropdown list
+    dropdown = page.locator(HomePageSelectors.CITY_LIST)
+    expect(dropdown, "City list not found on landing page").to_be_visible(
+        timeout=TIMEOUT
+    )
+    # Groups
+    city_groups = dropdown.locator('optgroup')
+    expect(city_groups).to_have_count(2, timeout=TIMEOUT)
+    # Cities
+    for group in city_groups.all():
+        expect(group).to_have_attribute(
+            'label', re.compile(r"Group [0-9]"), timeout=TIMEOUT
+        )
+        group_label = group.get_attribute('label')
+        first_city = group.get_by_role('option').first
+        expect(first_city, f"City not found in {group_label}").to_have_text(
+            re.compile(r"City [0-9]"), use_inner_text=True, timeout=TIMEOUT
+        )
 
 
 def test_selectors_home(page: Page):
@@ -38,7 +64,6 @@ def test_selectors_home(page: Page):
     # print("List title on landing page: " + title.inner_text())
 
     # list = container.locator(HomePageSelectors.LIST).first
-    # list = container.locator(HomePageSelectors.LIST).locator('nth=0')
     list = container.get_by_role('list').first
     expect(list, "List not found on landing page").to_be_visible(
         timeout=TIMEOUT
@@ -49,7 +74,7 @@ def test_selectors_home(page: Page):
     expect(items.first, "Item not found on landing page").to_be_visible(
         timeout=TIMEOUT
     )
-    assert items.count() == 2
+    expect(items).to_have_count(2)
     # print(f"{items.count()} items on landing page:")
     for item in items.all():
         assert "https://" in item.get_by_role('link').get_attribute('href')

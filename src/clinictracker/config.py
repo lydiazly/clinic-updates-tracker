@@ -46,6 +46,14 @@ USERS_JSON_PATH: Path = Path(
     os.getenv('USERS_JSON_PATH', 'data/users.json').strip()
 )
 
+# Extract the list of towns/cities and store in a JSON
+EXTRACT_CITIES: bool = (
+    os.getenv('EXTRACT_CITIES', 'false').strip().lower() == 'true'
+)
+CITIES_JSON_PATH: Path = Path(
+    os.getenv('CITIES_JSON_PATH', 'data/cities.json').strip()
+)
+
 
 @dataclass(frozen=True)
 class Config:
@@ -79,11 +87,13 @@ class RunConfig(Config):
         export (bool): Export to a file
         output_path (Path): Path of output file
         to_stdout (bool): Print results as plain text to STDOUT
+        extract_cities (bool): Extract the list of cities and store in a JSON
     """
 
     export: bool
     output_path: Path
     to_stdout: bool
+    extract_cities: bool
 
 
 def load_config(args: Namespace) -> RunConfig:
@@ -101,4 +111,5 @@ def load_config(args: Namespace) -> RunConfig:
         export=args.export,
         output_path=output_path,
         to_stdout=args.to_stdout,
+        extract_cities=args.extract_cities or EXTRACT_CITIES,
     )

@@ -72,7 +72,7 @@ def load_users_from_json(
     """Loads valid `User` objects from a JSON file."""
     data: list[UserDict]
     try:
-        with open(json_path, 'r', encoding='utf-8') as f:
+        with json_path.open('r', encoding='utf-8') as f:
             data = json.load(f)
     except FileNotFoundError:
         raise FileNotFoundError(f"{json_path}: file not found") from None
@@ -147,7 +147,7 @@ def save_users_to_json(
         logger.info(f"Backed up existing file to: {backup_name}")
 
     # Save to file
-    with open(json_path, 'w', encoding='utf-8') as f:
+    with json_path.open('w', encoding='utf-8') as f:
         f.write(compact_json)
     logger.info(f"Saved {len(users)} users to: {json_path}")
 
@@ -280,7 +280,7 @@ def ensure_pgpass_match(
     _svc_user = _service.get('user', '*')
 
     # Search for matching entry in pgpass
-    with open(pgpass_path, 'r') as f:
+    with pgpass_path.open('r') as f:
         for line in f:
             line = line.strip()
 

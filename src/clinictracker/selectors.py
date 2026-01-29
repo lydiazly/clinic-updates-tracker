@@ -13,6 +13,7 @@ class HomePageSelectors:
     CONTAINER = 'div.elementor-widget-container:has(' + TITLE + ')'
     LIST_TITLE = f'strong:has-text("{LIST_TITLE_PREFIX}")'  # CONTAINER >
     EMPTY_SIGN = f'p:has-text("{EMPTY_SIGN_PREFIX}")'  # CONTAINER >
+    CITY_LIST = 'select[name="list_town"]'
 
 
 # Detail page of an item

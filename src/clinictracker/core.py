@@ -5,6 +5,7 @@
 import asyncio
 from asyncio import Task
 from itertools import batched  # python 3.12+
+import json
 from logging import Logger, getLogger
 from playwright.async_api import (
     async_playwright,
@@ -28,6 +29,7 @@ from clinictracker.config import (
     TIMEOUT_PAGE,
     TIMEOUT_UL,
     MAX_ITEMS,
+    CITIES_JSON_PATH,
 )
 from clinictracker.models import ItemData, ListData, TaskResult
 from clinictracker.startup import (
@@ -53,6 +55,7 @@ NO_UPDATES_MSG = "No updates. No file exported."
 NO_EXPORT_MSG = "'--no-o' applied. No file exported."
 TASK_START_MSG = "==> Starting tasks {start}-{end} out of {total}..."
 TASK_TITLE = "Task {id}: {city}"
+INVALID_CITY_MSG = "'{city}' is not in '" + str(CITIES_JSON_PATH) + "'"
 
 
 class TaskContext(NamedTuple):
@@ -128,7 +131,49 @@ class PageManager:
                 TIMEOUT_ERR % ('updates', _timeout / 1000)
             ) from None
 
-    async def get_list(self) -> ListData:
+    async def extract_and_save_cities(self, page: Page) -> None:
+        """Extracts the list of towns/cities and stores in a JSON."""
+        city_dict: dict[str, list[dict[str, str]]] = {}
+
+        dropdown_locator = page.locator(HomePageSelectors.CITY_LIST).describe(
+            "Dropdown"
+        )
+
+        # Find all optgroup elements within the select
+        regions_locator = dropdown_locator.locator('optgroup').describe(
+            "Region groups"
+        )
+
+        for region_locator in await regions_locator.all():
+            region = (
+                await region_locator.get_attribute('label') or ''
+            ).strip()
+            # Get all towns/cities inside this group
+            options_locator = region_locator.get_by_role('option').describe(
+                "City options"
+            )
+            city_dict[region] = [
+                {
+                    'label': (
+                        await option.get_attribute('value') or ''
+                    ).strip(),
+                    'name': (await option.inner_text()).strip(),
+                }
+                for option in await options_locator.all()
+            ]
+
+        self.logger.info(
+            f"✓ Extracted {sum(len(r) for r in city_dict.values())} "
+            f"towns/cities in {len(city_dict.keys())} regions"
+        )
+
+        # Save as JSON
+        if CITIES_JSON_PATH:
+            with CITIES_JSON_PATH.open('w', encoding='utf-8') as f:
+                json.dump(city_dict, f, indent=2, ensure_ascii=False)
+            self.logger.info(f"City list saved to: {CITIES_JSON_PATH}")
+
+    async def get_list(self, extract_cities: bool = False) -> ListData:
         """Navigates to the page and collects the list items.
 
         Returns:
@@ -145,6 +190,10 @@ class PageManager:
 
         await self.goto_page(self.page, url)
         self.logger.info(f"Page loaded: {self.page.url} (tz: {tz or 'local'})")
+
+        # Extracts the list of towns/cities and stores in a JSON
+        if extract_cities:
+            await self.extract_and_save_cities(self.page)
 
         # Find the <strong>Updates regarding...</strong> element,
         # then navigate to following sibling <ul>
@@ -412,16 +461,31 @@ async def run_task(
 
         # Parse the result page for this city -------------------------|
         logger.info(f"==> Checking [{query.city}]...")
-        list_data = await pm.get_list()
+
+        # Warn if the query might be invalid
+        if CITIES_JSON_PATH.is_file():
+            with CITIES_JSON_PATH.open('r', encoding='utf-8') as f:
+                city_dict = json.load(f)
+            if city_dict and isinstance(city_dict, dict):
+                city_labels_lower = [
+                    c['label'].lower()
+                    for r in city_dict.values()
+                    for c in r
+                    if isinstance(c, dict) and 'label' in c
+                ]
+                if query.city.lower() not in city_labels_lower:
+                    logger.warning(INVALID_CITY_MSG.format(city=query.city))
+
+        extract_cities = (
+            isinstance(config, RunConfig)
+            and config.extract_cities
+            and task_id == 0
+        )
+        list_data = await pm.get_list(extract_cities=extract_cities)
 
     return TaskResult(
         task_id=task_id, data=list_data, records=record_collector.records
     )
-
-
-async def get_and_save_cities(task_context: TaskContext) -> None:
-    """Get the list of towns/cities and stores in JSON."""
-    pass
 
 
 async def assign_and_gather_tasks(
@@ -529,9 +593,9 @@ def handle_output(
             outpath = (
                 outpath.parent / f"{outpath.stem}_{i + 1}{outpath.suffix}"
             )
-        with open(outpath, "w") as f:
+        with outpath.open('w') as f:
             f.write(content)
-        logger.info(f"Exported to '{outpath}'")
+        logger.info(f"Updates exported to: {outpath}")
 
 
 # =====================================================================|

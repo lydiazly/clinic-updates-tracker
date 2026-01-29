@@ -13,6 +13,7 @@ from clinictracker.core import (
     NO_EXPORT_MSG,
     TASK_START_MSG,
     TASK_TITLE,
+    INVALID_CITY_MSG,
 )
 from clinictracker.selectors import (
     LIST_TITLE_PREFIX,
@@ -35,6 +36,7 @@ async def test_page(caplog):
         export=False,
         output_path=OUTPUT_HTML_PATH,
         to_stdout=False,
+        extract_cities=False,
     )
     query_dict = {'only_accepting': 'yes', 'list_town': city}
     full_url = get_full_url(TARGET_BASE_URL, query_dict)
@@ -57,15 +59,16 @@ async def test_page(caplog):
             and data_all[0].n_tot == 0
         )
         # Check the log records more specifically
-        assert len(caplog.records) >= 12
+        assert len(caplog.records) >= 13
         assert "Options: {'headless':" in caplog.records[0].message
         assert caplog.records[1].message == TASK_START_MSG.format(
             start=1, end=1, total=1
         )
-        assert full_url in caplog.records[3].message
-        assert EMPTY_SIGN_PREFIX in caplog.records[4].message
-        assert task_title in caplog.records[6].message
-        assert f"{TITLE_PREFIX} {city}" in caplog.records[8].message
-        assert f"{LIST_TITLE_PREFIX} {city}" in caplog.records[9].message
+        assert INVALID_CITY_MSG.format(city=city) in caplog.records[3].message
+        assert full_url in caplog.records[4].message
+        assert EMPTY_SIGN_PREFIX in caplog.records[5].message
+        assert task_title in caplog.records[7].message
+        assert f"{TITLE_PREFIX} {city}" in caplog.records[9].message
+        assert f"{LIST_TITLE_PREFIX} {city}" in caplog.records[10].message
         assert caplog.records[-3].message == NO_EXPORT_MSG
         assert caplog.records[-1].message == BROWSER_CLOSED_MSG

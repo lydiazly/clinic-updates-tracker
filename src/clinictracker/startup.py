@@ -272,6 +272,12 @@ def get_args_and_logger() -> tuple[Namespace, Logger | MyLogger]:
         action='store_false',
         help="No export (default: export to a file)",
     )
+    # Other args
+    parser.add_argument(
+        '--extract-cities',
+        action='store_true',
+        help="Extract the list of cities and store in a JSON (default: false)",
+    )
     # Browser args
     parser.add_argument(
         '-H',
