@@ -8,7 +8,7 @@ name: Run user service
 
 on:
   schedule:
-    - cron: '0 19 * * *'  # 19:00 UTC every day
+    - cron: '40 4 * * *'  # 19:00 UTC every day
   workflow_dispatch:
     inputs:
       test_mode:
