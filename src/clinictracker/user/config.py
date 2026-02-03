@@ -21,7 +21,7 @@ from clinictracker.user.helpers import (
 
 load_dotenv()
 
-# If true, add [TEST] in email subject
+# If true, email subject begins with [TEST]
 TEST_MODE: bool = os.getenv('TEST_MODE', 'false').strip().lower() == 'true'
 
 DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'false').strip().lower() == 'true'
