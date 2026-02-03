@@ -85,6 +85,7 @@ if [ "${SEND_EMAILS}" = 'true' ]; then
 fi
 if [ "${FORGET_LAST}" = 'true' ]; then
   args+=(--forget-last)
+  args+=(--no-record)
 fi
 
 echo -e "\n=== Step: Run script and send emails ===\n"

@@ -5,13 +5,21 @@
 from argparse import Namespace
 from dataclasses import dataclass
 from dotenv import load_dotenv
+from enum import StrEnum, auto  # python 3.11+
 import os
 from pathlib import Path
 
 
 load_dotenv()
 
-APP_ENV: str = os.getenv('APP_ENV', 'dev')
+
+class AppEnvName(StrEnum):
+    DEV = auto()
+    PROD = auto()
+
+
+# Only affects PGSERVICE
+APP_ENV: str = os.getenv('APP_ENV', AppEnvName.DEV.value)
 
 DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'false').strip().lower() == 'true'
 

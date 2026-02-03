@@ -47,13 +47,16 @@ class UserServiceDB:
         """
     )
     TABLE_CHECK_ERR = "Unable to check table: %s"
-    TABLE_EXIST_MSG = "Table '%s' already exists. Skipping creation..."
+    TABLE_EXIST_MSG = 'Table already exists: %s. Skipping creation...'
     TABLE_CREATE_MSG = "Table created: %s"
     TABLE_CREATE_ERR = "Unable to create table: %s"
     TABLE_CLEAR_MSG = "Removed all rows from: %s"
+    TABLE_NOT_FOUND_MSG = "Table not found: %s. Skipping..."
     USER_NOT_FOUND_MSG = "User not found: %s. Skipping..."
     USER_EXIST_MSG = "User already exists: %s. Skipping..."
     SEQ_NOT_FOUND_MSG = "Sequence not found: users_id_seq"
+    SEQ_RESET_MSG = "Reset: 'users_id_seq' (next user id: %d)"
+    SEQ_RESET_ERR = "Unable to reset 'users_id_seq'"
 
     def __init__(
         self,
@@ -587,7 +590,7 @@ class UserServiceDB:
         user for any city based on this user's preferences.
         Automatically handles timezone conversion for timezone-aware objects.
 
-        30-minute buffer time before last_sent_at is applied.
+        Applies a 30-minute buffer time before the last sent time.
         """
         if buffer is None:
             buffer = cls.INTERVAL_BUFFER
@@ -604,7 +607,7 @@ class UserServiceDB:
         item_hashes: list[str],
         sent_at: datetime | None = None,
     ) -> None:
-        """Inserts records into sent_items table."""
+        """Inserts records into "sent_items" table."""
         if not item_hashes:
             return
 
@@ -638,7 +641,7 @@ class UserServiceDB:
     def update_last_sent_at(
         self, user: User, sent_at: datetime | None = None
     ) -> None:
-        """Updates the user's last_sent_at field."""
+        """Updates the user's "last_sent_at" field."""
         conn, cur = self._ensure_connected()
 
         if sent_at is None:
@@ -654,10 +657,10 @@ class UserServiceDB:
         except Exception as e:
             conn.rollback()
             raise RuntimeError(
-                f"Unable to update last_sent_at for: {user.username}"
+                f'Unable to update "last_sent_at" for: {user.username}'
             ) from e
         else:
-            self.logger.info(f"Updated last_sent_at for: {user.username}")
+            self.logger.info(f'Updated "last_sent_at" for: {user.username}')
 
     def get_row_count(self, tb: TableName) -> int:
         """Get the row count of a table."""
@@ -675,7 +678,7 @@ class UserServiceDB:
             return 0
 
     def cleanup_old_sent_items(self, cutoff_date: datetime) -> None:
-        """Deletes sent_items records older than the cutoff date."""
+        """Deletes "sent_items" records older than the cutoff date."""
         conn, cur = self._ensure_connected()
 
         query = "DELETE FROM sent_items WHERE sent_at < %s;"
@@ -688,11 +691,11 @@ class UserServiceDB:
         except Exception as e:
             conn.rollback()
             raise RuntimeError(
-                "Unable to clean up old records in sent_items."
+                "Unable to clean up old records in: sent_items"
             ) from e
         else:
             self.logger.info(
-                f"Cleaned up {cur.rowcount} old records in sent_items."
+                f"Cleaned up {cur.rowcount} old records in: sent_items"
             )
 
     def reset_id_seq(self) -> None:
@@ -711,7 +714,7 @@ class UserServiceDB:
         )
         value_query = "SELECT last_value, is_called FROM users_id_seq;"
         try:
-            # Ensure sequence "users_id_seq" exists and get the name
+            # Ensure sequence 'users_id_seq' exists and get the name
             # cur.execute(seq_query)
             # row = cur.fetchone()
             # if row is None or row[0] is None:
@@ -725,6 +728,7 @@ class UserServiceDB:
             if _res is None:
                 raise RuntimeError(self.SEQ_NOT_FOUND_MSG)
             last_value_old, is_called_old = _res
+            last_value_old = int(last_value_old)
             # Reset to the max user id + 1 (is_called = false)
             # cur.execute(sql.SQL(reset_query).format(sql.Literal(seq_name)))
             cur.execute(reset_query)
@@ -732,20 +736,21 @@ class UserServiceDB:
             # cur.execute(sql.SQL(value_query).format(sql.Identifier(seq_name)))
             cur.execute(value_query)
             last_value_new, is_called_new = cur.fetchone()  # type: ignore[misc]
+            last_value_new = int(last_value_new)
             if not self.dryrun:
                 conn.commit()
             else:
                 conn.rollback()
         except Exception as e:
             conn.rollback()
-            raise RuntimeError("Unable to reset 'users_id_seq'.") from e
+            raise RuntimeError(self.SEQ_RESET_ERR) from e
         else:
             next_seq = last_value_new + 1 if is_called_new else last_value_new
             self.logger.debug(
                 f"users_id_seq: {last_value_old} (is_called: {is_called_old})"
                 f" -> {last_value_new} (is_called: {is_called_new})"
             )
-            self.logger.info(f"Reset. Next user id: {next_seq}")
+            self.logger.info(self.SEQ_RESET_MSG % next_seq)
 
     def truncate_table(
         self,
@@ -763,7 +768,7 @@ class UserServiceDB:
 
         row = cur.fetchone()
         if row is None or not row[0]:
-            self.logger.info(f"Table not found: {table_name}. Skipping...")
+            self.logger.warning(self.TABLE_NOT_FOUND_MSG % table_name)
             return
 
         query = sql.SQL("TRUNCATE TABLE {tb} {restart} {cascade};").format(
@@ -781,9 +786,9 @@ class UserServiceDB:
                 conn.rollback()
         except Exception as e:
             conn.rollback()
-            raise RuntimeError("Unable to reset users_id_seq.") from e
+            raise RuntimeError(f"Unable to clear table: {table_name}") from e
         else:
-            self.logger.info(f"Table cleared: {table_name} ")
+            self.logger.info(f"Removed all rows from: {table_name}")
 
 
 # def initialize_db(

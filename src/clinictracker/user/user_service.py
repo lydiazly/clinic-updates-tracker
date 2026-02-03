@@ -55,6 +55,7 @@ CREATE_ONLY_MSG = "*** Create only (data fetching skipped) ***"
 CRUD_ONLY_MSG = "*** CRUD only (data fetching skipped) ***"
 SKIP_CREATION_MSG = "'--skip-creation' applied. Table creation skipped."
 FORGET_LAST_MSG = "'--forget-last' applied. Skipping last sent %s checking..."
+NO_RECORD_MSG = "'--no-record' applied. Skipping %s last sent records..."
 NO_TABLES_ERR = "One or more tables not exist."
 
 
@@ -123,9 +124,11 @@ class UserService:
                         _users.append(user)
                     else:
                         self.logger.info(
-                            f"Skipping {user.username}: Not enough time "
-                            f"passed since last send "
-                            f"(buffer: {pretty_time_delta(buffer)})"
+                            f"Skipping {user.username}: Sent within the last "
+                            f"{user.interval} days"
+                        )
+                        self.logger.debug(
+                            f"Last sent buffer: {pretty_time_delta(buffer)}"
                         )
 
         self.selected_users = _users
@@ -491,21 +494,31 @@ class UserService:
             try:
                 es.send(EmailParams(user, body_to_send))
             except Exception as e:
+                # If error occurs, go to next user
                 print_error(e, self.logger)
                 success = False
                 continue
-            else:
+
+            # Record last sent time and items after sending
+            if self.config.record:
                 self.db.record_sent_items(user, hashes_to_record, current_time)
                 self.db.update_last_sent_at(user, current_time)
-
-        if success:
-            if self.config.send:
-                self.logger.info("✓ All emails sent successfully.")
-                self.cleanup_after_sent()
             else:
-                return
-        else:
+                self.logger.debug(NO_RECORD_MSG % 'updating')
+
+        if not success:
             raise RuntimeError("Error during email sending.")
+
+        if not self.config.send:
+            return
+
+        self.logger.info("✓ All emails sent successfully.")
+
+        # Clean up old sent records after updating them
+        if self.config.record:
+            self.cleanup_after_sent()
+        else:
+            self.logger.debug(NO_RECORD_MSG % 'cleaning up')
 
     def process_user(self, user: User) -> _ContentToSend:
         """Filters data for a user and constructs the email body.
@@ -638,7 +651,7 @@ async def run_service(
                 # Initialize email service
                 es = EmailService(logger)
 
-                # Prepare data and send to all users (cleanup after sent)
+                # Prepare data and send to all users (cleanup after sending)
                 await us.fetch_data_and_send(es)
 
             # Save User objects to JSON -------------------------------|

@@ -53,7 +53,7 @@ docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
   -e PGSERVICE=prod --rm clinic-test:$tag --forget-last  # ✓
 docker run -it --name clinic-test --env-file .env.test --env-file .secrets \
-  -e PGSERVICE=prod --rm clinic-test:$tag --forget-last --send  # ✓
+  -e PGSERVICE=prod --rm clinic-test:$tag --forget-last --send --no-record  # ✓
 
 #----------------------------------------------------------------------|
 # Compose

@@ -62,7 +62,7 @@ async def test_page(caplog):
         assert len(caplog.records) >= 13
         assert "Options: {'headless':" in caplog.records[0].message
         assert caplog.records[1].message == TASK_START_MSG.format(
-            start=1, end=1, total=1
+            tasks="task 1", total=1
         )
         assert INVALID_CITY_MSG.format(city=city) in caplog.records[3].message
         assert full_url in caplog.records[4].message

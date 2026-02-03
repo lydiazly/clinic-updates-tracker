@@ -12,7 +12,17 @@ on:
   workflow_dispatch:
     inputs:
       test_mode:
-        description: 'Test mode (--forget-last)'
+        description: 'Test mode (add [TEST] in email subject)'
+        required: false
+        type: boolean
+        default: false
+      forget_last:
+        description: 'Ignore last sent'
+        required: false
+        type: boolean
+        default: false
+      send_emails:
+        description: 'Send emails, otherwise preview'
         required: false
         type: boolean
         default: false
@@ -32,7 +42,8 @@ jobs:
 
     env:
       TEST_MODE: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
-      FORGET_LAST: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
+      FORGET_LAST: ${{ github.event.inputs.forget_last == 'true' && 'true' || 'false' }}
+      SEND_EMAILS: ${{ github.event.inputs.send_emails == 'true' && 'true' || 'false' }}
       MAX_ITEMS_MIN: ${{ github.event.inputs.test_mode == 'true' && '1' || vars.MAX_ITEMS_MIN }}
 
     steps:
@@ -42,6 +53,8 @@ jobs:
           echo "*** Debug Mode ***"
           echo "github.event.inputs.test_mode: '${{ github.event.inputs.test_mode }}'"
           echo "                env.TEST_MODE: '${{ env.TEST_MODE }}'"
+          echo "              env.FORGET_LAST: '${{ env.FORGET_LAST }}'"
+          echo "              env.SEND_EMAILS: '${{ env.SEND_EMAILS }}'"
           echo "           vars.MAX_ITEMS_MIN: '${{ vars.MAX_ITEMS_MIN }}'"
           echo "            env.MAX_ITEMS_MIN: '${{ env.MAX_ITEMS_MIN }}'"
           echo "         vars.TARGET_BASE_URL: '${{ vars.TARGET_BASE_URL }}'"
@@ -104,10 +117,13 @@ jobs:
             --tz "${{ vars.TARGET_TZ }}"
             --retries ${{ vars.RETRIES }}
             --skip-creation
-            --send
           )
+          if [ "${{ env.SEND_EMAILS }}" = 'true' ]; then
+            args+=(--send)
+          fi
           if [ "${{ env.FORGET_LAST }}" = 'true' ]; then
             args+=(--forget-last)
+            args+=(--no-record)
           fi
 
           uv run clinictracker-user "${args[@]}"

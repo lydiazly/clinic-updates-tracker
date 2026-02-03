@@ -21,22 +21,12 @@ from clinictracker.user.helpers import (
 
 load_dotenv()
 
+# If true, add [TEST] in email subject
+TEST_MODE: bool = os.getenv('TEST_MODE', 'false').strip().lower() == 'true'
+
 DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'false').strip().lower() == 'true'
 SEND_EMAILS: bool = os.getenv('SEND_EMAILS', 'false').strip().lower() == 'true'
 
-PGSERVICEFILE: str = os.getenv('PGSERVICEFILE', '').strip()
-PGSERVICE_PATH: Path = (
-    Path(PGSERVICEFILE).expanduser()
-    if PGSERVICEFILE
-    else (Path.home() / 'pg_service.conf')
-)
-
-PGPASSFILE: str = os.getenv('PGPASSFILE', '').strip()
-PGPASS_PATH: Path = (
-    Path(PGPASSFILE).expanduser() if PGPASSFILE else (Path.home() / '.pgpass')
-)
-
-PGSERVICE: str = os.getenv('PGSERVICE', APP_ENV).strip() or 'dev-local'
 
 SECRETS_PATH: Path = Path(os.getenv('SECRETS_PATH', '.secrets').strip())
 
@@ -60,6 +50,23 @@ class ServiceName(StrEnum):
     DEV = auto()
     DEV_LOCAL = 'dev-local'
     PROD = auto()
+
+
+PGSERVICEFILE: str = os.getenv('PGSERVICEFILE', '').strip()
+PGSERVICE_PATH: Path = (
+    Path(PGSERVICEFILE).expanduser()
+    if PGSERVICEFILE
+    else (Path.home() / 'pg_service.conf')
+)
+
+PGPASSFILE: str = os.getenv('PGPASSFILE', '').strip()
+PGPASS_PATH: Path = (
+    Path(PGPASSFILE).expanduser() if PGPASSFILE else (Path.home() / '.pgpass')
+)
+
+PGSERVICE: str = (
+    os.getenv('PGSERVICE', APP_ENV).strip() or ServiceName.DEV_LOCAL.value
+)
 
 
 class TableName(StrEnum):
@@ -122,6 +129,7 @@ class ServiceConfig(Config):
         crud_only (bool): Exit after CRUD operations on users
         send (bool): Send fetched data to users
         forget_last (bool): Skip checking last sent time and items
+        record (bool): Skip updating last sent time and items after sending
         usernames (list[str]): Only send to these users
         retries (int): Maximum retries if timeout
         dryrun (bool): Dry run for data management then exit
@@ -139,6 +147,7 @@ class ServiceConfig(Config):
     crud_only: bool
     send: bool
     forget_last: bool
+    record: bool
     usernames: list[str] | None
     retries: int
     dryrun: bool
@@ -208,6 +217,7 @@ def load_config_for_service(args: Namespace) -> ServiceConfig:
             and (args.send or SEND_EMAILS)
         ),
         forget_last=args.command is None and args.forget_last,
+        record=args.record,
         usernames=_usernames,
         retries=args.retries,
         dryrun=args.dry_run,

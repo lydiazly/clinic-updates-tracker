@@ -53,7 +53,7 @@ TEST_MSG = "*** Test only (no operation) ***"
 BROWSER_CLOSED_MSG = "Browser closed."
 NO_UPDATES_MSG = "No updates. No file exported."
 NO_EXPORT_MSG = "'--no-o' applied. No file exported."
-TASK_START_MSG = "==> Starting tasks {start}-{end} out of {total}..."
+TASK_START_MSG = "==> Starting {tasks} out of {total}..."
 TASK_TITLE = "Task {id}: {city}"
 INVALID_CITY_MSG = "'{city}' is not in '" + str(CITIES_JSON_PATH) + "'"
 
@@ -302,9 +302,7 @@ class PageManager:
             # Pause for a random interval
             await asyncio.sleep(random.uniform(1, 3))
 
-        self.logger.info(
-            f"[{city}] ✓ Collected {len(items)} updates from: {city}"
-        )
+        self.logger.info(f"[{city}] ✓ Collected {len(items)} updates.")
         return ListData(items=items, n_tot=n_tot, query=self.query)
 
     async def parse_item(self, item_locator: Locator) -> ItemData:
@@ -505,7 +503,12 @@ async def assign_and_gather_tasks(
     for batch in batched(range(task_num), BATCH_SIZE):
         logger.info(
             TASK_START_MSG.format(
-                start=batch[0] + 1, end=batch[-1] + 1, total=task_num
+                tasks=(
+                    f"tasks {batch[0] + 1}-{batch[-1] + 1}"
+                    if len(batch) > 1
+                    else f"task {batch[0] + 1}"
+                ),
+                total=task_num,
             )
         )
         async with asyncio.TaskGroup() as tg:

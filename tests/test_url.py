@@ -15,6 +15,7 @@ BASE_URL = "https://base_url"
     "sub, sub_url_expected",
     [
         ({'arg1': 'foo bar'}, "?arg1=foo+bar"),
+        ({'arg1': 'foo\'bar'}, "?arg1=foo%27bar"),
         ({'arg1': 'val1', 'arg2': 'val2'}, "?arg1=val1&arg2=val2"),
         ("sub_path", "/sub_path"),
         ("sub_path", "/sub_path"),

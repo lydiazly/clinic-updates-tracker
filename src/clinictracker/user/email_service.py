@@ -5,12 +5,16 @@ from dataclasses import dataclass
 from dotenv import load_dotenv, dotenv_values
 import json
 from logging import Logger
-import os
 import requests
 
 from clinictracker.startup import MyLogger, default_logger
 from clinictracker.user.models import User
-from clinictracker.user.config import SECRETS_PATH, UPDATE_URL, UNSUBSCRIBE_URL
+from clinictracker.user.config import (
+    TEST_MODE,
+    SECRETS_PATH,
+    UPDATE_URL,
+    UNSUBSCRIBE_URL,
+)
 
 
 SUBJECT = "Clinic Update Alerts"
@@ -60,9 +64,6 @@ class EmailService:
     ) -> None:
         self.logger: Logger | MyLogger = logger
         load_dotenv()
-        self.test: bool = (
-            os.getenv('TEST_MODE', 'false').strip().lower() == 'true'
-        )
         self.__secrets: dict[str, str | None] = dotenv_values(SECRETS_PATH)
         self.sender: str = self.__secrets.get('GMAIL_SENDER') or ''
         if not self.sender:
@@ -84,7 +85,7 @@ class EmailService:
         recipients: str = ', '.join(email_params.user.emails)
         body_content: str = email_params.body
         # Build subject
-        subject_prefix: str = " [TEST]" if self.test else ''
+        subject_prefix: str = " [TEST]" if TEST_MODE else ''
         subject_text: str = f"{subject_prefix} {SUBJECT}"
         # Create RFC 2822 message
         message: str = MESSAGE_TEMPLATE.format(
@@ -163,7 +164,7 @@ class EmailService:
         body_content: str = email_params.body
 
         # Build subject
-        subject_prefix: str = " [TEST]" if self.test else ''
+        subject_prefix: str = " [TEST]" if TEST_MODE else ''
         subject_text: str = f"{subject_prefix} {SUBJECT}"
         subject_encoded: str = base64.b64encode(
             subject_text.encode('utf-8')

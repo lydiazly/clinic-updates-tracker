@@ -42,7 +42,7 @@ async def test_chromium(caplog):
         # Check the log records more specifically
         assert len(caplog.records) >= 3
         assert caplog.records[0].message == TASK_START_MSG.format(
-            start=1, end=1, total=1
+            tasks="task 1", total=1
         )
         assert caplog.records[-2].message == TEST_MSG
         assert caplog.records[-1].message == BROWSER_CLOSED_MSG

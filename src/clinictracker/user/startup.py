@@ -323,6 +323,15 @@ def get_args_and_logger_for_service() -> (
         help=("Skip checking last sent time and items (default: false)"),
     )
     parser.add_argument(
+        '--no-record',
+        dest='record',
+        action='store_false',
+        help=(
+            "Do not update last sent time and items in database "
+            "(default: update them after sending)"
+        ),
+    )
+    parser.add_argument(
         '-u',
         '--usernames',
         nargs='+',
