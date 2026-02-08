@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 # tests/test_date.py
 # pytest tests/test_url.py -s
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.parser import parse, ParserError
 import logging
 import pytest
 from time import time
 
-from clinictracker.utils import is_date_within
+from clinictracker.utils import is_date_within, pretty_time_delta
 
 
 @pytest.mark.parametrize(
@@ -28,6 +28,20 @@ from clinictracker.utils import is_date_within
 def test_parse_datetime(datetime_str, expected_datetime):
     """Tests parsing strings."""
     assert parse(datetime_str) == expected_datetime
+
+
+@pytest.mark.parametrize(
+    "timedelta, expected_str",
+    [
+        (timedelta(seconds=86400), "1d00h00m00s"),
+        (timedelta(seconds=-86400), "-1d00h00m00s"),
+        (timedelta(seconds=3723.5), "01h02m03s"),
+        (timedelta(days=-1, hours=-2, minutes=-3, seconds=-4), "-1d02h03m04s"),
+    ],
+)
+def test_print_timedelta(timedelta, expected_str):
+    """Tests parsing strings."""
+    assert pretty_time_delta(timedelta) == expected_str
 
 
 @pytest.mark.parametrize(

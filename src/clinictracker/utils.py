@@ -315,7 +315,7 @@ def days_str(days: int | float) -> str:
 
 def pretty_time_delta(td: timedelta) -> str:
     """Pretty print a timedelta object in days, hours, minutes and seconds.
-    E.g., -1d2h3m4s
+    E.g., -1d02h03m04s, -03m04s, 4s
 
     Originally by @thatalextaylor
     https://gist.github.com/thatalextaylor/7408395
@@ -327,10 +327,10 @@ def pretty_time_delta(td: timedelta) -> str:
     hours, seconds = divmod(seconds, 3600)
     minutes, seconds = divmod(seconds, 60)
     if days > 0:
-        return '%s%dd%dh%dm%ds' % (sign, days, hours, minutes, seconds)
+        return '%s%dd%02dh%02dm%02ds' % (sign, days, hours, minutes, seconds)
     elif hours > 0:
-        return '%s%dh%dm%ds' % (sign, hours, minutes, seconds)
+        return '%s%02dh%02dm%02ds' % (sign, hours, minutes, seconds)
     elif minutes > 0:
-        return '%s%dm%ds' % (sign, minutes, seconds)
+        return '%s%02dm%02ds' % (sign, minutes, seconds)
     else:
         return '%s%ds' % (sign, seconds)
