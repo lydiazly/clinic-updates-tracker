@@ -21,8 +21,8 @@ on:
         required: false
         type: boolean
         default: false
-      send_emails:
-        description: 'Send emails, otherwise preview'
+      preview:
+        description: 'Preview emails without sending'
         required: false
         type: boolean
         default: false
@@ -43,7 +43,7 @@ jobs:
     env:
       TEST_MODE: ${{ github.event.inputs.test_mode == 'true' && 'true' || 'false' }}
       FORGET_LAST: ${{ github.event.inputs.forget_last == 'true' && 'true' || 'false' }}
-      SEND_EMAILS: ${{ github.event.inputs.send_emails == 'true' && 'true' || 'false' }}
+      SEND_EMAILS: ${{ github.event.inputs.preview == 'true' && 'false' || 'true' }}
       MAX_ITEMS_MIN: ${{ github.event.inputs.test_mode == 'true' && '1' || vars.MAX_ITEMS_MIN }}
 
     steps:
