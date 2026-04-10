@@ -181,7 +181,7 @@ def is_date_within(
             assuming at noon if no time specified (can be naive)
         days_back (int): number of days up to now
         ref_datetime (datetime): reference time to compare,
-            default to now (naive)
+            default to now (system's local timezone)
         tz (str): time zone of the target_date, default to local time zone
 
     Returns:
@@ -195,10 +195,11 @@ def is_date_within(
     ):
         raise ValueError("(is_date_within) Target date is missing.")
 
+    # Default to be the current time in the system's local timezone
     if ref_datetime is None:
         ref_datetime = datetime.now().astimezone()  # timezone-aware
 
-    # Prepare reference time ------------------------------------------|
+    # Prepare the reference time --------------------------------------|
     # Preset time (**adjust this if needed**)
     ref_time: time = time(12, 0, 0)
     # ref_time_str: str = ref_time.strftime('%H:%M:%S')
