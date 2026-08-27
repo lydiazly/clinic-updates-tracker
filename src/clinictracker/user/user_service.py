@@ -21,6 +21,7 @@ from clinictracker.user.config import (
     MAX_ITEMS_MIN,
     CLEANUP_BUFFER_DAYS,
     PGSERVICE,
+    TEST_MODE,
 )
 from clinictracker.startup import (
     MyLogger,
@@ -111,6 +112,8 @@ class UserService:
                     continue
                 if usernames is None or user.username in usernames:
                     _users.append(user)
+                    if TEST_MODE and len(_users) >= 1:
+                        break
         else:
             # Check if enough time has passed since last_sent_at
             current_time = datetime.now().astimezone()  # timezone-aware
@@ -122,6 +125,8 @@ class UserService:
                 if usernames is None or user.username in usernames:
                     if self.db.should_send_to_user(user, current_time, buffer):
                         _users.append(user)
+                        if TEST_MODE and len(_users) >= 1:
+                            break
                     else:
                         self.logger.info(
                             f"Skipping {user.username}: Sent within the last "

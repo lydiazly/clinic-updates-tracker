@@ -3,7 +3,7 @@
 [![Run](https://github.com/lydiazly/clinic-updates-tracker/actions/workflows/user-service.yml/badge.svg?branch=main)](https://github.com/lydiazly/clinic-updates-tracker/actions/workflows/user-service.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![python](https://img.shields.io/badge/Python-3.11|3.12-3776AB?logo=python&logoColor=white)](https://www.python.org)
-[![uv](https://img.shields.io/badge/uv-0.9.7-DE5FE9?logo=uv&logoColor=white)](https://www.python.org)
+[![uv](https://img.shields.io/badge/uv->=0.11.17-DE5FE9?logo=uv&logoColor=white)](https://www.python.org)
 [![playwright](https://img.shields.io/badge/Playwright->=0.7.1-44BA4C)](https://playwright.dev/python)
 
 A Python package for tracking updates across all clinics in specified regions from a target website.
@@ -23,32 +23,29 @@ A Python package for tracking updates across all clinics in specified regions fr
 
 ## Installation
 
-Install this module:
+> This guide is for local development.
+> **To subscribe the service, please contact the developer.**
+
+Clone the repository and install the package by [uv](https://docs.astral.sh/uv/):
 
 ```sh
-# Install from GitHub
-uv pip install git+https://github.com/lydiazly/clinic-updates-tracker.git
-# Installs: clinictracker
+git clone https://github.com/lydiazly/clinic-updates-tracker.git
+cd clinic-updates-tracker
+uv sync
 ```
 
-To uninstall:
-
-```sh
-uv pip uninstall clinictracker
-```
+`uv sync` installs two scripts to `.venv`: `clinictracker` and `clinictracker-user`
 
 ## Usage
 
-Use `uv run` if installed by uv.
-
 ```sh
-clinictracker
+uv run clinictracker
 ```
 
 Usage:
 
 ```sh
-clinictracker -h
+uv run clinictracker -h
 ```
 
 ```text
