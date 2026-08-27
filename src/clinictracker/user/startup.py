@@ -72,6 +72,8 @@ def user_parser_closure(
             match key:
                 case 'username':
                     user_dict[key] = value.lower()
+                case 'nickname':
+                    user_dict[key] = value
                 case 'emails':
                     user_dict[key] = [
                         trim_str(s).lower() for s in value.split(',')
