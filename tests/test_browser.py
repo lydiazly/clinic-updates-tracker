@@ -25,7 +25,13 @@ async def test_chromium(caplog):
         browser_name='chromium',
         headless_shell=headless_shell,
     )
-    query_dict = {'only_accepting': 'yes', 'list_town': 'Dummy'}
+    query_dict = {
+        'family_filter': 'accepting',
+        'service_id': '',
+        'show_family': 'Display Clinic List',
+        'search_radius': 5,
+        'list_town': 'Dummy',
+    }
     full_url = get_full_url(TARGET_BASE_URL, query_dict)
     query = QueryParams(
         url=full_url,

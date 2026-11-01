@@ -50,10 +50,13 @@ class QueryParams(NamedTuple):
 def load_query(args: Namespace) -> QueryParams:
     """Constructs query parameters."""
     # Constructs full target URL.
-    # Note: argument 'only_accepting' only affects the clinic table
+    # Note: argument 'family_filter' only affects the clinic table
     #       but not the update list
-    query_dict = ({'only_accepting': 'yes'} if not args.all else {}) | {
-        'list_town': args.city
+    query_dict = ({'family_filter': 'accepting'} if not args.all else {}) | {
+        'service_id': '',
+        'show_family': 'Display Clinic List',
+        'search_radius': 5,  # km, default: 10km
+        'list_town': args.city,
     }
     full_url = get_full_url(trim_str(args.url), query_dict)
     query = QueryParams(

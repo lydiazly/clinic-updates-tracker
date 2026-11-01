@@ -21,7 +21,12 @@ import traceback
 from types import TracebackType
 from typing import NamedTuple, Self, Literal
 
-from clinictracker.selectors import HomePageSelectors, DetailPageSelectors
+from clinictracker.selectors import (
+    HomePageSelectors,
+    DetailPageSelectors,
+    TITLE_PREFIX,
+    EMPTY_SIGN_PREFIX,
+)
 from clinictracker.config import (
     Config,
     RunConfig,
@@ -46,7 +51,6 @@ from clinictracker.utils import (
     print_content,
     is_date_within,
 )
-
 
 TIMEOUT_ERR = "Timeout loading %s after %gs."
 TEST_MSG = "*** Test only (no operation) ***"
@@ -119,17 +123,11 @@ class PageManager:
         except Exception as e:
             raise RuntimeError(f"Unable to load {url}.") from e
 
-    async def _find_empty_sign(self, locator: Locator) -> str:
-        try:
-            _empty_text: str = (
-                await locator.inner_text(timeout=TIMEOUT_UL)
-            ).strip()
-            return _empty_text
-        except TimeoutError:
-            _timeout = 2 * TIMEOUT_UL
-            raise TimeoutError(
-                TIMEOUT_ERR % ('updates', _timeout / 1000)
-            ) from None
+    async def _find_text(
+        self, locator: Locator, timeout: float | None = None
+    ) -> str:
+        """return (await locator.inner_text(timeout=timeout)).strip()"""
+        return (await locator.inner_text(timeout=timeout)).strip()
 
     async def extract_and_save_cities(self, page: Page) -> None:
         """Extracts the list of towns/cities and stores in a JSON."""
@@ -157,7 +155,7 @@ class PageManager:
                     'label': (
                         await option.get_attribute('value') or ''
                     ).strip(),
-                    'name': (await option.inner_text()).strip(),
+                    'name': await self._find_text(option),
                 }
                 for option in await options_locator.all()
             ]
@@ -184,6 +182,9 @@ class PageManager:
         days_back = self.query.days_back
         nmax = self.query.nmax
         tz = self.query.tz
+
+        n_tot: int = 0  # total number of updates on the page
+        items: list[ItemData] = []
 
         if not self.page:
             self.page = await self.open_page()
@@ -216,28 +217,58 @@ class PageManager:
         )
         empty_sign_locator = container_locator.locator(
             HomePageSelectors.EMPTY_SIGN
-        ).describe("No updates sign")
+        ).last.describe("No updates sign")
+        not_found_sign_locator = self.page.locator(
+            HomePageSelectors.NOT_FOUND_SIGN
+        ).last.describe("Not found sign")
 
         # Wait for the title to be loaded
+        # and look for "Starting town not found"
+        # and look for "There is no recent news/alerts for this town."
+        title_task = asyncio.create_task(
+            self._find_text(title_locator, TIMEOUT_PAGE)
+        )
+        not_found_task = asyncio.create_task(
+            self._find_text(not_found_sign_locator, TIMEOUT_PAGE)
+        )
+        empty_task = asyncio.create_task(
+            self._find_text(empty_sign_locator, TIMEOUT_PAGE)
+        )
+        # Wait for the first one to finish
+        _tasks = [title_task, not_found_task, empty_task]
         try:
-            _title = (await title_locator.inner_text()).strip()
-            self.task_logger.debug(f"Page title: {_title}")
-        except TimeoutError:
-            raise TimeoutError(
-                TIMEOUT_ERR % ('title', TIMEOUT_PAGE / 1000)
-            ) from None
+            _done, _pending = await asyncio.wait(
+                _tasks,
+                timeout=TIMEOUT_PAGE,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if not _done:
+                raise TimeoutError(
+                    TIMEOUT_ERR % ('result', TIMEOUT_PAGE / 1000)
+                ) from None
+
+            # Retrieve the result from the done set
+            _first_task = _done.pop()
+
+            _first_text = _first_task.result()
+            # If city/town not found or no result
+            if TITLE_PREFIX not in _first_text:
+                self.logger.warning(f"[{city}] {_first_text.splitlines()[-1]}")
+                return ListData(items=items, n_tot=n_tot, query=self.query)
+            if EMPTY_SIGN_PREFIX in _first_text:
+                self.logger.log(f"[{city}] {_first_text}")
+                return ListData(items=items, n_tot=n_tot, query=self.query)
+            # Print the title
+            self.task_logger.debug(f"Page title: {_first_text}")
+        finally:
+            # Cancel the remaining tasks
+            for _task in _tasks:
+                _task.cancel()
+            await asyncio.gather(*_tasks, return_exceptions=True)
 
         # Wait for the list title to be loaded
-        try:
-            _list_title = (await list_title_locator.inner_text()).strip()
-            self.task_logger.debug(f"List title: {_list_title}")
-        except TimeoutError:
-            raise TimeoutError(
-                TIMEOUT_ERR % ('list', TIMEOUT_PAGE / 1000)
-            ) from None
-
-        n_tot: int = 0  # total number of updates on the page
-        items: list[ItemData] = []
+        _list_title = await self._find_text(list_title_locator, TIMEOUT_PAGE)
+        self.task_logger.debug(f"List title: {_list_title}")
 
         # Wait for the list items to be loaded
         _timeout: bool = False
@@ -257,9 +288,10 @@ class PageManager:
             )
 
         if _timeout:
-            # Look for "There is no recent news/alerts for this town."
-            _empty_text = await self._find_empty_sign(empty_sign_locator)
-            self.logger.info(f"[{city}] {_empty_text}")
+
+            self.logger.info(
+                f"[{city}] {TIMEOUT_ERR % ('updates', _timeout / 1000)}"
+            )
             return ListData(items=items, n_tot=n_tot, query=self.query)
 
         # Get items and parse details
@@ -321,7 +353,7 @@ class PageManager:
             link_locator = item_locator.get_by_role('link').describe(
                 "Detail link"
             )
-            title = (await link_locator.inner_text()).strip()
+            title = await self._find_text(item_locator)
             url = (await link_locator.get_attribute('href')) or ''
         except Exception as e:
             raise RuntimeError(
@@ -389,8 +421,8 @@ class PageManager:
             self.task_logger.debug(
                 f"Detail page loaded in new tab: {new_page.url}"
             )
-            title = (await title_locator.inner_text()).strip()
-            date = (await date_locator.inner_text()).strip()
+            title = await self._find_text(title_locator)
+            date = await self._find_text(date_locator)
             content = sanitize_content(await content_locator.inner_html())
         except Exception:  # propagate to upper level
             raise

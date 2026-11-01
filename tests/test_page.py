@@ -16,9 +16,10 @@ from clinictracker.core import (
     INVALID_CITY_MSG,
 )
 from clinictracker.selectors import (
-    LIST_TITLE_PREFIX,
-    TITLE_PREFIX,
-    EMPTY_SIGN_PREFIX,
+    # LIST_TITLE_PREFIX,
+    # TITLE_PREFIX,
+    # EMPTY_SIGN_PREFIX,
+    NOT_FOUND_PREFIX,
 )
 
 
@@ -38,7 +39,13 @@ async def test_page(caplog):
         to_stdout=False,
         extract_cities=False,
     )
-    query_dict = {'only_accepting': 'yes', 'list_town': city}
+    query_dict = {
+        'family_filter': 'accepting',
+        'service_id': '',
+        'show_family': 'Display Clinic List',
+        'search_radius': 5,
+        'list_town': city,
+    }
     full_url = get_full_url(TARGET_BASE_URL, query_dict)
     query = QueryParams(
         url=full_url,
@@ -66,9 +73,10 @@ async def test_page(caplog):
         )
         assert INVALID_CITY_MSG.format(city=city) in caplog.records[3].message
         assert full_url in caplog.records[4].message
-        assert EMPTY_SIGN_PREFIX in caplog.records[5].message
+        # assert EMPTY_SIGN_PREFIX in caplog.records[5].message
+        assert NOT_FOUND_PREFIX in caplog.records[5].message
         assert task_title in caplog.records[7].message
-        assert f"{TITLE_PREFIX} {city}" in caplog.records[9].message
-        assert f"{LIST_TITLE_PREFIX} {city}" in caplog.records[10].message
+        # assert f"{TITLE_PREFIX} {city}" in caplog.records[9].message
+        # assert f"{LIST_TITLE_PREFIX} {city}" in caplog.records[10].message
         assert caplog.records[-3].message == NO_EXPORT_MSG
         assert caplog.records[-1].message == BROWSER_CLOSED_MSG

@@ -48,7 +48,7 @@ def test_selectors_home(page: Page):
         timeout=TIMEOUT
     )
     assert (
-        "Family Clinics in"
+        "Family Clinics near"
         in container.locator(HomePageSelectors.TITLE).inner_text()
     )
     # print(
@@ -86,6 +86,13 @@ def test_selectors_home(page: Page):
         timeout=TIMEOUT
     )
     assert text.inner_text() == "There is no recent news/alerts for this town."
+    # print("Text on landing page: " + text.inner_text())
+
+    text = page.locator(HomePageSelectors.NOT_FOUND_SIGN)
+    expect(text, "Text not found on landing page").to_be_visible(
+        timeout=TIMEOUT
+    )
+    assert text.inner_text() == "Starting town not found: non-existent"
     # print("Text on landing page: " + text.inner_text())
 
 

@@ -28,7 +28,7 @@ def test_get_full_url(sub, sub_url_expected):
 
 @pytest.mark.parametrize(
     "query, text_expected",
-    [({'list_town': 'Dummy'}, "Updates regarding %s")],
+    [({'list_town': 'Vancouver'}, "Updates regarding %s")],
 )
 def test_url(page: Page, query, text_expected):
     """Tests TARGET_BASE_URL."""

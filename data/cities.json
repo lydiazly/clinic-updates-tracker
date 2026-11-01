@@ -1,0 +1,558 @@
+{
+  "Mainland/Southwest/Sea to Sky": [
+    {
+      "label": "Abbotsford",
+      "name": "Abbotsford"
+    },
+    {
+      "label": "Agassiz",
+      "name": "Agassiz"
+    },
+    {
+      "label": "Aldergrove",
+      "name": "Aldergrove"
+    },
+    {
+      "label": "Burnaby",
+      "name": "Burnaby"
+    },
+    {
+      "label": "Chilliwack",
+      "name": "Chilliwack"
+    },
+    {
+      "label": "Coquitlam",
+      "name": "Coquitlam"
+    },
+    {
+      "label": "Delta",
+      "name": "Delta"
+    },
+    {
+      "label": "Hope",
+      "name": "Hope"
+    },
+    {
+      "label": "Langley",
+      "name": "Langley"
+    },
+    {
+      "label": "Lillooet",
+      "name": "Lillooet"
+    },
+    {
+      "label": "Maple Ridge",
+      "name": "Maple Ridge"
+    },
+    {
+      "label": "Mission",
+      "name": "Mission"
+    },
+    {
+      "label": "New Westminster",
+      "name": "New Westminster"
+    },
+    {
+      "label": "North Vancouver",
+      "name": "North Vancouver"
+    },
+    {
+      "label": "Pemberton",
+      "name": "Pemberton"
+    },
+    {
+      "label": "Pitt Meadows",
+      "name": "Pitt Meadows"
+    },
+    {
+      "label": "Port Moody",
+      "name": "Port Moody"
+    },
+    {
+      "label": "Port Coquitlam",
+      "name": "Port Coquitlam"
+    },
+    {
+      "label": "Richmond",
+      "name": "Richmond"
+    },
+    {
+      "label": "Squamish",
+      "name": "Squamish"
+    },
+    {
+      "label": "Surrey",
+      "name": "Surrey"
+    },
+    {
+      "label": "Whistler",
+      "name": "Whistler"
+    },
+    {
+      "label": "White Rock",
+      "name": "White Rock"
+    },
+    {
+      "label": "West Vancouver",
+      "name": "West Vancouver"
+    },
+    {
+      "label": "Vancouver",
+      "name": "Vancouver City"
+    }
+  ],
+  "South Island": [
+    {
+      "label": "Brentwood Bay",
+      "name": "Brentwood Bay"
+    },
+    {
+      "label": "Galiano",
+      "name": "Galiano"
+    },
+    {
+      "label": "Pender Island",
+      "name": "Pender Island"
+    },
+    {
+      "label": "Saanichton",
+      "name": "Saanichton"
+    },
+    {
+      "label": "Salt Spring Island",
+      "name": "Salt Spring Island"
+    },
+    {
+      "label": "Sidney",
+      "name": "Sidney"
+    },
+    {
+      "label": "Sooke",
+      "name": "Sooke"
+    },
+    {
+      "label": "Victoria",
+      "name": "Victoria"
+    }
+  ],
+  "Mid Island": [
+    {
+      "label": "Chemainus",
+      "name": "Chemainus"
+    },
+    {
+      "label": "Cobble Hill",
+      "name": "Cobble Hill"
+    },
+    {
+      "label": "Comox",
+      "name": "Comox"
+    },
+    {
+      "label": "Courtenay",
+      "name": "Courtenay"
+    },
+    {
+      "label": "Cumberland",
+      "name": "Cumberland"
+    },
+    {
+      "label": "Denman Island",
+      "name": "Denman Island"
+    },
+    {
+      "label": "Duncan",
+      "name": "Duncan"
+    },
+    {
+      "label": "Gabriola",
+      "name": "Gabriola"
+    },
+    {
+      "label": "Hornby Island",
+      "name": "Hornby Island"
+    },
+    {
+      "label": "Ladysmith",
+      "name": "Ladysmith"
+    },
+    {
+      "label": "Lake Cowichan",
+      "name": "Lake Cowichan"
+    },
+    {
+      "label": "Lantzville",
+      "name": "Lantzville"
+    },
+    {
+      "label": "Mill Bay",
+      "name": "Mill Bay"
+    },
+    {
+      "label": "Nanaimo",
+      "name": "Nanaimo"
+    },
+    {
+      "label": "Parksville",
+      "name": "Parksville"
+    },
+    {
+      "label": "Port Alberni",
+      "name": "Port Alberni"
+    },
+    {
+      "label": "Qualicum Beach",
+      "name": "Qualicum Beach"
+    },
+    {
+      "label": "Quathiaski Cove",
+      "name": "Quathiaski Cove"
+    },
+    {
+      "label": "Shawnigan Lake",
+      "name": "Shawnigan Lake"
+    },
+    {
+      "label": "Tofino",
+      "name": "Tofino"
+    },
+    {
+      "label": "Ucluelet",
+      "name": "Ucluelet"
+    }
+  ],
+  "North Island": [
+    {
+      "label": "Alert Bay",
+      "name": "Alert Bay"
+    },
+    {
+      "label": "Campbell River",
+      "name": "Campbell River"
+    },
+    {
+      "label": "Gold River",
+      "name": "Gold River"
+    },
+    {
+      "label": "Port Alice",
+      "name": "Port Alice"
+    },
+    {
+      "label": "Port Hardy",
+      "name": "Port Hardy"
+    },
+    {
+      "label": "Port McNeill",
+      "name": "Port McNeill"
+    }
+  ],
+  "Sunshine Coast": [
+    {
+      "label": "Gibsons",
+      "name": "Gibsons"
+    },
+    {
+      "label": "Powell River",
+      "name": "Powell River"
+    },
+    {
+      "label": "Sechelt",
+      "name": "Sechelt"
+    }
+  ],
+  "Thompson Okanagan": [
+    {
+      "label": "Armstrong",
+      "name": "Armstrong"
+    },
+    {
+      "label": "Ashcroft",
+      "name": "Ashcroft"
+    },
+    {
+      "label": "Beaverdell",
+      "name": "Beaverdell"
+    },
+    {
+      "label": "Chase",
+      "name": "Chase"
+    },
+    {
+      "label": "Clearwater",
+      "name": "Clearwater"
+    },
+    {
+      "label": "Enderby",
+      "name": "Enderby"
+    },
+    {
+      "label": "Kamloops",
+      "name": "Kamloops"
+    },
+    {
+      "label": "Kelowna",
+      "name": "Kelowna"
+    },
+    {
+      "label": "Keremeos",
+      "name": "Keremeos"
+    },
+    {
+      "label": "Lake Country",
+      "name": "Lake Country"
+    },
+    {
+      "label": "Logan Lake",
+      "name": "Logan Lake"
+    },
+    {
+      "label": "Merritt",
+      "name": "Merritt"
+    },
+    {
+      "label": "Okanagan Falls",
+      "name": "Okanagan Falls"
+    },
+    {
+      "label": "Oliver",
+      "name": "Oliver"
+    },
+    {
+      "label": "Osoyoos",
+      "name": "Osoyoos"
+    },
+    {
+      "label": "Penticton",
+      "name": "Penticton"
+    },
+    {
+      "label": "Princeton",
+      "name": "Princeton"
+    },
+    {
+      "label": "Revelstoke",
+      "name": "Revelstoke"
+    },
+    {
+      "label": "Salmon Arm",
+      "name": "Salmon Arm"
+    },
+    {
+      "label": "Summerland",
+      "name": "Summerland"
+    },
+    {
+      "label": "Sun Peaks",
+      "name": "Sun Peaks"
+    },
+    {
+      "label": "Vernon",
+      "name": "Vernon"
+    },
+    {
+      "label": "West Kelowna",
+      "name": "West Kelowna"
+    },
+    {
+      "label": "Westbank",
+      "name": "Westbank"
+    }
+  ],
+  "Kootenay": [
+    {
+      "label": "Castlegar",
+      "name": "Castlegar"
+    },
+    {
+      "label": "Christina Lake",
+      "name": "Christina Lake"
+    },
+    {
+      "label": "Cranbrook",
+      "name": "Cranbrook"
+    },
+    {
+      "label": "Crawford Bay",
+      "name": "Crawford Bay"
+    },
+    {
+      "label": "Creston",
+      "name": "Creston"
+    },
+    {
+      "label": "Elkford",
+      "name": "Elkford"
+    },
+    {
+      "label": "Fernie",
+      "name": "Fernie"
+    },
+    {
+      "label": "Fruitvale",
+      "name": "Fruitvale"
+    },
+    {
+      "label": "Golden",
+      "name": "Golden"
+    },
+    {
+      "label": "Grand Forks",
+      "name": "Grand Forks"
+    },
+    {
+      "label": "Greenwood",
+      "name": "Greenwood"
+    },
+    {
+      "label": "Invermere",
+      "name": "Invermere"
+    },
+    {
+      "label": "Kaslo",
+      "name": "Kaslo"
+    },
+    {
+      "label": "Kimberley",
+      "name": "Kimberley"
+    },
+    {
+      "label": "Nakusp",
+      "name": "Nakusp"
+    },
+    {
+      "label": "Nelson",
+      "name": "Nelson"
+    },
+    {
+      "label": "New Denver",
+      "name": "New Denver"
+    },
+    {
+      "label": "Rossland",
+      "name": "Rossland"
+    },
+    {
+      "label": "Salmo",
+      "name": "Salmo"
+    },
+    {
+      "label": "Sparwood",
+      "name": "Sparwood"
+    },
+    {
+      "label": "Trail",
+      "name": "Trail"
+    }
+  ],
+  "Cariboo & Northern BC": [
+    {
+      "label": "100 Mile House",
+      "name": "100 Mile House"
+    },
+    {
+      "label": "Burns Lake",
+      "name": "Burns Lake"
+    },
+    {
+      "label": "Chetwynd",
+      "name": "Chetwynd"
+    },
+    {
+      "label": "Daajing Giids",
+      "name": "Daajing Giids"
+    },
+    {
+      "label": "Dawson Creek",
+      "name": "Dawson Creek"
+    },
+    {
+      "label": "Fort Nelson",
+      "name": "Fort Nelson"
+    },
+    {
+      "label": "Fort St James",
+      "name": "Fort St James"
+    },
+    {
+      "label": "Fort St John",
+      "name": "Fort St John"
+    },
+    {
+      "label": "Fraser Lake",
+      "name": "Fraser Lake"
+    },
+    {
+      "label": "Gitlaxtaamiks",
+      "name": "Gitlaxtaamiks"
+    },
+    {
+      "label": "Hazelton",
+      "name": "Hazelton"
+    },
+    {
+      "label": "Houston",
+      "name": "Houston"
+    },
+    {
+      "label": "Hudson's Hope",
+      "name": "Hudson’s Hope"
+    },
+    {
+      "label": "Kitimat",
+      "name": "Kitimat"
+    },
+    {
+      "label": "Mackenzie",
+      "name": "Mackenzie"
+    },
+    {
+      "label": "Masset",
+      "name": "Masset"
+    },
+    {
+      "label": "Moberly Lake",
+      "name": "Moberly Lake"
+    },
+    {
+      "label": "Prince George",
+      "name": "Prince George"
+    },
+    {
+      "label": "Prince Rupert",
+      "name": "Prince Rupert"
+    },
+    {
+      "label": "Quesnel",
+      "name": "Quesnel"
+    },
+    {
+      "label": "Smithers",
+      "name": "Smithers"
+    },
+    {
+      "label": "Stewart",
+      "name": "Stewart"
+    },
+    {
+      "label": "Terrace",
+      "name": "Terrace"
+    },
+    {
+      "label": "Tumbler Ridge",
+      "name": "Tumbler Ridge"
+    },
+    {
+      "label": "Valemount",
+      "name": "Valemount"
+    },
+    {
+      "label": "Vanderhoof",
+      "name": "Vanderhoof"
+    },
+    {
+      "label": "Williams Lake",
+      "name": "Williams Lake"
+    }
+  ]
+}

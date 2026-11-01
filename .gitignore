@@ -1,4 +1,5 @@
-data/
+data/*
+!data/cities.json
 output/
 .pgpass
 .pg_password

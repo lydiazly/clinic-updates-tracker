@@ -181,7 +181,13 @@ class UserService:
 
     def set_params_per_city(self, city: str) -> QueryParams:
         """Sets query parameters for fetching full list in each city."""
-        query_dict = {'only_accepting': 'yes', 'list_town': city}
+        query_dict = {
+            'family_filter': 'accepting',
+            'service_id': '',
+            'show_family': 'Display Clinic List',
+            'search_radius': 5,
+            'list_town': city,
+        }
         full_url = get_full_url(self.config.url, query_dict)
         return QueryParams(
             url=full_url,
