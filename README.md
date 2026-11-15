@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![python](https://img.shields.io/badge/Python-3.11|3.12-3776AB?logo=python&logoColor=white)](https://www.python.org)
 [![uv](https://img.shields.io/badge/uv->=0.11.17-DE5FE9?logo=uv&logoColor=white)](https://www.python.org)
-[![playwright](https://img.shields.io/badge/Playwright->=0.7.1-44BA4C)](https://playwright.dev/python)
+[![playwright](https://img.shields.io/badge/Playwright->=1.61.0-44BA4C)](https://playwright.dev/python)
 
 A Python package for tracking updates across all clinics in specified regions from a target website.
 
